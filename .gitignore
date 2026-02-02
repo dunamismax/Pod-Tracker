@@ -15,10 +15,15 @@ web-build/
 *.aab
 *.keystore
 *.jks
-# If you fully rely on Expo managed workflow, you may ignore native folders.
-# Otherwise keep them tracked after prebuild.
-# android/
-# ios/
+
+# Native builds (keep source files tracked)
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+ios/Pods/
+ios/Podfile.lock
+ios/build/
 
 # EAS
 .eas/build/
@@ -33,6 +38,7 @@ logs/
 Thumbs.db
 .vscode/
 .idea/
+.swc/
 
 # Env files
 .env
