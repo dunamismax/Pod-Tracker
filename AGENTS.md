@@ -35,6 +35,7 @@ It focuses on event-scoped planning, arrival, and real-time coordination.
   - EXPO_PUBLIC_SUPABASE_URL
   - EXPO_PUBLIC_SUPABASE_ANON_KEY
 - `.env.example` exists; never commit real secrets.
+- MCP servers: use the Supabase MCP server when you need to view or change project state, and use the Context7 MCP server to pull latest library documentation when up-to-date info is needed.
 
 ## Current setup
 
@@ -44,16 +45,22 @@ It focuses on event-scoped planning, arrival, and real-time coordination.
 - Query client: `src/lib/queryClient.ts`
 - Env validation: `src/lib/env.ts`
 - Supabase session hook: `src/hooks/use-supabase-session.ts`
+- Push token registration: `src/hooks/use-register-push-token.ts` (uses `expo-notifications`)
 - Supabase SQL bootstrap: `scripts/supabase-setup.sql` (run in Supabase SQL editor; idempotent)
   - Includes transactional RPCs: `create_pod_with_owner` and `accept_pod_invite`
   - Invite acceptance is restricted to the RPC path
+  - Includes `notifications` + `user_push_tokens` tables and Realtime publication for notifications
+- Edge Function: `supabase/functions/notify-event/index.ts` (delivers arrival/schedule notifications)
 - Supabase query hooks:
   - Pods: `src/features/pods/pods-queries.ts`
   - Events/attendance/checklist: `src/features/events/events-queries.ts`
   - Profiles: `src/features/profiles/profiles-queries.ts`
   - Invites (RPC accept): `src/features/invites/invites-queries.ts`
+  - Notifications: `src/features/notifications/notifications-queries.ts`
 - Auth screens: `app/auth.tsx`, `app/auth/callback.tsx`
 - Create flows: `app/create-pod.tsx`, `app/create-event.tsx`
+- Event detail/edit: `app/event/[id].tsx`, `app/event/edit/[id].tsx`
+- Notifications screen: `app/notifications.tsx`
 - Home and Pods tabs pull live data in `app/(tabs)/index.tsx` and `app/(tabs)/explore.tsx`.
 - Template components still exist in `src/components/` and can be pruned once replaced.
   - Invite tokens are generated server-side (see `scripts/supabase-setup.sql`).

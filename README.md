@@ -4,10 +4,10 @@ Gatherer is a lightweight, privacy-first coordination app for small groups who g
 
 ## Project next step
 
-- Run the latest `scripts/supabase-setup.sql` in the Supabase SQL editor (RPCs + tighter RLS).
-- Wire realtime updates for arrivals, RSVP changes, and checklist edits.
-- Add notification delivery for arrivals and schedule changes.
 - Add recurring pod schedules and role management UI.
+- Add event cancel flows and host controls.
+- Add notification preferences and quiet hours.
+- Add opt-in reminders and ETA/location sharing controls.
 
 ## What it is
 
@@ -33,6 +33,8 @@ This is not a social network. It is social infrastructure for recurring, real-li
 - Pod invites + pending invites flow (invite tokens are generated server-side)
 - Profile creation on sign-in + profile editing
 - Pod + event detail screens with RSVP/arrival/checklist editing
+- Event edit screen with schedule change notifications
+- In-app notifications + push notifications for arrivals and schedule changes
 - Dark theme via React Native Paper
 - Expo Router tab navigation
 - Supabase Query hooks for pods, events, attendance, checklist
@@ -41,8 +43,9 @@ This is not a social network. It is social infrastructure for recurring, real-li
 
 - Recurring pod schedules and roles management
 - Event history and richer attendance analytics
-- Realtime updates for arrivals and status changes
-- Notifications and reminders
+- Notification preferences and quiet hours
+- Event cancel flows and host controls
+- Presence/arrival timeline refinements
 
 ## Tech stack (current)
 
@@ -105,6 +108,14 @@ If you run `npm run android`, ensure the Android SDK is installed and `ANDROID_H
 Use `scripts/supabase-setup.sql` in the Supabase SQL editor to bootstrap or update the schema, RLS, and policies in one run (idempotent, non-destructive). This script also ensures `pod_invites.token` is server-generated and non-null.
 It also defines transactional RPCs for create pod + owner membership and accept invite + membership, and restricts invite acceptance to the RPC path.
 `scripts/supabase-setup.sql` is the source of truth for schema and policy changes.
+
+### Notifications
+
+Notifications are delivered via an Edge Function (`notify-event`) and stored in the `notifications` table. Push tokens are stored in `user_push_tokens`. To enable push + in-app notifications:
+
+1. Deploy the Edge Function and set the `SUPABASE_SERVICE_ROLE_KEY` secret in Supabase Edge Functions.
+2. Install `expo-notifications` in the client app.
+3. Ensure Realtime is enabled for the `notifications` table (the setup SQL includes the publication add).
 
 ## Contributing
 
