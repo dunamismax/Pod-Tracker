@@ -1,0 +1,45 @@
+# Node / package managers
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Expo / React Native
+.expo/
+dist/
+web-build/
+.expo-shared/
+*.ipa
+*.apk
+*.aab
+*.keystore
+*.jks
+# If you fully rely on Expo managed workflow, you may ignore native folders.
+# Otherwise keep them tracked after prebuild.
+# android/
+# ios/
+
+# EAS
+.eas/build/
+.eas/submit/
+
+# Logs
+logs/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Supabase
+supabase/.temp/
+supabase/.branches/
+supabase/.postgres/
