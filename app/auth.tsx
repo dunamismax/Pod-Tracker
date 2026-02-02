@@ -18,6 +18,8 @@ export default function AuthScreen() {
   const [status, setStatus] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
+  const [lastMagicLinkSentAt, setLastMagicLinkSentAt] = useState<number | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   const [displayName, setDisplayName] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -41,8 +43,23 @@ export default function AuthScreen() {
     setContactNotes(profileQuery.data.contact_notes ?? '');
   }, [profileQuery.data]);
 
+  useEffect(() => {
+    if (!lastMagicLinkSentAt) return;
+    const tick = () => {
+      const remainingMs = 60_000 - (Date.now() - lastMagicLinkSentAt);
+      const remaining = Math.max(0, Math.ceil(remainingMs / 1000));
+      setCooldownSeconds(remaining);
+      if (remaining === 0) {
+        setLastMagicLinkSentAt(null);
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [lastMagicLinkSentAt]);
+
   const handleMagicLink = async () => {
-    if (!email || emailError) return;
+    if (!email || emailError || lastMagicLinkSentAt) return;
     setIsSubmitting(true);
     setStatus(null);
 
@@ -52,9 +69,14 @@ export default function AuthScreen() {
     });
 
     if (error) {
-      setStatus(error.message);
+      if (error.status === 429) {
+        setStatus('Too many requests. Please wait a minute and try again.');
+      } else {
+        setStatus(error.message);
+      }
     } else {
       setStatus('Magic link sent. Check your email to finish signing in.');
+      setLastMagicLinkSentAt(Date.now());
     }
 
     setIsSubmitting(false);
@@ -126,8 +148,10 @@ export default function AuthScreen() {
             <Button
               mode="contained"
               onPress={handleMagicLink}
-              disabled={isSubmitting || isLoading || !email || emailError}>
-              Send magic link
+              disabled={
+                isSubmitting || isLoading || !email || emailError || Boolean(lastMagicLinkSentAt)
+              }>
+              {cooldownSeconds > 0 ? `Try again in ${cooldownSeconds}s` : 'Send magic link'}
             </Button>
           </Surface>
 
