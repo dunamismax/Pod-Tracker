@@ -69,6 +69,16 @@ create table if not exists pods (
   updated_at timestamptz not null default now()
 );
 
+-- Profiles: display names for members
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text,
+  full_name text,
+  email text,
+  avatar_url text,
+  updated_at timestamptz not null default now()
+);
+
 -- Pod memberships: who is in each pod
 create table if not exists pod_memberships (
   id uuid primary key default gen_random_uuid(),
@@ -137,6 +147,7 @@ create table if not exists pod_invites (
 ```sql
 create index if not exists idx_pod_memberships_pod on pod_memberships(pod_id);
 create index if not exists idx_pod_memberships_user on pod_memberships(user_id);
+create index if not exists idx_profiles_display_name on profiles(display_name);
 create index if not exists idx_events_pod on events(pod_id);
 create index if not exists idx_events_starts_at on events(starts_at);
 create index if not exists idx_event_attendance_event on event_attendance(event_id);
@@ -162,6 +173,11 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
+  create trigger profiles_set_updated_at before update on profiles
+  for each row execute procedure set_updated_at();
+exception when duplicate_object then null; end $$;
+
+do $$ begin
   create trigger events_set_updated_at before update on events
   for each row execute procedure set_updated_at();
 exception when duplicate_object then null; end $$;
@@ -180,6 +196,7 @@ Enable RLS and add policies so only pod members can read/write their pod data.
 
 ```sql
 alter table pods enable row level security;
+alter table profiles enable row level security;
 alter table pod_memberships enable row level security;
 alter table events enable row level security;
 alter table event_attendance enable row level security;
@@ -193,7 +210,8 @@ alter table pod_invites enable row level security;
 -- Pods: members can read pods they belong to
 create policy "pods_read" on pods
 for select using (
-  exists (
+  created_by = auth.uid()
+  or exists (
     select 1 from pod_memberships
     where pod_memberships.pod_id = pods.id
       and pod_memberships.user_id = auth.uid()
@@ -204,6 +222,17 @@ for select using (
 -- Pods: creators can insert
 create policy "pods_insert" on pods
 for insert with check (auth.uid() = created_by);
+
+-- Profiles: authenticated users can read display names
+create policy "profiles_read" on profiles
+for select using (auth.role() = 'authenticated');
+
+-- Profiles: users can insert/update their own profile
+create policy "profiles_insert" on profiles
+for insert with check (auth.uid() = id);
+
+create policy "profiles_update" on profiles
+for update using (auth.uid() = id);
 
 -- Pods: admins/owners can update
 create policy "pods_update" on pods

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
 
@@ -42,11 +42,59 @@ async function fetchPodsByUser(userId: string): Promise<PodSummary[]> {
     .filter((row): row is PodSummary => Boolean(row));
 }
 
+type CreatePodInput = {
+  userId: string;
+  name: string;
+  description?: string | null;
+  locationText?: string | null;
+};
+
+async function createPod({ userId, name, description, locationText }: CreatePodInput) {
+  const { data: pod, error: podError } = await supabase
+    .from('pods')
+    .insert({
+      name,
+      description: description ?? null,
+      location_text: locationText ?? null,
+      created_by: userId,
+    })
+    .select('id')
+    .single();
+
+  if (podError) {
+    throw podError;
+  }
+
+  const { error: membershipError } = await supabase.from('pod_memberships').insert({
+    pod_id: pod.id,
+    user_id: userId,
+    role: 'owner',
+    is_active: true,
+  });
+
+  if (membershipError) {
+    throw membershipError;
+  }
+
+  return pod.id;
+}
+
 export function usePodsByUser(userId?: string) {
   return useQuery({
     queryKey: podKeys.byUser(userId ?? 'anonymous'),
     queryFn: () => fetchPodsByUser(userId ?? ''),
     enabled: Boolean(userId),
     staleTime: 60_000,
+  });
+}
+
+export function useCreatePod() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createPod,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: podKeys.all });
+    },
   });
 }
