@@ -3,7 +3,7 @@
 This file gives fast context for AI agents working in this repo.
 
 ## Project summary
-Pod Tracker is a privacy-first coordination app for small, trusted groups who gather regularly.
+Gatherer is a privacy-first coordination app for small, trusted groups who gather regularly.
 It focuses on event-scoped planning, arrival, and real-time coordination.
 
 ## Tech stack
