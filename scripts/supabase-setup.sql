@@ -197,12 +197,12 @@ create index if not exists idx_invites_pod on pod_invites(pod_id);
 
 -- 5) Updated-at trigger
 create or replace function set_updated_at()
-returns trigger as 
+returns trigger as $$
 begin
   new.updated_at = now();
   return new;
 end;
- language plpgsql;
+$$ language plpgsql;
 
 DO $$ BEGIN
   create trigger pods_set_updated_at before update on pods
