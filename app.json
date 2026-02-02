@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Pod-Tracker",
-    "slug": "Pod-Tracker",
+    "name": "Gatherer",
+    "slug": "gatherer",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./src/assets/images/icon.png",
-    "scheme": "podtracker",
+    "scheme": "gatherer",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
