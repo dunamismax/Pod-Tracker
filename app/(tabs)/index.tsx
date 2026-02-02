@@ -115,6 +115,7 @@ export default function HomeScreen() {
         : profile?.display_name || fullName || profile?.email?.split('@')[0];
 
     return {
+      id: member.user_id,
       name: displayName ?? formatMemberLabel(member.user_id),
       status: arrivalLabels[member.arrival] ?? 'Not sure',
       eta:
@@ -240,7 +241,7 @@ export default function HomeScreen() {
             <Text variant="bodyMedium">No arrivals shared yet.</Text>
           ) : (
             arrivalBoard.map((member) => (
-              <View key={member.name} style={styles.arrivalRow}>
+              <View key={member.id} style={styles.arrivalRow}>
                 <Avatar.Text size={36} label={member.name.slice(0, 2).toUpperCase()} />
                 <View style={styles.arrivalMeta}>
                   <Text variant="bodyLarge">{member.name}</Text>

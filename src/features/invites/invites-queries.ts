@@ -26,10 +26,6 @@ const inviteKeys = {
   byPod: (podId: string) => [...inviteKeys.all, 'by-pod', podId] as const,
 };
 
-function createInviteToken() {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
 async function fetchInvitesForUser(userId: string, email: string | null): Promise<PodInvite[]> {
   if (!userId) return [];
 
@@ -79,7 +75,6 @@ async function createInvite({ podId, invitedEmail, invitedBy }: CreateInviteInpu
     pod_id: podId,
     invited_email: invitedEmail,
     invited_by: invitedBy,
-    token: createInviteToken(),
     status: 'pending',
   });
 

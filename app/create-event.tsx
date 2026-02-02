@@ -75,7 +75,10 @@ export default function CreateEventScreen() {
   const startsAtIso = toIsoString(startsAt);
   const endsAtIso = endsAt ? toIsoString(endsAt) : null;
   const startsAtError = !startsAtIso;
-  const endsAtError = Boolean(endsAt && !endsAtIso);
+  const endsAtInvalid = Boolean(endsAt && !endsAtIso);
+  const endsAtBeforeStart =
+    Boolean(endsAtIso && startsAtIso) && new Date(endsAtIso) < new Date(startsAtIso);
+  const endsAtError = endsAtInvalid || endsAtBeforeStart;
   const isWeb = Platform.OS === 'web';
 
   const handleStartChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -195,8 +198,11 @@ export default function CreateEventScreen() {
                   onChangeText={setEndsAt}
                   style={styles.input}
                 />
-                <HelperText type="error" visible={endsAtError}>
+                <HelperText type="error" visible={endsAtInvalid}>
                   Enter a valid end time (example: 2026-02-02T20:30).
+                </HelperText>
+                <HelperText type="error" visible={endsAtBeforeStart}>
+                  End time must be after the start time.
                 </HelperText>
               </>
             ) : (
@@ -224,9 +230,14 @@ export default function CreateEventScreen() {
                     Select a valid start time.
                   </HelperText>
                 ) : null}
-                {endsAtError ? (
-                  <HelperText type="error" visible={endsAtError}>
+                {endsAtInvalid ? (
+                  <HelperText type="error" visible={endsAtInvalid}>
                     Select a valid end time.
+                  </HelperText>
+                ) : null}
+                {endsAtBeforeStart ? (
+                  <HelperText type="error" visible={endsAtBeforeStart}>
+                    End time must be after the start time.
                   </HelperText>
                 ) : null}
                 {showStartPicker ? (

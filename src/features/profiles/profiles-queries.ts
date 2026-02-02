@@ -36,7 +36,7 @@ async function fetchProfiles(userIds: string[]): Promise<Profile[]> {
     .in('id', userIds);
 
   if (error) {
-    return [];
+    throw error;
   }
 
   return (data ?? []) as Profile[];
@@ -52,7 +52,7 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
     .maybeSingle();
 
   if (error) {
-    return null;
+    throw error;
   }
 
   return (data ?? null) as Profile | null;

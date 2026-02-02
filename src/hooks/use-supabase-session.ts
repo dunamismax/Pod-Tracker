@@ -37,10 +37,13 @@ export function useSupabaseSession(): SessionState {
   }, []);
 
   useEffect(() => {
-    const userId = session?.user?.id ?? null;
+    const user = session?.user ?? null;
+    const userId = user?.id ?? null;
     if (!userId || userId === lastProfileUserId.current) return;
     lastProfileUserId.current = userId;
-    ensureProfile(session?.user).catch(() => undefined);
+    ensureProfile(user).catch((error) => {
+      console.warn('Failed to ensure profile:', error);
+    });
   }, [session?.user]);
 
   return { session, user: session?.user ?? null, isLoading };

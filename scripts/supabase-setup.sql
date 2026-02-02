@@ -184,6 +184,15 @@ ALTER TABLE pod_invites ADD COLUMN IF NOT EXISTS token text;
 ALTER TABLE pod_invites ADD COLUMN IF NOT EXISTS expires_at timestamptz;
 ALTER TABLE pod_invites ADD COLUMN IF NOT EXISTS created_at timestamptz not null default now();
 
+-- Ensure invite tokens are server-generated and non-null
+UPDATE pod_invites
+SET token = encode(gen_random_uuid()::bytea, 'hex')
+WHERE token IS NULL;
+
+ALTER TABLE pod_invites
+  ALTER COLUMN token SET DEFAULT encode(gen_random_uuid()::bytea, 'hex'),
+  ALTER COLUMN token SET NOT NULL;
+
 -- 4) Indexes
 create index if not exists idx_pod_memberships_pod on pod_memberships(pod_id);
 create index if not exists idx_pod_memberships_user on pod_memberships(user_id);

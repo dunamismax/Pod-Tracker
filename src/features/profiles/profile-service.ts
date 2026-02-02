@@ -21,8 +21,8 @@ function pickDisplayName(user: User) {
   return null;
 }
 
-export async function ensureProfile(user: User) {
-  if (!user.id) return;
+export async function ensureProfile(user: User | null) {
+  if (!user?.id) return;
 
   const payload: ProfileUpsert = {
     id: user.id,
@@ -30,5 +30,8 @@ export async function ensureProfile(user: User) {
     display_name: pickDisplayName(user),
   };
 
-  await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
+  const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
+  if (error) {
+    throw error;
+  }
 }
