@@ -42,7 +42,11 @@ It focuses on event-scoped planning, arrival, and real-time coordination.
 - Supabase client: `src/lib/supabase.ts`
 - Query client: `src/lib/queryClient.ts`
 - Env validation: `src/lib/env.ts`
-- UI scaffolding lives in `app/(tabs)/index.tsx` and `app/(tabs)/explore.tsx`.
+- Supabase session hook: `src/hooks/use-supabase-session.ts`
+- Supabase query hooks:
+  - Pods: `src/features/pods/pods-queries.ts`
+  - Events/attendance/checklist: `src/features/events/events-queries.ts`
+- Home and Pods tabs now pull live data in `app/(tabs)/index.tsx` and `app/(tabs)/explore.tsx`.
 - Template components still exist in `src/components/` and can be pruned once replaced.
 
 ## Commands

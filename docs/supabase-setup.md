@@ -1,5 +1,7 @@
 # Supabase Setup Guide (Gatherer)
 
+> Note: All SQL commands below have been run for the current backend setup.
+
 This guide describes a clean, minimal Supabase schema for Gatherer and the recommended policies for a privacy-first, pod-scoped coordination app.
 
 ## Prerequisites

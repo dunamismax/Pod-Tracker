@@ -1,27 +1,41 @@
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Appbar, Button, Card, List, Surface, Text } from 'react-native-paper';
+import { ActivityIndicator, Appbar, Button, Card, List, Surface, Text } from 'react-native-paper';
 
-const pods = [
-  {
-    name: 'Northside Magic Pod',
-    members: 7,
-    next: 'Tonight · 7:00 PM',
-    status: '3 confirmed · 2 on the way',
-  },
-  {
-    name: 'Midweek Board Crew',
-    members: 5,
-    next: 'Wed · 6:30 PM',
-    status: 'Planning in progress',
-  },
-];
+import { useUpcomingEvents } from '@/features/events/events-queries';
+import { usePodsByUser } from '@/features/pods/pods-queries';
+import { useSupabaseSession } from '@/hooks/use-supabase-session';
 
-const upcoming = [
-  { title: 'D&D Session 12', when: 'Sat · 2:00 PM', place: 'Jules’ place' },
-  { title: 'Bouldering swap', when: 'Sun · 10:00 AM', place: 'Summit Gym' },
-];
+const roleLabels = {
+  owner: 'Owner',
+  admin: 'Admin',
+  member: 'Member',
+} as const;
+
+function formatEventTime(startsAt: string) {
+  const start = new Date(startsAt);
+  const dateLabel = new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(start);
+  const timeLabel = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(start);
+
+  return `${dateLabel} · ${timeLabel}`;
+}
 
 export default function ExploreScreen() {
+  const { user, isLoading: authLoading } = useSupabaseSession();
+  const podsQuery = usePodsByUser(user?.id);
+  const podIds = useMemo(() => podsQuery.data?.map((pod) => pod.id) ?? [], [podsQuery.data]);
+  const podNameById = useMemo(
+    () => new Map((podsQuery.data ?? []).map((pod) => [pod.id, pod.name])),
+    [podsQuery.data]
+  );
+  const eventsQuery = useUpcomingEvents(podIds);
+  const isLoading = authLoading || podsQuery.isLoading || eventsQuery.isLoading;
+  const pods = podsQuery.data ?? [];
+  const upcoming = eventsQuery.data ?? [];
+
   return (
     <View style={styles.screen}>
       <Appbar.Header elevated>
@@ -48,31 +62,46 @@ export default function ExploreScreen() {
 
         <Surface elevation={1} style={styles.surface}>
           <Text variant="titleMedium">Your pods</Text>
-          {pods.map((pod) => (
-            <List.Item
-              key={pod.name}
-              title={pod.name}
-              description={`${pod.members} members · ${pod.status}`}
-              right={() => (
-                <Text variant="labelSmall" style={styles.listMeta}>
-                  {pod.next}
-                </Text>
-              )}
-              left={(props) => <List.Icon {...props} icon="account-group" />}
-            />
-          ))}
+          {isLoading ? (
+            <ActivityIndicator />
+          ) : !user ? (
+            <Text variant="bodyMedium">Sign in to view your pods.</Text>
+          ) : pods.length === 0 ? (
+            <Text variant="bodyMedium">No pods yet. Create one to get started.</Text>
+          ) : (
+            pods.map((pod) => (
+              <List.Item
+                key={pod.id}
+                title={pod.name}
+                description={
+                  [pod.location_text, roleLabels[pod.role] ?? 'Member'].filter(Boolean).join(' · ')
+                }
+                left={(props) => <List.Icon {...props} icon="account-group" />}
+              />
+            ))
+          )}
         </Surface>
 
         <Surface elevation={1} style={styles.surface}>
           <Text variant="titleMedium">Upcoming across pods</Text>
-          {upcoming.map((event) => (
-            <List.Item
-              key={event.title}
-              title={event.title}
-              description={`${event.when} · ${event.place}`}
-              left={(props) => <List.Icon {...props} icon="calendar-star" />}
-            />
-          ))}
+          {isLoading ? (
+            <ActivityIndicator />
+          ) : !user ? (
+            <Text variant="bodyMedium">Sign in to see upcoming events.</Text>
+          ) : upcoming.length === 0 ? (
+            <Text variant="bodyMedium">No upcoming events yet.</Text>
+          ) : (
+            upcoming.map((event) => (
+              <List.Item
+                key={event.id}
+                title={event.title}
+                description={`${formatEventTime(event.starts_at)} · ${
+                  podNameById.get(event.pod_id) ?? 'Your pod'
+                }`}
+                left={(props) => <List.Icon {...props} icon="calendar-star" />}
+              />
+            ))
+          )}
           <Button mode="text" onPress={() => undefined}>
             See all events
           </Button>

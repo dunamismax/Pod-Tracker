@@ -4,7 +4,7 @@ Gatherer is a lightweight, privacy-first coordination app for small groups who g
 
 ## Project next step
 
-We are ready to wire the Home and Pods tabs to real Supabase data. Next: create the Supabase schema (see `docs/supabase-setup.md`), then implement TanStack Query hooks and replace mock data in the screens.
+Home and Pods tabs now pull real Supabase data with TanStack Query. Next: add auth UI (magic link/OAuth), then implement write actions (RSVP, checklist updates) and invalidate queries.
 
 ## What it is
 
@@ -22,17 +22,18 @@ This is not a social network. It is social infrastructure for recurring, real-li
 
 ## Features (current)
 
-- Home screen scaffold for the next gather (arrival board, checklist, quick actions)
-- Pods overview scaffold (pods list + upcoming events)
+- Home screen backed by Supabase (next event, arrival board, checklist, quick actions)
+- Pods overview backed by Supabase (pods list + upcoming events)
 - Dark theme via React Native Paper
 - Expo Router tab navigation
+- Supabase Query hooks for pods, events, attendance, checklist
 
 ## Roadmap (near-term)
 
 - Pod detail screens (members, roles, recurring schedule)
 - Event detail flow (RSVP, arrival status, checklist editing)
-- Supabase-backed data (pods, events, membership, invites)
-- Auth (magic link + OAuth)
+- Auth (magic link + OAuth) and session UI
+- Supabase mutations for RSVPs/checklists/invites
 - Realtime updates for arrivals and status changes
 - Notifications and reminders
 

@@ -43,6 +43,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1e6eed41-21b3-40eb-8c3f-a46f2745498e"
+      }
+    },
+    "owner": "dunamismaxs-organization"
   }
 }
