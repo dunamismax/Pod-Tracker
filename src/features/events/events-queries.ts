@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
 
@@ -86,6 +86,92 @@ async function fetchChecklist(eventId: string): Promise<ChecklistItem[]> {
   return (data ?? []) as ChecklistItem[];
 }
 
+type CreateEventInput = {
+  userId: string;
+  podId: string;
+  title: string;
+  description?: string | null;
+  startsAt: string;
+  endsAt?: string | null;
+  locationText?: string | null;
+};
+
+type UpdateRsvpInput = {
+  eventId: string;
+  userId: string;
+  rsvp: EventAttendanceRow['rsvp'];
+};
+
+type UpdateChecklistItemInput = {
+  eventId: string;
+  itemId: string;
+  state: ChecklistItem['state'];
+  note?: string | null;
+};
+
+async function updateRsvp({ eventId, userId, rsvp }: UpdateRsvpInput) {
+  const { error } = await supabase
+    .from('event_attendance')
+    .upsert(
+      {
+        event_id: eventId,
+        user_id: userId,
+        rsvp,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'event_id,user_id' }
+    );
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function updateChecklistItem({ itemId, state, note }: UpdateChecklistItemInput) {
+  const { error } = await supabase
+    .from('event_checklist_items')
+    .update({
+      state,
+      note: note ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', itemId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function createEvent({
+  userId,
+  podId,
+  title,
+  description,
+  startsAt,
+  endsAt,
+  locationText,
+}: CreateEventInput) {
+  const { data, error } = await supabase
+    .from('events')
+    .insert({
+      pod_id: podId,
+      title,
+      description: description ?? null,
+      starts_at: startsAt,
+      ends_at: endsAt ?? null,
+      location_text: locationText ?? null,
+      created_by: userId,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data.id;
+}
+
 export function useUpcomingEvents(podIds: string[]) {
   const normalized = normalizeIds(podIds);
 
@@ -112,5 +198,38 @@ export function useEventChecklist(eventId?: string) {
     queryFn: () => fetchChecklist(eventId ?? ''),
     enabled: Boolean(eventId),
     staleTime: 30_000,
+  });
+}
+
+export function useUpdateRsvp() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateRsvp,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: eventKeys.attendance(variables.eventId) });
+    },
+  });
+}
+
+export function useUpdateChecklistItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateChecklistItem,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: eventKeys.checklist(variables.eventId) });
+    },
+  });
+}
+
+export function useCreateEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: createEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: eventKeys.all });
+    },
   });
 }

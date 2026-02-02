@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, Appbar, Button, Card, List, Surface, Text } from 'react-native-paper';
 
 import { useUpcomingEvents } from '@/features/events/events-queries';
@@ -24,6 +25,7 @@ function formatEventTime(startsAt: string) {
 }
 
 export default function ExploreScreen() {
+  const router = useRouter();
   const { user, isLoading: authLoading } = useSupabaseSession();
   const podsQuery = usePodsByUser(user?.id);
   const podIds = useMemo(() => podsQuery.data?.map((pod) => pod.id) ?? [], [podsQuery.data]);
@@ -51,7 +53,7 @@ export default function ExploreScreen() {
             </Text>
           </Card.Content>
           <Card.Actions style={styles.cardActions}>
-            <Button mode="contained" icon="plus" onPress={() => undefined}>
+            <Button mode="contained" icon="plus" onPress={() => router.push('/create-pod')}>
               New pod
             </Button>
             <Button mode="outlined" icon="qrcode-scan" onPress={() => undefined}>

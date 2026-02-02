@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import {
   ActivityIndicator,
@@ -13,9 +13,17 @@ import {
   Text,
   useTheme,
 } from 'react-native-paper';
+import { useRouter } from 'expo-router';
 
-import { useEventAttendance, useEventChecklist, useUpcomingEvents } from '@/features/events/events-queries';
+import {
+  useEventAttendance,
+  useEventChecklist,
+  useUpcomingEvents,
+  useUpdateChecklistItem,
+  useUpdateRsvp,
+} from '@/features/events/events-queries';
 import { usePodsByUser } from '@/features/pods/pods-queries';
+import { useProfilesByIds } from '@/features/profiles/profiles-queries';
 import { useSupabaseSession } from '@/hooks/use-supabase-session';
 
 const arrivalLabels = {
@@ -29,6 +37,12 @@ const checklistIconByState = {
   open: 'checkbox-blank-circle-outline',
   done: 'checkbox-marked-circle-outline',
   blocked: 'alert-circle-outline',
+} as const;
+
+const checklistNextState = {
+  open: 'done',
+  done: 'blocked',
+  blocked: 'open',
 } as const;
 
 function formatMemberLabel(userId: string) {
@@ -57,6 +71,7 @@ function formatEventTime(startsAt: string, endsAt?: string | null) {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const theme = useTheme();
   const { user, isLoading: authLoading } = useSupabaseSession();
   const podsQuery = usePodsByUser(user?.id);
@@ -69,6 +84,18 @@ export default function HomeScreen() {
   const nextEvent = eventsQuery.data?.[0];
   const attendanceQuery = useEventAttendance(nextEvent?.id);
   const checklistQuery = useEventChecklist(nextEvent?.id);
+  const updateRsvp = useUpdateRsvp();
+  const updateChecklistItem = useUpdateChecklistItem();
+  const attendanceUserIds = useMemo(
+    () => (attendanceQuery.data ?? []).map((member) => member.user_id),
+    [attendanceQuery.data]
+  );
+  const profilesQuery = useProfilesByIds(attendanceUserIds);
+  const profileById = useMemo(
+    () => new Map((profilesQuery.data ?? []).map((profile) => [profile.id, profile])),
+    [profilesQuery.data]
+  );
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const nextEventDisplay = nextEvent
     ? {
@@ -79,32 +106,68 @@ export default function HomeScreen() {
       }
     : null;
 
-  const arrivalBoard = (attendanceQuery.data ?? []).map((member) => ({
-    name: formatMemberLabel(member.user_id),
-    status: arrivalLabels[member.arrival] ?? 'Not sure',
-    eta:
-      member.arrival === 'arrived'
-        ? 'Here'
-        : member.eta_minutes
-          ? `${member.eta_minutes} min`
-          : '—',
-  }));
+  const arrivalBoard = (attendanceQuery.data ?? []).map((member) => {
+    const profile = profileById.get(member.user_id);
+    const displayName =
+      member.user_id === user?.id
+        ? 'You'
+        : profile?.display_name || profile?.full_name || profile?.email?.split('@')[0];
+
+    return {
+      name: displayName ?? formatMemberLabel(member.user_id),
+      status: arrivalLabels[member.arrival] ?? 'Not sure',
+      eta:
+        member.arrival === 'arrived'
+          ? 'Here'
+          : member.eta_minutes
+            ? `${member.eta_minutes} min`
+            : '—',
+    };
+  });
 
   const checklist = (checklistQuery.data ?? []).map((item) => ({
+    id: item.id,
     label: item.label,
     detail: item.note ?? item.state.replace('_', ' '),
     icon: checklistIconByState[item.state] ?? checklistIconByState.open,
+    state: item.state,
   }));
 
   const isCoreLoading = authLoading || podsQuery.isLoading || eventsQuery.isLoading;
   const canRespond = Boolean(user && nextEvent);
+  const isUpdating = updateRsvp.isPending || updateChecklistItem.isPending;
+
+  const handleRsvp = (rsvp: 'yes' | 'no' | 'maybe') => {
+    if (!user || !nextEvent) return;
+    setActionMessage(null);
+    updateRsvp.mutate(
+      { eventId: nextEvent.id, userId: user.id, rsvp },
+      {
+        onSuccess: () => {
+          setActionMessage(rsvp === 'yes' ? "You're in." : "You're out.");
+        },
+        onError: (error) => {
+          setActionMessage(error instanceof Error ? error.message : 'Unable to update RSVP.');
+        },
+      }
+    );
+  };
+
+  const handleChecklistPress = (itemId: string, currentState: 'open' | 'done' | 'blocked') => {
+    if (!user || !nextEvent) return;
+    updateChecklistItem.mutate({
+      eventId: nextEvent.id,
+      itemId,
+      state: checklistNextState[currentState],
+    });
+  };
 
   return (
     <View style={styles.screen}>
       <Appbar.Header elevated>
         <Appbar.Content title="Gatherer" subtitle="Your next meet-up" />
         <Appbar.Action icon="bell-outline" onPress={() => undefined} />
-        <Appbar.Action icon="account-circle" onPress={() => undefined} />
+        <Appbar.Action icon="account-circle" onPress={() => router.push('/auth')} />
       </Appbar.Header>
       <ScrollView contentContainerStyle={styles.content}>
         <Text variant="titleLarge">Next gather</Text>
@@ -132,10 +195,16 @@ export default function HomeScreen() {
             )}
           </Card.Content>
           <Card.Actions style={styles.cardActions}>
-            <Button mode="outlined" disabled={!canRespond} onPress={() => undefined}>
+            <Button
+              mode="outlined"
+              disabled={!canRespond || isUpdating}
+              onPress={() => handleRsvp('no')}>
               Can&apos;t make it
             </Button>
-            <Button mode="contained" disabled={!canRespond} onPress={() => undefined}>
+            <Button
+              mode="contained"
+              disabled={!canRespond || isUpdating}
+              onPress={() => handleRsvp('yes')}>
               I&apos;m in
             </Button>
           </Card.Actions>
@@ -195,28 +264,41 @@ export default function HomeScreen() {
           ) : (
             checklist.map((item) => (
               <List.Item
-                key={item.label}
+                key={item.id}
                 title={item.label}
                 description={item.detail}
                 left={(props) => <List.Icon {...props} icon={item.icon} />}
+                onPress={
+                  canRespond && !isUpdating
+                    ? () => handleChecklistPress(item.id, item.state)
+                    : undefined
+                }
               />
             ))
           )}
-          <Button mode="text" disabled={!canRespond} onPress={() => undefined}>
-            Update checklist
+          <Button mode="text" disabled={!canRespond || isUpdating} onPress={() => undefined}>
+            Manage checklist
           </Button>
         </Surface>
 
         <Surface elevation={1} style={styles.surface}>
           <Text variant="titleMedium">Quick actions</Text>
           <View style={styles.actions}>
-            <Button icon="plus" mode="contained" onPress={() => undefined}>
+            <Button icon="plus" mode="contained" onPress={() => router.push('/create-event')}>
               Create event
+            </Button>
+            <Button icon="account-group" mode="outlined" onPress={() => router.push('/create-pod')}>
+              Create pod
             </Button>
             <Button icon="link-variant" mode="outlined" onPress={() => undefined}>
               Share invite
             </Button>
           </View>
+          {actionMessage ? (
+            <Text variant="bodySmall" style={{ color: theme.colors.primary }}>
+              {actionMessage}
+            </Text>
+          ) : null}
         </Surface>
       </ScrollView>
     </View>

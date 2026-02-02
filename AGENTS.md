@@ -23,7 +23,7 @@ It focuses on event-scoped planning, arrival, and real-time coordination.
   - src/lib/ : client helpers (env, Supabase, Query)
   - src/theme/ : theme tokens and Paper theme
   - src/components/ : shared UI
-  - src/features/ : domain modules (planned; not yet populated)
+  - src/features/ : domain modules (pods, events, profiles)
   - src/types/ : shared types (planned; not yet populated)
   - src/assets/ : images and app icons
 
@@ -46,7 +46,10 @@ It focuses on event-scoped planning, arrival, and real-time coordination.
 - Supabase query hooks:
   - Pods: `src/features/pods/pods-queries.ts`
   - Events/attendance/checklist: `src/features/events/events-queries.ts`
-- Home and Pods tabs now pull live data in `app/(tabs)/index.tsx` and `app/(tabs)/explore.tsx`.
+  - Profiles: `src/features/profiles/profiles-queries.ts`
+- Auth screens: `app/auth.tsx`, `app/auth/callback.tsx`
+- Create flows: `app/create-pod.tsx`, `app/create-event.tsx`
+- Home and Pods tabs pull live data in `app/(tabs)/index.tsx` and `app/(tabs)/explore.tsx`.
 - Template components still exist in `src/components/` and can be pruned once replaced.
 
 ## Commands
