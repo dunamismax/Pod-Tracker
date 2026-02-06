@@ -4,9 +4,38 @@ Gatherer is a lightweight, privacy-first coordination app for small groups who g
 
 ## Project next step
 
-- Add recurring pod schedules and role management UI.
-- Add notification preferences and quiet hours.
-- Add event history and richer attendance analytics.
+1. Pod admin permissions (backend first)
+   - Add transactional RPCs for:
+     - promoting/demoting members (`member` <-> `admin`)
+     - transferring ownership
+     - removing members from a pod
+     - deleting a pod (owner-only)
+   - Enforce role constraints in SQL/RLS:
+     - only owners can transfer ownership or delete pods
+     - owners/admins can manage members
+     - owners cannot be removed unless ownership is transferred first
+   - Keep `scripts/supabase-setup.sql` as the source of truth for all policy/RPC updates.
+
+2. Pod admin controls in app UI
+   - Add a pod "Manage members" screen for owners/admins.
+   - Show role badges and admin-only actions (promote, demote, remove).
+   - Add owner-only controls: transfer ownership and delete pod (with explicit confirmation).
+   - Hide or disable admin actions for non-admin members.
+
+3. Safety, auditing, and notification wiring
+   - Add in-app notifications for role changes, removals, ownership transfer, and pod deletion.
+   - Add soft-guard UX for destructive actions (typed confirm + irreversible warning).
+   - Add event logging metadata (who changed what, when) to support debugging and trust.
+
+4. Stabilize with tests and edge-case handling
+   - Add integration coverage for permission boundaries and failure modes.
+   - Verify no self-lockout scenarios (for example, last owner losing owner role).
+   - Validate query invalidation/refetch for member list and pod list after admin actions.
+
+5. After permissions are solid, continue product roadmap
+   - Recurring pod schedules
+   - Notification preferences and quiet hours
+   - Event history and richer attendance analytics
 
 ## What it is
 
