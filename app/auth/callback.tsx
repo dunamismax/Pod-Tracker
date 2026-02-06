@@ -4,95 +4,19 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { ActivityIndicator, Text } from 'react-native-paper';
 
-import { clearPendingMagicLinkEmail, getPendingMagicLinkEmail } from '@/lib/magic-link-state';
+import {
+  completeAuthFromParsed,
+  parseAuthParamsFromRouteParams,
+  parseAuthParamsFromUrl,
+  redactSensitiveAuthUrl,
+  type RouteAuthParams,
+} from '@/lib/auth-link';
 import { supabase } from '@/lib/supabase';
-
-type SupportedOtpType =
-  | 'signup'
-  | 'invite'
-  | 'magiclink'
-  | 'recovery'
-  | 'email_change'
-  | 'email';
-
-type AuthParams = {
-  code: string | null;
-  tokenHash: string | null;
-  token: string | null;
-  type: string | null;
-  accessToken: string | null;
-  refreshToken: string | null;
-  error: string | null;
-  errorCode: string | null;
-  errorDescription: string | null;
-};
-
-type RouteAuthParams = Record<
-  'code' | 'token_hash' | 'token' | 'type' | 'access_token' | 'refresh_token' | 'error' | 'error_code' | 'error_description',
-  string | string[] | undefined
->;
-
-function parseAuthParams(rawUrl: string): AuthParams {
-  const decodeValue = (value: string) => decodeURIComponent(value.replace(/\+/g, ' '));
-  const parseParamSegment = (segment: string) => {
-    const params = new Map<string, string>();
-    for (const pair of segment.split('&')) {
-      if (!pair) continue;
-      const separatorIndex = pair.indexOf('=');
-      const rawKey = separatorIndex >= 0 ? pair.slice(0, separatorIndex) : pair;
-      const rawValue = separatorIndex >= 0 ? pair.slice(separatorIndex + 1) : '';
-      const key = decodeValue(rawKey);
-      if (!key) continue;
-      params.set(key, decodeValue(rawValue));
-    }
-    return params;
-  };
-
-  const hashIndex = rawUrl.indexOf('#');
-  const queryIndex = rawUrl.indexOf('?');
-  const queryEnd = hashIndex >= 0 ? hashIndex : rawUrl.length;
-  const query =
-    queryIndex >= 0 && queryIndex < queryEnd ? rawUrl.slice(queryIndex + 1, queryEnd) : '';
-  const hash = hashIndex >= 0 ? rawUrl.slice(hashIndex + 1) : '';
-  const queryParams = parseParamSegment(query);
-  const hashParams = parseParamSegment(hash);
-
-  const getParam = (key: string) => queryParams.get(key) ?? hashParams.get(key);
-
-  return {
-    code: getParam('code'),
-    tokenHash: getParam('token_hash'),
-    token: getParam('token'),
-    type: getParam('type'),
-    accessToken: getParam('access_token'),
-    refreshToken: getParam('refresh_token'),
-    error: getParam('error'),
-    errorCode: getParam('error_code'),
-    errorDescription: getParam('error_description'),
-  };
-}
-
-function parseRouteParams(params: RouteAuthParams): AuthParams {
-  const pick = (value: string | string[] | undefined) =>
-    Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
-
-  return {
-    code: pick(params.code),
-    tokenHash: pick(params.token_hash),
-    token: pick(params.token),
-    type: pick(params.type),
-    accessToken: pick(params.access_token),
-    refreshToken: pick(params.refresh_token),
-    error: pick(params.error),
-    errorCode: pick(params.error_code),
-    errorDescription: pick(params.error_description),
-  };
-}
 
 export default function AuthCallbackScreen() {
   const router = useRouter();
   const url = Linking.useURL();
-  const routeParams = useLocalSearchParams<RouteAuthParams>();
+  const routeParams = useLocalSearchParams();
   const [message, setMessage] = useState('Finalizing your sign-in...');
   const processedUrlRef = useRef<Set<string>>(new Set());
 
@@ -101,84 +25,16 @@ export default function AuthCallbackScreen() {
     const setScreenMessage = (value: string) => {
       if (isMounted) setMessage(value);
     };
-    const redactSensitive = (value: string | null) =>
-      value?.replace(
-        /(token_hash|token|access_token|refresh_token|code)=([^&#]+)/g,
-        '$1=[redacted]'
-      ) ?? null;
 
-    const finalizeFromParsed = async (parsed: AuthParams) => {
-      const {
-        code,
-        tokenHash,
-        token,
-        type,
-        accessToken,
-        refreshToken,
-        error,
-        errorCode,
-        errorDescription,
-      } = parsed;
-
-      if (error || errorCode || errorDescription) {
-        setScreenMessage(errorDescription ?? errorCode ?? error ?? 'Unable to sign in.');
-        return true;
-      }
-
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          setScreenMessage(error.message);
-          return true;
-        }
-      } else if (type && (tokenHash || token)) {
-        const otpType = type as SupportedOtpType;
-        const tokenHashCandidate = tokenHash ?? token;
-        let { error } = await supabase.auth.verifyOtp({
-          token_hash: tokenHashCandidate,
-          type: otpType,
-        });
-
-        if (error && token) {
-          const pendingEmail = getPendingMagicLinkEmail();
-          if (pendingEmail) {
-            const verifyByEmail = await supabase.auth.verifyOtp({
-              email: pendingEmail,
-              token,
-              type: otpType,
-            });
-            error = verifyByEmail.error;
-          }
-        }
-
-        if (error) {
-          setScreenMessage(error.message);
-          return true;
-        }
-      } else if (accessToken && refreshToken) {
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (error) {
-          setScreenMessage(error.message);
-          return true;
-        }
-      } else {
+    const finalizeFromParsed = async (rawParams: ReturnType<typeof parseAuthParamsFromUrl>) => {
+      const result = await completeAuthFromParsed(rawParams);
+      if (!result.handled) {
         return false;
       }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        setScreenMessage('Sign-in link was opened, but no session was created. Request a new link.');
+      if (!result.sessionCreated) {
+        setScreenMessage(result.message ?? 'Unable to sign in.');
         return true;
       }
-
-      clearPendingMagicLinkEmail();
       router.replace('/');
       return true;
     };
@@ -186,7 +42,7 @@ export default function AuthCallbackScreen() {
     const finalizeFromUrl = async (rawUrl: string | null) => {
       if (!rawUrl || processedUrlRef.current.has(rawUrl)) return false;
       processedUrlRef.current.add(rawUrl);
-      return finalizeFromParsed(parseAuthParams(rawUrl));
+      return finalizeFromParsed(parseAuthParamsFromUrl(rawUrl));
     };
 
     const finalize = async () => {
@@ -198,7 +54,9 @@ export default function AuthCallbackScreen() {
         const finalizedInitial = await finalizeFromUrl(initialUrl);
         if (finalizedInitial) return;
 
-        const finalizedRouteParams = await finalizeFromParsed(parseRouteParams(routeParams));
+        const finalizedRouteParams = await finalizeFromParsed(
+          parseAuthParamsFromRouteParams(routeParams as RouteAuthParams)
+        );
         if (finalizedRouteParams) return;
 
         const {
@@ -210,8 +68,8 @@ export default function AuthCallbackScreen() {
           return;
         }
 
-        const redactedCurrent = redactSensitive(url);
-        const redactedInitial = redactSensitive(initialUrl);
+        const redactedCurrent = redactSensitiveAuthUrl(url);
+        const redactedInitial = redactSensitiveAuthUrl(initialUrl);
         setScreenMessage(
           `No auth data found in the link. URL: ${redactedCurrent ?? 'none'} | Initial URL: ${redactedInitial ?? 'none'}`
         );

@@ -26,7 +26,7 @@ This is not a social network. It is social infrastructure for recurring, real-li
 
 - Home screen backed by Supabase (next event, arrival board, checklist, quick actions)
 - Pods overview backed by Supabase (pods list + upcoming events)
-- Auth screens (magic link only) with callback handling
+- Auth screens (magic link only) with callback handling and pasted-link fallback
 - Create pod + create event flows (Supabase inserts)
 - RSVP + checklist updates (mutations + query invalidation)
 - Pod invites + pending invites flow (invite tokens are generated server-side)
@@ -95,6 +95,12 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 npm start
 ```
 
+For Expo Go on a physical iPhone, tunnel mode is usually the most reliable:
+
+```bash
+npm start -- --tunnel
+```
+
 ### Android setup note
 
 If you run `npm run android`, ensure the Android SDK is installed and `ANDROID_HOME` is set, and that `platform-tools` is on your PATH so `adb` is available.
@@ -104,6 +110,17 @@ If you run `npm run android`, ensure the Android SDK is installed and `ANDROID_H
 Use `scripts/supabase-setup.sql` in the Supabase SQL editor to bootstrap or update the schema, RLS, and policies in one run (idempotent, non-destructive). This script also ensures `pod_invites.token` is server-generated and non-null.
 It also defines transactional RPCs for create pod + owner membership and accept invite + membership, and restricts invite acceptance to the RPC path.
 `scripts/supabase-setup.sql` is the source of truth for schema and policy changes.
+
+### Magic link auth URL config (important)
+
+Magic links in this app use `Linking.createURL('auth/callback')` at runtime. In Expo Go this resolves to an `exp://.../--/auth/callback` URL, and in app builds it resolves to your app scheme callback.
+
+In Supabase Auth URL configuration, allow the callback URLs you use:
+
+1. `gatherer://auth/callback` (app scheme from `app.json`)
+2. Your current Expo Go callback URL shown by `Linking.createURL('auth/callback')` (typically `exp://.../--/auth/callback`)
+
+If a magic link opens in Safari and does not return to the app, the auth screen includes a pasted-link fallback: copy the full URL from Safari and use "Sign in from pasted URL".
 
 ### Notifications
 

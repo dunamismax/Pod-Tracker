@@ -6,6 +6,11 @@ import { Appbar, Button, HelperText, Surface, Text, TextInput, useTheme } from '
 
 import { useProfile, useUpsertProfile } from '@/features/profiles/profiles-queries';
 import { useSupabaseSession } from '@/hooks/use-supabase-session';
+import {
+  completeAuthFromParsed,
+  parseAuthParamsFromUrl,
+  redactSensitiveAuthUrl,
+} from '@/lib/auth-link';
 import { clearPendingMagicLinkEmail, setPendingMagicLinkEmail } from '@/lib/magic-link-state';
 import { supabase } from '@/lib/supabase';
 
@@ -21,6 +26,9 @@ export default function AuthScreen() {
   const [profileStatus, setProfileStatus] = useState<string | null>(null);
   const [lastMagicLinkSentAt, setLastMagicLinkSentAt] = useState<number | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [pastedMagicLinkUrl, setPastedMagicLinkUrl] = useState('');
+  const [pastedMagicLinkStatus, setPastedMagicLinkStatus] = useState<string | null>(null);
+  const [isFinalizingPastedMagicLink, setIsFinalizingPastedMagicLink] = useState(false);
 
   const [displayName, setDisplayName] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -66,6 +74,7 @@ export default function AuthScreen() {
 
     setIsSubmitting(true);
     setStatus(null);
+    setPastedMagicLinkStatus(null);
     setPendingMagicLinkEmail(normalizedEmail);
 
     const { error } = await supabase.auth.signInWithOtp({
@@ -81,11 +90,50 @@ export default function AuthScreen() {
         setStatus(error.message);
       }
     } else {
-      setStatus('Magic link sent. Check your email to finish signing in.');
+      setStatus(
+        'Magic link sent. Check your email to finish signing in. If it stays in Safari, paste the full URL below.'
+      );
       setLastMagicLinkSentAt(Date.now());
     }
 
     setIsSubmitting(false);
+  };
+
+  const handleFinalizePastedMagicLink = async () => {
+    if (!pastedMagicLinkUrl.trim()) return;
+
+    const normalizedUrl = pastedMagicLinkUrl.trim().replace(/^['"]|['"]$/g, '');
+    setStatus(null);
+    setPastedMagicLinkStatus(null);
+    setIsFinalizingPastedMagicLink(true);
+
+    try {
+      const parsed = parseAuthParamsFromUrl(normalizedUrl);
+      const result = await completeAuthFromParsed(parsed);
+
+      if (!result.handled) {
+        const redactedUrl = redactSensitiveAuthUrl(normalizedUrl);
+        setPastedMagicLinkStatus(
+          `No auth data found in pasted URL. Pasted URL: ${redactedUrl ?? 'none'}`
+        );
+        return;
+      }
+
+      if (!result.sessionCreated) {
+        setPastedMagicLinkStatus(result.message ?? 'Unable to finish sign-in from pasted URL.');
+        return;
+      }
+
+      setPastedMagicLinkUrl('');
+      setPastedMagicLinkStatus('Sign-in complete. Redirecting...');
+      router.replace('/');
+    } catch (error) {
+      setPastedMagicLinkStatus(
+        error instanceof Error ? error.message : 'Unable to finish sign-in from pasted URL.'
+      );
+    } finally {
+      setIsFinalizingPastedMagicLink(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -157,10 +205,45 @@ export default function AuthScreen() {
               mode="contained"
               onPress={handleMagicLink}
               disabled={
-                isSubmitting || isLoading || !email || emailError || Boolean(lastMagicLinkSentAt)
+                isSubmitting ||
+                isFinalizingPastedMagicLink ||
+                isLoading ||
+                !email ||
+                emailError ||
+                Boolean(lastMagicLinkSentAt)
               }>
               {cooldownSeconds > 0 ? `Try again in ${cooldownSeconds}s` : 'Send magic link'}
             </Button>
+
+            <TextInput
+              mode="outlined"
+              label="Paste magic link URL (fallback)"
+              value={pastedMagicLinkUrl}
+              onChangeText={setPastedMagicLinkUrl}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.input}
+            />
+            <Text variant="bodySmall" style={styles.caption}>
+              If Safari opens a long URL instead of returning to the app, copy that full URL and
+              paste it here.
+            </Text>
+            <Button
+              mode="outlined"
+              onPress={handleFinalizePastedMagicLink}
+              disabled={
+                isSubmitting ||
+                isFinalizingPastedMagicLink ||
+                isLoading ||
+                !pastedMagicLinkUrl.trim()
+              }>
+              {isFinalizingPastedMagicLink ? 'Finishing sign-in...' : 'Sign in from pasted URL'}
+            </Button>
+            {pastedMagicLinkStatus ? (
+              <Text variant="bodySmall" style={{ color: theme.colors.primary }}>
+                {pastedMagicLinkStatus}
+              </Text>
+            ) : null}
           </Surface>
 
           <Surface elevation={1} style={styles.surface}>
@@ -170,7 +253,10 @@ export default function AuthScreen() {
             ) : user ? (
               <>
                 <Text variant="bodyMedium">Signed in as {user.email ?? 'Unknown email'}.</Text>
-                <Button mode="contained" onPress={handleSignOut} disabled={isSubmitting}>
+                <Button
+                  mode="contained"
+                  onPress={handleSignOut}
+                  disabled={isSubmitting || isFinalizingPastedMagicLink}>
                   Sign out
                 </Button>
               </>

@@ -44,6 +44,7 @@ It focuses on event-scoped planning, arrival, and real-time coordination.
 - Providers are wired in `app/_layout.tsx` (Query + Paper).
 - Dark theme is enforced via `src/theme/paperTheme.ts`.
 - Supabase client: `src/lib/supabase.ts`
+- Auth link parser/finalizer: `src/lib/auth-link.ts`
 - Query client: `src/lib/queryClient.ts`
 - Env validation: `src/lib/env.ts`
 - Supabase session hook: `src/hooks/use-supabase-session.ts`
@@ -60,6 +61,7 @@ It focuses on event-scoped planning, arrival, and real-time coordination.
   - Invites (RPC accept): `src/features/invites/invites-queries.ts`
   - Notifications: `src/features/notifications/notifications-queries.ts`
 - Auth screens: `app/auth.tsx`, `app/auth/callback.tsx`
+  - Includes pasted-link fallback for Expo Go/Safari magic-link redirects
 - Create flows: `app/create-pod.tsx`, `app/create-event.tsx`
 - Event detail/edit: `app/event/[id].tsx`, `app/event/edit/[id].tsx`
 - Event cancel flow + host controls: `app/event/edit/[id].tsx`, `src/features/events/events-queries.ts`
@@ -72,6 +74,7 @@ It focuses on event-scoped planning, arrival, and real-time coordination.
 
 - Install: `npm install`
 - Run: `npm start`
+- Run (Expo Go on device): `npm start -- --tunnel`
 - Android: `npm run android`
 - iOS (Mac only): `npm run ios`
 - Web: `npm run web`
