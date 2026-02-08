@@ -200,6 +200,7 @@ Deno.serve(async (req) => {
 
     const eventTime = formatEventTime(eventRow.starts_at, eventRow.ends_at);
     const locationLabel = eventRow.location_text ?? "Location TBD";
+    const hasEtaMinutes = typeof payload.etaMinutes === "number";
 
     let title = "";
     let body = "";
@@ -215,7 +216,7 @@ Deno.serve(async (req) => {
       body = `${changeLabel} ${eventTime} · ${locationLabel}`;
     } else if (payload.type === "eta_update") {
       title = `${actorName} shared an ETA`;
-      body = payload.etaMinutes
+      body = hasEtaMinutes
         ? `${payload.etaMinutes} min to ${eventRow.title}`
         : `${actorName} updated their ETA.`;
     } else if (payload.type === "event_cancelled") {
@@ -223,7 +224,7 @@ Deno.serve(async (req) => {
       body = payload.cancelReason ? payload.cancelReason : `${actorName} canceled this event.`;
     } else {
       title = `${actorName} is ${buildArrivalLabel(payload.arrival)}`;
-      body = payload.etaMinutes
+      body = hasEtaMinutes
         ? `ETA ${payload.etaMinutes} min · ${eventRow.title}`
         : eventRow.title;
     }

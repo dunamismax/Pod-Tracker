@@ -425,9 +425,27 @@ export function useEventRealtime(eventId?: string) {
       )
       .subscribe();
 
+    const eventChannel = supabase
+      .channel(`event-${eventId}-details`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'events',
+          filter: `id=eq.${eventId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: eventKeys.byId(eventId) });
+          queryClient.invalidateQueries({ queryKey: eventKeys.all });
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(attendanceChannel);
       supabase.removeChannel(checklistChannel);
+      supabase.removeChannel(eventChannel);
     };
   }, [eventId, queryClient]);
 }
@@ -449,11 +467,12 @@ export function useUpdateArrival() {
   return useMutation({
     mutationFn: updateArrival,
     onSuccess: (_data, variables) => {
+      const hasEta = typeof variables.etaMinutes === 'number';
       queryClient.invalidateQueries({ queryKey: eventKeys.attendance(variables.eventId) });
       void notifyEvent({
         eventId: variables.eventId,
         actorId: variables.userId,
-        type: variables.etaMinutes ? 'eta_update' : 'arrival_update',
+        type: hasEta ? 'eta_update' : 'arrival_update',
         arrival: variables.arrival,
         etaMinutes: variables.etaMinutes ?? null,
       });
@@ -506,6 +525,7 @@ export function useUpdateEvent() {
     mutationFn: updateEvent,
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: eventKeys.byId(variables.eventId) });
+      queryClient.invalidateQueries({ queryKey: eventKeys.all });
       const changedFields = [
         typeof variables.startsAt !== 'undefined' ? 'starts_at' : null,
         typeof variables.endsAt !== 'undefined' ? 'ends_at' : null,

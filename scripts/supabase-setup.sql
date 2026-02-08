@@ -173,7 +173,7 @@ create table if not exists pod_invites (
   invited_user_id uuid references auth.users(id) on delete set null,
   invited_by uuid not null references auth.users(id) on delete restrict,
   status invite_status not null default 'pending',
-  token text not null unique default encode(gen_random_uuid()::bytea, 'hex'),
+  token text not null unique default encode(gen_random_bytes(16), 'hex'),
   expires_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -523,7 +523,7 @@ CREATE POLICY invites_read ON pod_invites
 FOR SELECT USING (
   is_pod_admin(pod_invites.pod_id, auth.uid())
   OR pod_invites.invited_user_id = auth.uid()
-  OR pod_invites.invited_email = (auth.jwt() ->> 'email')
+  OR lower(pod_invites.invited_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
 );
 
 DROP POLICY IF EXISTS invites_insert ON pod_invites;
@@ -599,13 +599,20 @@ begin
     raise exception 'Invite not found or already handled';
   end if;
 
+  if invite_row.expires_at is not null and invite_row.expires_at < now() then
+    update pod_invites
+    set status = 'expired'
+    where id = invite_row.id;
+    raise exception 'Invite expired';
+  end if;
+
   if invite_row.invited_user_id is not null and invite_row.invited_user_id <> auth.uid() then
     raise exception 'Invite not for this user';
   end if;
 
   if invite_row.invited_user_id is null
      and invite_row.invited_email is not null
-     and invite_row.invited_email <> (auth.jwt() ->> 'email') then
+     and lower(invite_row.invited_email) <> lower(coalesce(auth.jwt() ->> 'email', '')) then
     raise exception 'Invite not for this email';
   end if;
 

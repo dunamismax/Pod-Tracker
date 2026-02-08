@@ -148,7 +148,7 @@ export function HomePage() {
                 <span className="pill">
                   {member.arrival === 'arrived'
                     ? 'Here'
-                    : member.eta_minutes
+                    : member.eta_minutes !== null
                       ? `${member.eta_minutes} min`
                       : '-'}
                 </span>

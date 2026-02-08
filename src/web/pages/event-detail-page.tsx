@@ -66,12 +66,13 @@ export function EventDetailPage() {
 
   useEffect(() => {
     if (!currentAttendance) return;
-    setEtaInput(currentAttendance.eta_minutes ? String(currentAttendance.eta_minutes) : '');
+    setEtaInput(currentAttendance.eta_minutes !== null ? String(currentAttendance.eta_minutes) : '');
   }, [currentAttendance]);
 
   const parsedEta = Number(etaInput);
   const etaMinutes = etaInput.trim() ? parsedEta : null;
-  const etaError = etaInput.trim().length > 0 && (!Number.isFinite(parsedEta) || parsedEta < 0);
+  const etaError =
+    etaInput.trim().length > 0 && (!Number.isInteger(parsedEta) || parsedEta < 0);
   const podRole = useMemo(
     () => (eventQuery.data ? (podsQuery.data ?? []).find((pod) => pod.id === eventQuery.data?.pod_id)?.role : null),
     [eventQuery.data, podsQuery.data]
@@ -183,7 +184,11 @@ export function EventDetailPage() {
           ETA minutes
           <input
             className="input"
+            inputMode="numeric"
+            min={0}
             onChange={(event) => setEtaInput(event.target.value)}
+            step={1}
+            type="number"
             value={etaInput}
           />
         </label>
@@ -208,7 +213,11 @@ export function EventDetailPage() {
                 <p className="muted">{arrivalLabels[member.arrival] ?? 'Not sure'}</p>
               </div>
               <span className="pill">
-                {member.arrival === 'arrived' ? 'Here' : member.eta_minutes ? `${member.eta_minutes} min` : '-'}
+                {member.arrival === 'arrived'
+                  ? 'Here'
+                  : member.eta_minutes !== null
+                    ? `${member.eta_minutes} min`
+                    : '-'}
               </span>
             </li>
           ))}

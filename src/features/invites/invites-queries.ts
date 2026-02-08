@@ -42,6 +42,7 @@ const inviteKeys = {
 
 async function fetchInvitesForUser(userId: string, email: string | null): Promise<PodInvite[]> {
   if (!userId) return [];
+  const normalizedEmail = email?.trim().toLowerCase() ?? null;
 
   const query = supabase
     .from('pod_invites')
@@ -50,8 +51,8 @@ async function fetchInvitesForUser(userId: string, email: string | null): Promis
     )
     .eq('status', 'pending');
 
-  if (email) {
-    query.or(`invited_user_id.eq.${userId},invited_email.eq.${email}`);
+  if (normalizedEmail) {
+    query.or(`invited_user_id.eq.${userId},invited_email.eq.${normalizedEmail}`);
   } else {
     query.eq('invited_user_id', userId);
   }
@@ -90,11 +91,13 @@ type CreateInviteInput = {
 };
 
 async function createInvite({ podId, invitedEmail, invitedBy }: CreateInviteInput) {
+  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
   const { error } = await supabase.from('pod_invites').insert({
     pod_id: podId,
-    invited_email: invitedEmail,
+    invited_email: invitedEmail.trim().toLowerCase(),
     invited_by: invitedBy,
     status: 'pending',
+    expires_at: expiresAt,
   });
 
   if (error) {
