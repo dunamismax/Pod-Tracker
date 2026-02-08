@@ -242,6 +242,23 @@ ALTER TABLE pod_invites
   ALTER COLUMN token SET DEFAULT encode(gen_random_bytes(16), 'hex'),
   ALTER COLUMN token SET NOT NULL;
 
+-- Data integrity constraints (NOT VALID keeps migration safe for existing historical rows)
+DO $$ BEGIN
+  ALTER TABLE events
+    ADD CONSTRAINT events_ends_after_start_chk
+    CHECK (ends_at IS NULL OR ends_at >= starts_at) NOT VALID;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE event_attendance
+    ADD CONSTRAINT event_attendance_eta_nonnegative_chk
+    CHECK (eta_minutes IS NULL OR eta_minutes >= 0) NOT VALID;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
 -- 4) Indexes
 create index if not exists idx_pod_memberships_pod on pod_memberships(pod_id);
 create index if not exists idx_pod_memberships_user on pod_memberships(user_id);
@@ -328,6 +345,11 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   create trigger events_set_updated_at before update on events
+  for each row execute procedure set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  create trigger attendance_set_updated_at before update on event_attendance
   for each row execute procedure set_updated_at();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -439,11 +461,33 @@ FOR SELECT USING (
 
 DROP POLICY IF EXISTS attendance_upsert ON event_attendance;
 CREATE POLICY attendance_upsert ON event_attendance
-FOR INSERT WITH CHECK (auth.uid() = user_id);
+FOR INSERT WITH CHECK (
+  auth.uid() = user_id
+  AND EXISTS (
+    SELECT 1 FROM events
+    WHERE events.id = event_attendance.event_id
+      AND can_access_pod(events.pod_id, auth.uid())
+  )
+);
 
 DROP POLICY IF EXISTS attendance_update ON event_attendance;
 CREATE POLICY attendance_update ON event_attendance
-FOR UPDATE USING (auth.uid() = user_id);
+FOR UPDATE USING (
+  auth.uid() = user_id
+  AND EXISTS (
+    SELECT 1 FROM events
+    WHERE events.id = event_attendance.event_id
+      AND can_access_pod(events.pod_id, auth.uid())
+  )
+)
+WITH CHECK (
+  auth.uid() = user_id
+  AND EXISTS (
+    SELECT 1 FROM events
+    WHERE events.id = event_attendance.event_id
+      AND can_access_pod(events.pod_id, auth.uid())
+  )
+);
 
 DROP POLICY IF EXISTS checklist_read ON event_checklist_items;
 CREATE POLICY checklist_read ON event_checklist_items
@@ -532,7 +576,7 @@ FOR INSERT WITH CHECK (
   is_pod_admin(pod_invites.pod_id, auth.uid())
 );
 
--- Invites: invitees can mark their invite accepted
+-- Invites: admins/owners can update invite rows directly; invitees accept via RPC
 DROP POLICY IF EXISTS invites_update ON pod_invites;
 CREATE POLICY invites_update ON pod_invites
 FOR UPDATE USING (
