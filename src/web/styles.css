@@ -2,14 +2,15 @@
 
 :root {
   color-scheme: dark;
-  --bg: #11141a;
-  --panel: #171c25;
-  --panel-soft: #1b2230;
+  --bg: #101217;
+  --panel: #161a22;
+  --panel-soft: #1c2230;
   --text: #f6f7fb;
   --muted: #a8b1c4;
   --line: #2a3346;
-  --primary: #2fd0a8;
-  --primary-ink: #0c251f;
+  --primary: #c83914;
+  --primary-ink: #fff5f1;
+  --accent-blue: #3b5f8e;
   --danger: #ff6f6f;
 }
 
@@ -22,8 +23,8 @@ body {
   font-family: 'IBM Plex Sans', sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at 20% -10%, #243144 0%, transparent 42%),
-    radial-gradient(circle at 90% 0%, #2e2d44 0%, transparent 35%),
+    radial-gradient(circle at 16% -12%, #34212c 0%, transparent 42%),
+    radial-gradient(circle at 90% 0%, #1f2d43 0%, transparent 36%),
     var(--bg);
   min-height: 100vh;
 }
@@ -119,7 +120,7 @@ a {
 }
 
 .hero {
-  background: linear-gradient(120deg, rgba(47, 208, 168, 0.14), rgba(255, 255, 255, 0.03)), var(--panel);
+  background: linear-gradient(120deg, rgba(200, 57, 20, 0.2), rgba(59, 95, 142, 0.11)), var(--panel);
 }
 
 .section-header {
@@ -195,7 +196,7 @@ a {
 }
 
 .input:focus {
-  outline: 2px solid rgba(47, 208, 168, 0.45);
+  outline: 2px solid rgba(200, 57, 20, 0.5);
   outline-offset: 1px;
 }
 

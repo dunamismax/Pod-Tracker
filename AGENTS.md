@@ -4,8 +4,8 @@ This file gives fast context for AI agents working in this repo.
 
 ## Project summary
 
-Gatherer is a privacy-first web app for small, trusted groups who gather regularly.
-It focuses on event-scoped planning, arrival, and real-time coordination.
+Pod Tracker is a privacy-first web app for Magic: The Gathering pods and other tabletop groups.
+It focuses on event planning, attendance, and real-time session updates.
 
 ## Tech stack
 

@@ -27,7 +27,7 @@ export function PodsPage() {
     <div className="stack">
       <section className="panel">
         <h2>Pods</h2>
-        <p className="muted">Your trusted circles and their upcoming sessions.</p>
+        <p className="muted">Your MTG pods and other tabletop play groups.</p>
         <div className="actions">
           <Link className="btn btn-primary" to="/create-pod">
             New pod

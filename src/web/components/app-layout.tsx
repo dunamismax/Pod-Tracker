@@ -1,7 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 
 import { supabase } from '@/lib/supabase';
-import { clearPendingMagicLinkEmail } from '@/lib/magic-link-state';
 import { useSession } from '@/web/session-context';
 
 const navItems = [
@@ -19,7 +18,6 @@ export function AppLayout() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    clearPendingMagicLinkEmail();
     navigate('/auth');
   };
 
@@ -27,8 +25,8 @@ export function AppLayout() {
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">Gatherer</p>
-          <h1>Coordination for trusted groups</h1>
+          <p className="eyebrow">Pod Tracker</p>
+          <h1>MTG pod tracking for better game nights.</h1>
         </div>
         <div className="topbar-actions">
           {user ? <span className="pill">{user.email ?? 'Signed in'}</span> : null}

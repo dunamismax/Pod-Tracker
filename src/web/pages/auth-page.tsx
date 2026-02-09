@@ -1,14 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useProfile, useUpsertProfile } from '@/features/profiles/profiles-queries';
 import { supabase } from '@/lib/supabase';
-import { clearPendingMagicLinkEmail, setPendingMagicLinkEmail } from '@/lib/magic-link-state';
-import {
-  completeAuthFromParsed,
-  parseAuthParamsFromUrl,
-  redactSensitiveAuthUrl,
-} from '@/lib/auth-link';
 import { useSession } from '@/web/session-context';
 
 export function AuthPage() {
@@ -16,15 +10,16 @@ export function AuthPage() {
   const { user, isLoading } = useSession();
   const profileQuery = useProfile(user?.id);
   const upsertProfile = useUpsertProfile();
+
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [status, setStatus] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [profileStatus, setProfileStatus] = useState<string | null>(null);
-  const [lastMagicLinkSentAt, setLastMagicLinkSentAt] = useState<number | null>(null);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [codeSentToEmail, setCodeSentToEmail] = useState<string | null>(null);
+  const [lastCodeSentAt, setLastCodeSentAt] = useState<number | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
-  const [pastedMagicLinkUrl, setPastedMagicLinkUrl] = useState('');
-  const [pastedMagicLinkStatus, setPastedMagicLinkStatus] = useState<string | null>(null);
-  const [isFinalizingPastedMagicLink, setIsFinalizingPastedMagicLink] = useState(false);
+  const [profileStatus, setProfileStatus] = useState<string | null>(null);
 
   const [displayName, setDisplayName] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -34,8 +29,8 @@ export function AuthPage() {
   const [contactHandle, setContactHandle] = useState('');
   const [contactNotes, setContactNotes] = useState('');
 
-  const redirectTo = useMemo(() => `${window.location.origin}/auth/callback`, []);
   const emailError = email.length > 0 && !email.includes('@');
+  const codeError = code.length > 0 && code.trim().length < 6;
   const firstNameError = firstName.trim().length === 0;
   const lastNameError = lastName.trim().length === 0;
   const contactEmailError = contactEmail.length > 0 && !contactEmail.includes('@');
@@ -52,86 +47,74 @@ export function AuthPage() {
   }, [profileQuery.data]);
 
   useEffect(() => {
-    if (!lastMagicLinkSentAt) return;
+    if (!lastCodeSentAt) return;
     const tick = () => {
-      const remainingMs = 60_000 - (Date.now() - lastMagicLinkSentAt);
+      const remainingMs = 60_000 - (Date.now() - lastCodeSentAt);
       const remaining = Math.max(0, Math.ceil(remainingMs / 1000));
       setCooldownSeconds(remaining);
-      if (remaining === 0) setLastMagicLinkSentAt(null);
+      if (remaining === 0) setLastCodeSentAt(null);
     };
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
-  }, [lastMagicLinkSentAt]);
+  }, [lastCodeSentAt]);
 
-  const handleMagicLink = async () => {
-    if (!email || emailError || lastMagicLinkSentAt) return;
+  const handleSendCode = async () => {
+    if (!email || emailError || lastCodeSentAt) return;
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) return;
 
-    setIsSubmitting(true);
+    setIsSendingCode(true);
     setStatus(null);
-    setPastedMagicLinkStatus(null);
-    setPendingMagicLinkEmail(normalizedEmail);
 
     const { error } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
-      options: { emailRedirectTo: redirectTo },
+      options: { shouldCreateUser: true },
     });
 
     if (error) {
-      clearPendingMagicLinkEmail();
       setStatus(error.status === 429 ? 'Too many requests. Wait a minute and try again.' : error.message);
     } else {
-      setStatus('Magic link sent. If callback fails, paste the full URL below.');
-      setLastMagicLinkSentAt(Date.now());
+      setCodeSentToEmail(normalizedEmail);
+      setStatus(`Code sent to ${normalizedEmail}. Enter it below to sign in.`);
+      setLastCodeSentAt(Date.now());
     }
 
-    setIsSubmitting(false);
+    setIsSendingCode(false);
   };
 
-  const handleFinalizePastedMagicLink = async () => {
-    if (!pastedMagicLinkUrl.trim()) return;
-    const normalizedUrl = pastedMagicLinkUrl.trim().replace(/^['"]|['"]$/g, '');
+  const handleVerifyCode = async () => {
+    const normalizedEmail = codeSentToEmail ?? email.trim().toLowerCase();
+    if (!normalizedEmail || !code.trim() || emailError || codeError) return;
 
+    setIsVerifyingCode(true);
     setStatus(null);
-    setPastedMagicLinkStatus(null);
-    setIsFinalizingPastedMagicLink(true);
 
-    try {
-      const parsed = parseAuthParamsFromUrl(normalizedUrl);
-      const result = await completeAuthFromParsed(parsed);
-      if (!result.handled) {
-        const redactedUrl = redactSensitiveAuthUrl(normalizedUrl);
-        setPastedMagicLinkStatus(`No auth data found in pasted URL: ${redactedUrl ?? 'none'}`);
-        return;
-      }
-      if (!result.sessionCreated) {
-        setPastedMagicLinkStatus(result.message ?? 'Unable to finish sign-in from pasted URL.');
-        return;
-      }
-      setPastedMagicLinkUrl('');
-      setPastedMagicLinkStatus('Sign-in complete. Redirecting...');
+    const { error } = await supabase.auth.verifyOtp({
+      email: normalizedEmail,
+      token: code.trim(),
+      type: 'email',
+    });
+
+    if (error) {
+      setStatus(error.message);
+    } else {
+      setCode('');
+      setStatus('Sign-in complete. Redirecting...');
       navigate('/');
-    } catch (error) {
-      setPastedMagicLinkStatus(
-        error instanceof Error ? error.message : 'Unable to finish sign-in from pasted URL.'
-      );
-    } finally {
-      setIsFinalizingPastedMagicLink(false);
     }
+
+    setIsVerifyingCode(false);
   };
 
   const handleSignOut = async () => {
-    setIsSubmitting(true);
+    setIsSendingCode(true);
     setStatus(null);
     const { error } = await supabase.auth.signOut();
     if (error) {
       setStatus(error.message);
-    } else {
-      clearPendingMagicLinkEmail();
     }
-    setIsSubmitting(false);
+    setIsSendingCode(false);
   };
 
   const handleSaveProfile = async () => {
@@ -159,7 +142,7 @@ export function AuthPage() {
     <div className="stack">
       <section className="panel">
         <h2>Sign in</h2>
-        <p className="muted">Magic link only.</p>
+        <p className="muted">Email + one-time code.</p>
         <label className="field">
           Email
           <input
@@ -172,36 +155,30 @@ export function AuthPage() {
         {emailError ? <p className="error">Enter a valid email address.</p> : null}
         <button
           className="btn btn-primary"
-          disabled={
-            isSubmitting ||
-            isFinalizingPastedMagicLink ||
-            isLoading ||
-            !email ||
-            emailError ||
-            Boolean(lastMagicLinkSentAt)
-          }
-          onClick={handleMagicLink}
+          disabled={isSendingCode || isVerifyingCode || isLoading || !email || emailError || Boolean(lastCodeSentAt)}
+          onClick={handleSendCode}
           type="button">
-          {cooldownSeconds > 0 ? `Try again in ${cooldownSeconds}s` : 'Send magic link'}
+          {cooldownSeconds > 0 ? `Try again in ${cooldownSeconds}s` : 'Send code'}
         </button>
 
         <label className="field">
-          Paste magic link URL
+          One-time code
           <input
             className="input"
-            onChange={(event) => setPastedMagicLinkUrl(event.target.value)}
-            value={pastedMagicLinkUrl}
+            inputMode="numeric"
+            onChange={(event) => setCode(event.target.value)}
+            value={code}
           />
         </label>
+        {codeError ? <p className="error">Enter the full code from your email.</p> : null}
         <button
           className="btn btn-outline"
-          disabled={isSubmitting || isFinalizingPastedMagicLink || !pastedMagicLinkUrl.trim()}
-          onClick={handleFinalizePastedMagicLink}
+          disabled={isSendingCode || isVerifyingCode || !email || emailError || !code.trim() || codeError}
+          onClick={handleVerifyCode}
           type="button">
-          {isFinalizingPastedMagicLink ? 'Finishing sign-in...' : 'Sign in from pasted URL'}
+          {isVerifyingCode ? 'Verifying...' : 'Verify code and sign in'}
         </button>
         {status ? <p className="muted">{status}</p> : null}
-        {pastedMagicLinkStatus ? <p className="muted">{pastedMagicLinkStatus}</p> : null}
       </section>
 
       <section className="panel">

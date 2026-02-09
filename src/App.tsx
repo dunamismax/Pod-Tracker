@@ -4,7 +4,6 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import { queryClient } from '@/lib/queryClient';
 import { SessionProvider, useSession } from '@/web/session-context';
 import { AppLayout } from '@/web/components/app-layout';
-import { AuthCallbackPage } from '@/web/pages/auth-callback-page';
 import { AuthPage } from '@/web/pages/auth-page';
 import { CreateEventPage } from '@/web/pages/create-event-page';
 import { CreatePodPage } from '@/web/pages/create-pod-page';
@@ -47,7 +46,6 @@ export default function App() {
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/auth" element={<AuthPage />} />
-              <Route path="/auth/callback" element={<AuthCallbackPage />} />
               <Route element={<RequireAuthRoute />}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/pods" element={<PodsPage />} />

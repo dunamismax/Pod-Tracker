@@ -1,4 +1,4 @@
--- Gatherer Supabase Setup (idempotent)
+-- Pod Tracker Supabase Setup (idempotent)
 -- Safe to run multiple times; creates or updates schema, policies, and indexes without destroying data.
 
 -- 1) Extensions

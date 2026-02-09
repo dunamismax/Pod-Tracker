@@ -1,7 +1,7 @@
-# Gatherer (Web)
+# Pod Tracker (Web)
 
-Gatherer is a privacy-first coordination website for small, trusted groups who gather regularly.
-It focuses on event-scoped planning, arrival, and real-time coordination.
+Pod Tracker is a privacy-first web app for Magic: The Gathering pods and other tabletop groups.
+It focuses on event planning, attendance, and real-time session updates.
 
 ## Tech stack
 
@@ -42,7 +42,7 @@ After changing `.env`, restart the dev server.
 - `src/App.tsx` : app routes and shell
 - `src/web/` : website pages, layout, and styles
 - `src/features/` : Supabase domain query/mutation modules
-- `src/lib/` : env parsing, Supabase client, query client, auth parsing helpers
+- `src/lib/` : env parsing, Supabase client, query client
 - `src/hooks/use-supabase-session.ts` : shared session hook
 - `scripts/supabase-setup.sql` : schema/RLS source of truth
 - `supabase/functions/notify-event` : notification edge function
@@ -51,10 +51,7 @@ After changing `.env`, restart the dev server.
 
 Run `scripts/supabase-setup.sql` in the Supabase SQL editor to bootstrap or update schema/RLS policies.
 
-The app uses magic link auth and callback path:
-
-- `http://localhost:5173/auth/callback` for local development
-- Your deployed web URL with `/auth/callback` in production
+The app uses email one-time-code auth on `/auth`.
 
 ## License
 
