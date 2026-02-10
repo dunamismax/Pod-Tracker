@@ -1,151 +1,135 @@
-# Magic Pod Dashboard (Web)
+# Pod Dashboard
 
-Magic Pod Dashboard is a web app for Magic: The Gathering pods and other tabletop groups that need a shared place to coordinate sessions. It combines pod membership, event planning, RSVP tracking, arrival updates, checklists, and notifications in one flow so groups can move from planning to game night with less back-and-forth.
+Web app for coordinating tabletop game pods with shared events, RSVPs, arrival tracking, checklists, invites, and in-app notifications.
 
-Live URL: https://poddashboard.com
+![React](https://img.shields.io/badge/React-19-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6)
+![Backend](https://img.shields.io/badge/Backend-Supabase-3ecf8e)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## What the app does
+Live URL: `https://poddashboard.com`
 
-- Sign in with email one-time code (`/auth`)
-- Create and manage pods
-- Invite members by email and accept invites in-app
-- Create events with title, schedule, description, and location
-- Track RSVP and live arrival status (including ETA minutes)
-- Keep a shared event checklist and cycle item state (`open`, `done`, `blocked`)
-- Edit event details or cancel events (host/admin controls)
-- Deliver in-app notifications for event changes and arrival updates
-- Subscribe to realtime updates for attendance, checklist, event details, and notifications
+## Quick Start
 
-## Main routes
+### Prerequisites
 
-- `/` dashboard for next event, RSVP actions, arrival board, and checklist
-- `/pods` list of your pods plus upcoming events across pods
-- `/pod/:id` pod details, members, and invite management (admin/owner)
-- `/create-pod` create a new pod
-- `/create-event` create an event in one of your pods
-- `/event/:id` event detail, RSVP, arrival status, checklist
-- `/event/edit/:id` edit/cancel event (event creator or pod owner/admin)
-- `/invites` accept pending pod invites
-- `/notifications` read and manage event notifications
-- `/auth` one-time-code sign in and profile management
+- Node.js 20+ (recommended)
+- npm
+- Supabase project (URL + anon key)
 
-## Tech stack
-
-- React 19 + TypeScript
-- Vite
-- React Router
-- TanStack Query
-- Zod
-- Supabase
-  - Postgres
-  - Auth (email OTP)
-  - Realtime
-  - Edge Functions
-  - Storage
-
-## Data model overview
-
-Core tables from `scripts/supabase-setup.sql`:
-
-- `pods`
-- `pod_memberships`
-- `pod_invites`
-- `events`
-- `event_attendance`
-- `event_checklist_items`
-- `notifications`
-- `profiles`
-- `user_push_tokens`
-
-The schema script also includes:
-
-- enums for membership, invite, RSVP, arrival, and checklist states
-- indexes and `updated_at` triggers
-- helper functions (`can_access_pod`, `is_pod_admin`, `shares_pod_with`)
-- RPCs (`create_pod_with_owner`, `accept_pod_invite`)
-- RLS policies for all major tables
-
-## Project structure
-
-- `src/App.tsx` route table and app providers
-- `src/web/` pages, app layout, styles, and utility formatters
-- `src/features/` feature-scoped query/mutation modules
-- `src/lib/` env parsing, Supabase client, React Query client
-- `src/hooks/use-supabase-session.ts` auth/session bootstrap hook
-- `scripts/supabase-setup.sql` schema, policies, indexes, RPCs
-- `supabase/functions/notify-event` event notification edge function
-
-## Local setup
-
-### 1) Install dependencies
+### Local Setup
 
 ```bash
+git clone https://github.com/dunamismax/poddashboard.git
+cd poddashboard
 npm install
+cp .env.example .env
 ```
 
-### 2) Configure environment
+Set required values in `.env`:
 
-Create `.env`:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
-```bash
-# Preferred for web
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
+Apply database setup in Supabase SQL editor:
 
-# Optional compatibility keys
-EXPO_PUBLIC_SUPABASE_URL=...
-EXPO_PUBLIC_SUPABASE_ANON_KEY=...
-```
+- Run `scripts/supabase-setup.sql`
 
-`src/lib/env.ts` validates env values with Zod at startup.  
-After editing `.env`, restart the dev server.
+Configure Supabase Auth email templates for code-based login:
 
-### 3) Configure Supabase Auth for code login (required)
+- Use `{{ .Token }}` (OTP)
+- Remove `{{ .ConfirmationURL }}` for email sign-in templates
 
-In Supabase Dashboard:
-
-1. Go to `Authentication -> Providers -> Email` and keep email sign-in enabled.
-2. Go to `Authentication -> Email Templates`.
-3. For templates used in email sign-in (`Magic Link`, and `Confirm signup` if you allow new users), use `{{ .Token }}` in the email body.
-4. Remove `{{ .ConfirmationURL }}` from those templates so users receive a one-time code instead of a login link.
-
-Supabase sends OTP vs magic link based on the template variables, not only the client SDK call.
-
-### 4) Apply schema + policies
-
-Run `scripts/supabase-setup.sql` in the Supabase SQL editor.
-
-### 5) Run the app
+Start the app:
 
 ```bash
 npm run dev
 ```
 
-Open the local URL shown by Vite, then sign in at `/auth`.
+Expected result: Vite serves the app locally and login is available at `/auth`.
 
-## Available scripts
+## Features
 
-- `npm run dev` start local dev server
-- `npm start` alias for `npm run dev`
-- `npm run build` type-check + production build
-- `npm run preview` preview production build locally
-- `npm run lint` run ESLint for `src/**/*.ts(x)`
+- OTP email authentication with Supabase Auth.
+- Pod creation, membership management, and invite acceptance flows.
+- Event creation/editing with schedule, location, and cancellation support.
+- RSVP and live arrival status tracking with optional ETA minutes.
+- Shared checklist items per event with `open`, `done`, and `blocked` states.
+- In-app notifications and realtime cache refresh for event/pod activity.
 
-## Notifications and realtime behavior
+## Tech Stack
 
-- App-side notification reads/writes use `src/features/notifications/notifications-queries.ts`.
-- Event mutations call the `notify-event` edge function with event context.
-- `notify-event` writes in-app notifications and can fan out Expo push notifications when `user_push_tokens` exist.
-- Realtime subscriptions invalidate React Query caches for fresh UI state.
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend | [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) | Web UI and route-driven pages |
+| Build Tool | [Vite](https://vitejs.dev/) | Local dev server and production build |
+| Routing | [React Router](https://reactrouter.com/) | Client-side page routing |
+| Data Fetching | [TanStack Query](https://tanstack.com/query) | Query/mutation state and cache management |
+| Validation | [Zod](https://zod.dev/) | Environment and input validation |
+| Backend | [Supabase](https://supabase.com/) | Postgres, Auth, Realtime, Edge Functions |
 
-## Notes for contributors
+## Project Structure
 
-- Keep web UI code under `src/web/`.
-- Keep domain data access in `src/features/`.
-- Keep env/input validation with Zod.
-- Keep schema and policy changes in `scripts/supabase-setup.sql`.
-- Do not commit real secrets; use `.env.example`.
+```text
+poddashboard/
+├── src/
+│   ├── App.tsx                         # Route graph and app providers
+│   ├── web/                            # Pages, layout, styles, and UI utils
+│   ├── features/                       # Domain query/mutation modules
+│   ├── hooks/use-supabase-session.ts   # Session bootstrap/auth state
+│   └── lib/                            # Env parsing, Supabase client, query client
+├── scripts/supabase-setup.sql          # DB schema, enums, RLS, RPC, indexes
+├── supabase/functions/notify-event/    # Notification edge function
+├── POD_TESTERS_QUICK_START.md          # End-user testing guide
+├── package.json
+└── .env.example
+```
+
+## Development Workflow and Common Commands
+
+```bash
+# Start dev server
+npm run dev
+
+# Lint source files
+npm run lint
+
+# Type-check + production build
+npm run build
+
+# Preview production build locally
+npm run preview
+```
+
+## Deployment and Operations
+
+- Production build artifacts are generated with `npm run build`.
+- Supabase schema and policies are defined in `scripts/supabase-setup.sql`.
+- Edge function `notify-event` expects Supabase runtime env vars (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`).
+- Health/behavior checks are primarily done through app routes and Supabase dashboard logs.
+
+## Security and Reliability Notes
+
+- RLS policies are enabled across core tables (`pods`, `events`, `attendance`, `invites`, `notifications`, and others).
+- Helper SQL functions (`can_access_pod`, `is_pod_admin`, `shares_pod_with`) centralize authorization logic.
+- RPC functions (`create_pod_with_owner`, `accept_pod_invite`) enforce transactional membership/invite behavior.
+- `src/lib/env.ts` validates env inputs at startup and fails fast on invalid config.
+- Keep real credentials out of source control; use `.env.example` as the template only.
+
+## Documentation
+
+| Path | Purpose |
+|---|---|
+| [POD_TESTERS_QUICK_START.md](POD_TESTERS_QUICK_START.md) | Lightweight guide for pod testers |
+| [scripts/supabase-setup.sql](scripts/supabase-setup.sql) | Authoritative schema, RLS policies, RPC functions |
+| [supabase/functions/notify-event/index.ts](supabase/functions/notify-event/index.ts) | Notification fan-out function |
+| [src/App.tsx](src/App.tsx) | Route definitions and auth gating |
+| [src/lib/env.ts](src/lib/env.ts) | Runtime environment validation |
+
+## Contributing
+
+Open an issue or pull request with clear repro steps and expected behavior. Keep data-access logic in `src/features`, UI code in `src/web`, and schema changes in `scripts/supabase-setup.sql`.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Licensed under the [MIT License](LICENSE).
