@@ -11,21 +11,12 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "noEmit": true,
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    },
-    "types": ["vite/client"]
+    "types": ["node"]
   },
   "include": [
-    "src/main.tsx",
-    "src/App.tsx",
-    "src/lib/**/*.ts",
-    "src/features/**/*.ts",
-    "src/hooks/use-supabase-session.ts",
-    "src/web/**/*.tsx",
-    "src/vite-env.d.ts",
+    "app/**/*",
+    "scripts/**/*.ts",
+    "react-router.config.ts",
     "vite.config.ts"
   ]
 }

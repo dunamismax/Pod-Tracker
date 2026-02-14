@@ -1,24 +1,13 @@
-# Pod Testers Quick Start (Web)
+# Pod Tester Quick Start
 
-This guide is for friends testing Pod Dashboard in the browser.
-
-## 1) Open the website URL
-
-Ask the organizer for the latest Pod Dashboard web link, or use `https://poddashboard.com`.
-
-## 2) Sign in
-
-1. Open `/auth`.
-2. Enter your email and request a one-time code.
-3. Check your email for the 6-digit code (not a login link).
-4. Enter the code in the app to sign in.
-
-## 3) Join your pod
-
-1. Open `Invites`.
-2. Accept pending invite(s).
-3. Open your pod and event details.
-
-## 4) Report issues
-
-Send screenshots, exact error text, browser name/version, and timestamp to the organizer.
+1. Open `/login`.
+2. Enter your email to request a 6-digit OTP.
+3. Open your mailbox and copy the code.
+4. Open `/verify`, enter email + code, then sign in.
+5. On the dashboard:
+   - Create a pod.
+   - Confirm the pod appears under "Your pods".
+6. Hit API endpoints while signed in:
+   - `GET /api/pods`
+   - `GET /api/events`
+7. Sign out from the header and re-test `GET /api/pods`; it should return `401`.

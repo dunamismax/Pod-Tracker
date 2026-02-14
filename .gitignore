@@ -6,7 +6,10 @@ yarn-error.log*
 pnpm-debug.log*
 
 dist/
+build/
 coverage/
+.react-router/
+bun.lockb
 
 # Native build artifacts
 android/.gradle/
@@ -30,7 +33,3 @@ Thumbs.db
 .env.*
 !.env.example
 
-# Supabase
-supabase/.temp/
-supabase/.branches/
-supabase/.postgres/

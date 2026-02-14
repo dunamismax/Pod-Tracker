@@ -1,39 +1,38 @@
 {
-  "name": "pod-dashboard",
-  "version": "1.0.0",
+  "name": "magic-pod-dashboard",
+  "version": "2.0.0",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/dunamismax/pod-dashboard.git"
-  },
-  "homepage": "https://poddashboard.com",
+  "private": true,
   "scripts": {
-    "start": "vite",
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "lint": "eslint src --ext .ts,.tsx"
+    "dev": "react-router dev",
+    "build": "react-router build",
+    "start": "react-router-serve build/server/index.js",
+    "typecheck": "react-router typegen && tsc --noEmit",
+    "lint": "eslint app scripts --ext .ts,.tsx",
+    "db:migrate": "bun run scripts/migrate.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.93.3",
-    "@tanstack/react-query": "^5.90.20",
+    "@react-router/node": "^7.1.5",
+    "@react-router/serve": "^7.1.5",
+    "nodemailer": "^6.10.1",
+    "pg": "^8.16.3",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-router-dom": "^7.1.5",
-    "zod": "^4.3.6"
+    "react-router": "^7.1.5",
+    "zod": "^4.3.6",
+    "isbot": "^5"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
+    "@react-router/dev": "^7.1.5",
+    "@types/node": "^22.13.10",
+    "@types/nodemailer": "^6.4.19",
+    "@types/pg": "^8.15.5",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
-    "@vitejs/plugin-react": "^4.4.1",
     "eslint": "^9.25.0",
-    "eslint-plugin-react-hooks": "^5.1.0",
-    "eslint-plugin-react-refresh": "^0.4.18",
-    "supabase": "^2.75.5",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.22.0",
     "vite": "^6.0.11"
-  },
-  "private": true
+  }
 }
