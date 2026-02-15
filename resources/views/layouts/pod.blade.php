@@ -25,18 +25,6 @@
                         <span class="text-sm font-semibold tracking-[0.04em] text-zinc-100 sm:text-base">Magic Pod Dashboard</span>
                     </a>
                     <div class="flex items-center gap-2 sm:gap-3">
-                        <flux:button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            icon="moon"
-                            class="cursor-pointer"
-                            x-data="{ dark: document.documentElement.classList.contains('dark') }"
-                            x-on:click="dark = ! dark; document.documentElement.classList.toggle('dark', dark)"
-                            x-bind:aria-label="dark ? 'Switch to light theme' : 'Switch to dark theme'"
-                        >
-                            <span class="hidden sm:inline" x-text="dark ? 'Dark' : 'Light'"></span>
-                        </flux:button>
                         @auth
                             <flux:text class="hidden text-sm text-zinc-400 sm:inline">{{ auth()->user()->email }}</flux:text>
                             <form method="POST" action="{{ route('logout') }}">

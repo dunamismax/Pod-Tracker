@@ -41,10 +41,6 @@
         color-scheme: dark;
     }
 
-    html:not(.dark) {
-        color-scheme: light;
-    }
-
     body {
         background-color: #09090b;
         background-image:
