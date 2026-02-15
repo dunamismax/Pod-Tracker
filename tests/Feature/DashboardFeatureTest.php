@@ -55,6 +55,8 @@ it('shows upcoming events for pods the user belongs to', function (): void {
     $this->actingAs($user)
         ->get('/dashboard')
         ->assertOk()
+        ->assertSee('class="h-full dark"', false)
+        ->assertSee('Magic Pod Dashboard')
         ->assertSee('Commander Night')
         ->assertSee('Guild Pod');
 });

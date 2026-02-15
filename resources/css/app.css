@@ -23,27 +23,79 @@
     --color-zinc-900: #171717;
     --color-zinc-950: #0a0a0a;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
+    --color-accent: var(--color-cyan-400);
+    --color-accent-content: var(--color-cyan-400);
+    --color-accent-foreground: var(--color-zinc-950);
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-accent: var(--color-cyan-300);
+        --color-accent-content: var(--color-cyan-300);
+        --color-accent-foreground: var(--color-zinc-950);
     }
 }
 
 @layer base {
+    html {
+        color-scheme: dark;
+    }
+
+    html:not(.dark) {
+        color-scheme: light;
+    }
+
+    body {
+        background-color: #09090b;
+        background-image:
+            radial-gradient(140% 90% at 0% 0%, rgb(34 211 238 / 0.15) 0%, rgb(9 9 11 / 0) 45%),
+            radial-gradient(120% 90% at 100% 0%, rgb(99 102 241 / 0.2) 0%, rgb(9 9 11 / 0) 45%),
+            linear-gradient(180deg, #09090b 0%, #030712 100%);
+    }
 
     *,
     ::after,
     ::before,
     ::backdrop,
     ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
+        border-color: var(--color-zinc-700, currentColor);
+    }
+}
+
+@layer components {
+    .ui-grid {
+        background-image:
+            linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+            linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+        background-size: 56px 56px;
+    }
+
+    .ui-shell {
+        @apply relative min-h-screen overflow-x-hidden;
+    }
+
+    .ui-panel {
+        @apply rounded-3xl border border-white/10 bg-zinc-900/65 p-6 shadow-2xl shadow-black/35 backdrop-blur;
+    }
+
+    .ui-panel-soft {
+        @apply rounded-2xl border border-white/10 bg-white/5 p-4;
+    }
+
+    .ui-list-item {
+        @apply rounded-2xl border border-white/10 bg-zinc-900/80 p-4 transition duration-200 hover:border-cyan-300/50 hover:bg-zinc-900;
+    }
+
+    .ui-kicker {
+        @apply text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/85;
+    }
+
+    .ui-muted {
+        @apply text-sm text-zinc-400;
+    }
+
+    .auth-panel {
+        @apply rounded-3xl border border-white/10 bg-zinc-900/70 p-8 shadow-2xl shadow-black/35 backdrop-blur;
     }
 }
 
@@ -52,7 +104,15 @@
 }
 
 [data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+    @apply !mb-0 !leading-tight text-zinc-200;
+}
+
+[data-flux-description] {
+    @apply text-zinc-400;
+}
+
+[data-flux-control] {
+    @apply border-white/15 bg-zinc-950/65 text-zinc-100;
 }
 
 input:focus[data-flux-control],
@@ -60,7 +120,3 @@ textarea:focus[data-flux-control],
 select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
 }
-
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
-} */

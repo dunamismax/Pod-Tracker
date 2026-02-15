@@ -8,15 +8,19 @@ use Illuminate\Support\Facades\Password;
 it('renders authentication pages with flux assets', function (): void {
     $this->get('/login')
         ->assertOk()
-        ->assertSee('/flux/flux', false);
+        ->assertSee('/flux/flux', false)
+        ->assertSee('class="h-full dark"', false)
+        ->assertSee('name="remember"', false);
 
     $this->get('/register')
         ->assertOk()
-        ->assertSee('/flux/flux', false);
+        ->assertSee('/flux/flux', false)
+        ->assertSee('class="h-full dark"', false);
 
     $this->get('/forgot-password')
         ->assertOk()
-        ->assertSee('/flux/flux', false);
+        ->assertSee('/flux/flux', false)
+        ->assertSee('class="h-full dark"', false);
 });
 
 it('registers a user with the built-in auth flow', function (): void {

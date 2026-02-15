@@ -3,45 +3,99 @@
 </p>
 
 <p align="center">
-  Lean Laravel + Livewire app for built-in auth, pod management, and upcoming events.
+  Dark-themed TALL app for auth, pod management, and upcoming event visibility.
 </p>
 
 # PodDashboard
 
-PodDashboard is a trimmed TALL-stack app for organizing tabletop pods and events.
-It currently ships with:
+PodDashboard is a focused TALL-stack application for organizing tabletop pods and events.  
+It uses Laravel Fortify for authentication, Livewire for server-driven UI, Flux UI for components, and Tailwind for styling.
 
-- Laravel Fortify authentication (`/login`, `/register`, password reset)
-- Authenticated dashboard (`/dashboard`) for pod creation and event visibility
-- Session-authenticated JSON API (`/api/pods`, `/api/events`)
+## Current Features
 
-The repository was intentionally cleaned to remove unused starter-kit auth/settings surfaces so the codebase stays small and maintainable.
+- Dark-themed dashboard UI built with Flux components and Tailwind
+- Laravel Fortify auth flows:
+  - login/logout
+  - register
+  - forgot/reset password
+  - confirm password routes
+- Authenticated dashboard at `/dashboard`:
+  - create pods
+  - list your pods
+  - list upcoming events across pods you belong to
+- Session-authenticated JSON API:
+  - `GET /api/pods`
+  - `POST /api/pods`
+  - `GET /api/events`
 
 ## Tech Stack
 
 - Laravel 12
 - Livewire 4
-- Alpine.js (via Livewire)
+- Alpine.js (bundled via Livewire)
 - Flux UI Free
-- Tailwind CSS 4 + Vite 7
-- Pest 4 + PHPUnit 12
+- Tailwind CSS 4
+- Vite 7
+- Pest 4 / PHPUnit 12
 
-## Active HTTP Surface
+## Requirements
+
+- PHP 8.2+ (currently tested in this repo on 8.4.1)
+- Composer 2+
+- Node.js 22+ (Node 24 also works)
+- npm 10+
+- PostgreSQL 14+ by default (`.env.example`), or another Laravel-supported database
+
+## Setup
+
+### One-command setup
+
+```bash
+composer setup
+```
+
+`composer setup` installs PHP + JS dependencies, creates `.env` if needed, generates the app key, runs migrations, and builds frontend assets.
+
+### Manual setup
+
+```bash
+cp .env.example .env
+composer install
+npm install
+php artisan key:generate
+php artisan migrate
+npm run build
+```
+
+## Run Locally
+
+```bash
+composer dev
+```
+
+This starts:
+
+- `php artisan serve`
+- `php artisan queue:listen`
+- `php artisan pail`
+- `npm run dev`
+
+If UI changes are not visible, run `npm run dev` or `npm run build`.
+
+## Route Surface (Current)
 
 ### Web
 
-- `GET /` -> redirects to `/dashboard`
-- `GET /login` -> login page (guest)
-- `POST /login` -> authenticate session (guest)
-- `POST /logout` -> sign out (auth)
-- `GET /register` -> registration page (guest)
-- `POST /register` -> create account (guest)
-- `GET /forgot-password` -> request reset link (guest)
-- `POST /forgot-password` -> send reset link (guest)
-- `GET /reset-password/{token}` -> reset form (guest)
-- `POST /reset-password` -> apply new password (guest)
-- `GET /dashboard` -> dashboard (auth)
-- `GET /up` -> health endpoint
+- `GET /` redirects to `/dashboard`
+- `GET /dashboard` (auth)
+- `GET /login` / `POST /login`
+- `POST /logout`
+- `GET /register` / `POST /register`
+- `GET /forgot-password` / `POST /forgot-password`
+- `GET /reset-password/{token}` / `POST /reset-password`
+- `GET /user/confirm-password` / `POST /user/confirm-password`
+- `GET /user/confirmed-password-status`
+- `GET /up`
 
 ### API (session-authenticated)
 
@@ -49,59 +103,19 @@ The repository was intentionally cleaned to remove unused starter-kit auth/setti
 - `POST /api/pods`
 - `GET /api/events`
 
-Unauthenticated API requests return `401`.
+Notes:
 
-## Requirements
+- API endpoints rely on the authenticated session user (`$request->user()`); unauthenticated requests return `401`.
+- `POST /api/pods` expects valid JSON and returns `400` when the request body is malformed.
 
-- PHP 8.2+ (tested on 8.4.1)
-- Composer 2+
-- Node.js 22+ (CI target; Node 24 also works locally)
-- npm 10+
-- PostgreSQL 14+ (default `.env.example`) or another Laravel-supported database
+## Example API Request
 
-## Quick Start
+Create pod:
 
-```bash
-git clone <your-repo-url> poddashboard
-cd poddashboard
-cp .env.example .env
-composer install
-npm install
-php artisan key:generate
-php artisan migrate
-composer dev
+```http
+POST /api/pods
+Content-Type: application/json
 ```
-
-App URLs after startup:
-
-- `http://localhost:8000/login`
-- `http://localhost:8000/register`
-- `http://localhost:8000/forgot-password`
-- `http://localhost:8000/dashboard`
-- `http://localhost:8000/up`
-
-If frontend changes are not reflected, run `npm run dev` (or `npm run build`).
-
-## Local Data and Auth Notes
-
-Optional seed user:
-
-```bash
-php artisan db:seed
-```
-
-Seeder creates:
-
-- Email: `test@example.com`
-- Password: `password`
-
-Password reset links use your configured mail transport. For local development, use a mailbox catcher (Mailpit/Mailhog) or set a log driver.
-
-## API Behavior
-
-### Create Pod
-
-`POST /api/pods` (JSON):
 
 ```json
 {
@@ -110,7 +124,7 @@ Password reset links use your configured mail transport. For local development, 
 }
 ```
 
-Returns `201` with:
+Success response (`201`):
 
 ```json
 {
@@ -123,74 +137,61 @@ Returns `201` with:
 }
 ```
 
-Malformed JSON returns `400` with an `error` field.
-
-## Development Commands
-
-### Setup helper
+## Seed Data
 
 ```bash
-composer setup
+php artisan db:seed
 ```
 
-### Run app stack
+Default seeded user:
 
-```bash
-composer dev
-```
+- Email: `test@example.com`
+- Password: `password`
 
-### Tests
+## Quality Commands
 
 ```bash
 php artisan test --compact
 php artisan test --compact tests/Feature/OtpAuthenticationTest.php
-```
-
-### Lint / format
-
-```bash
+php artisan test --compact tests/Feature/DashboardFeatureTest.php
 composer lint
 vendor/bin/pint --dirty --format agent
-```
-
-### Build assets
-
-```bash
 npm run build
 ```
 
-## Project Structure
+## Project Layout
 
 ```text
 app/
-  Actions/Fortify/            Fortify user/password action classes
+  Actions/Fortify/           Fortify user/password actions
   Http/Controllers/Api/      API endpoints
   Http/Requests/             API request validation
-  Livewire/                  Dashboard component
+  Livewire/                  Dashboard Livewire component
   Models/                    User, Pod, PodMember, Event
   Providers/FortifyServiceProvider.php
 resources/views/
-  auth/                      Fortify auth pages (Flux UI)
-  layouts/pod.blade.php
-  livewire/                  Livewire dashboard template
-routes/web.php               App routes + API routes
-tests/Feature/               Auth, dashboard, API coverage
+  auth/                      Fortify auth views (Flux UI)
+  layouts/pod.blade.php      Global app shell
+  livewire/                  Dashboard view
+routes/web.php               Web + API route definitions
+tests/Feature/               Auth, dashboard, and API behavior tests
 ```
 
 ## Security Notes
 
-- Authentication is handled through Laravel Fortify's built-in login pipeline.
-- Login attempts are rate-limited by email + IP (`fortify.limiters.login`).
-- Passwords are hashed by Laravel (`password` cast on `User`).
-- Dashboard and API data are scoped to the authenticated session user.
+- Auth is provided by Laravel Fortify (web guard).
+- Login is rate-limited at 5 attempts/minute by email+IP.
+- Passwords are hashed via Laravel’s user password casting/hashing pipeline.
+- Dashboard and API responses are scoped to the authenticated user.
 
-## Documentation
+## Reference Files
 
-- `AGENTS.md` - repository-specific engineering instructions for coding agents
-- `routes/web.php` - source of truth for app routes
-- `app/Providers/FortifyServiceProvider.php` - Fortify view/action bindings and login throttling
-- `tests/Feature/OtpAuthenticationTest.php` - authentication flow coverage (legacy filename)
-- `tests/Feature/ApiEndpointsTest.php` - API authorization and responses
+- `routes/web.php` for route definitions
+- `app/Providers/FortifyServiceProvider.php` for auth views and rate limiter
+- `tests/Feature/OtpAuthenticationTest.php` for auth flow coverage
+- `tests/Feature/DashboardFeatureTest.php` for dashboard behavior
+- `tests/Feature/ApiEndpointsTest.php` for API behavior and auth responses
+- `AGENTS.md` for repository-specific agent instructions
 
 ## License
 
