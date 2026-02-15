@@ -9,6 +9,16 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
 
+it('renders otp pages with flux assets', function (): void {
+    $this->get('/login')
+        ->assertOk()
+        ->assertSee('/flux/flux', false);
+
+    $this->get('/verify')
+        ->assertOk()
+        ->assertSee('/flux/flux', false);
+});
+
 it('sends an otp code from the login page', function (): void {
     Mail::fake();
 

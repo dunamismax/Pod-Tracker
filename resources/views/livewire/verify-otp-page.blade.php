@@ -1,50 +1,45 @@
-<section class="max-w-xl mx-auto mt-12 rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
-    <h1 class="text-2xl font-semibold text-zinc-900">Verify your sign-in code</h1>
-    <p class="mt-2 text-sm text-zinc-600">Enter the 6-digit code we emailed to you.</p>
+<section class="mx-auto mt-12 w-full max-w-xl rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
+    <flux:heading size="xl">Verify your sign-in code</flux:heading>
+    <flux:subheading class="mt-2">Enter the 6-digit code we emailed to you.</flux:subheading>
 
     <form wire:submit="verify" class="mt-6 space-y-4">
-        <div class="space-y-1">
-            <label for="email" class="block text-sm font-medium text-zinc-800">Email</label>
-            <input
-                id="email"
-                wire:model="email"
-                type="email"
-                autocomplete="email"
-                required
-                class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-600"
-            />
-            @error('email')
-                <p class="text-sm text-red-600">{{ $message }}</p>
-            @enderror
-        </div>
+        <flux:input
+            wire:model="email"
+            :label="__('Email')"
+            type="email"
+            autocomplete="email"
+            required
+            placeholder="email@example.com"
+        />
 
-        <div class="space-y-1">
-            <label for="code" class="block text-sm font-medium text-zinc-800">Code</label>
-            <input
-                id="code"
-                wire:model="code"
-                type="text"
-                inputmode="numeric"
-                pattern="\d{6}"
-                maxlength="6"
-                required
-                class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-600"
-            />
-            @error('code')
-                <p class="text-sm text-red-600">{{ $message }}</p>
-            @enderror
-        </div>
+        @error('email')
+            <flux:text class="text-sm !text-red-600">{{ $message }}</flux:text>
+        @enderror
 
-        <button
-            type="submit"
-            class="inline-flex items-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-        >
+        <flux:input
+            wire:model="code"
+            :label="__('Code')"
+            type="text"
+            inputmode="numeric"
+            pattern="\d{6}"
+            maxlength="6"
+            required
+            placeholder="123456"
+        />
+
+        @error('code')
+            <flux:text class="text-sm !text-red-600">{{ $message }}</flux:text>
+        @enderror
+
+        <flux:button type="submit" variant="primary" class="cursor-pointer" data-test="verify-otp-button">
             Sign in
-        </button>
+        </flux:button>
+
+        <flux:text wire:loading wire:target="verify" variant="subtle" class="text-sm">Verifying...</flux:text>
     </form>
 
     <p class="mt-4 text-sm text-zinc-600">
         Need another code?
-        <a href="{{ route('login') }}" class="text-zinc-900 underline">Request a new one</a>.
+        <flux:link href="{{ route('login') }}">Request a new one</flux:link>.
     </p>
 </section>

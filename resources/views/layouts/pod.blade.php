@@ -1,37 +1,30 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Magic Pod Dashboard</title>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @fluxAppearance
         @livewireStyles
     </head>
-    <body class="min-h-screen bg-zinc-100 text-zinc-900">
+    <body class="min-h-screen bg-zinc-100 text-zinc-900 antialiased">
         <header class="border-b border-zinc-200 bg-white">
             <div class="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-                <a href="{{ auth()->check() ? route('dashboard') : route('login') }}" class="font-semibold">
+                <a href="{{ auth()->check() ? route('dashboard') : route('login') }}" class="font-semibold tracking-tight">
                     Magic Pod Dashboard
                 </a>
                 <div class="flex items-center gap-3">
                     @auth
-                        <span class="text-sm text-zinc-600">{{ auth()->user()->email }}</span>
+                        <flux:text class="hidden text-sm text-zinc-600 sm:inline">{{ auth()->user()->email }}</flux:text>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-                            <button
-                                type="submit"
-                                class="inline-flex items-center rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-                            >
+                            <flux:button type="submit" variant="ghost" size="sm" class="cursor-pointer">
                                 Sign out
-                            </button>
+                            </flux:button>
                         </form>
                     @else
-                        <a
-                            href="{{ route('login') }}"
-                            class="inline-flex items-center rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
-                        >
-                            Sign in
-                        </a>
+                        <flux:link href="{{ route('login') }}" wire:navigate>Sign in</flux:link>
                     @endauth
                 </div>
             </div>
@@ -42,5 +35,6 @@
         </main>
 
         @livewireScripts
+        @fluxScripts
     </body>
 </html>
