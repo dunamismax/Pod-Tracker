@@ -1,15 +1,26 @@
-import { hash } from 'bcryptjs';
+import { compare, hash } from 'bcryptjs';
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { events, permissions, podMembers, pods, roles, userRoles, users } from '../db/schema';
+import { events, podMembers, pods, roles, userRoles, users } from '../db/schema';
 import { db } from './db';
 import { json } from './http';
 import { userHasPermission } from './permissions';
-import { resolveSessionUser } from './session';
+import {
+  appendSessionCookie,
+  clearSessionCookies,
+  createSession,
+  destroySession,
+  resolveSessionUser,
+} from './session';
 
 const createPodSchema = z.object({
   name: z.string().trim().min(2, 'Pod name must be at least 2 characters.').max(120),
   description: z.string().trim().max(500).optional().nullable(),
+});
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1, 'Password is required.'),
 });
 
 const registerSchema = z
@@ -53,6 +64,73 @@ async function parseJson(
   }
 }
 
+export async function handleSession(request: Request): Promise<Response> {
+  const user = await resolveSessionUser(request);
+
+  return json({
+    authenticated: Boolean(user),
+    user,
+  });
+}
+
+export async function handleLogin(request: Request): Promise<Response> {
+  const parsedBody = await parseJson(request);
+  if (!parsedBody.ok) {
+    return parsedBody.error;
+  }
+
+  const payload = loginSchema.safeParse(parsedBody.data);
+  if (!payload.success) {
+    return json({ error: payload.error.issues[0]?.message ?? 'Invalid payload.' }, 400);
+  }
+
+  const user = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      passwordHash: users.passwordHash,
+    })
+    .from(users)
+    .where(eq(users.email, payload.data.email))
+    .limit(1);
+
+  if (!user[0]) {
+    return json({ error: 'Invalid credentials.' }, 401);
+  }
+
+  const validPassword = await compare(payload.data.password, user[0].passwordHash);
+  if (!validPassword) {
+    return json({ error: 'Invalid credentials.' }, 401);
+  }
+
+  const { expires, sessionToken } = await createSession(user[0].id);
+  const headers = new Headers();
+  appendSessionCookie(headers, sessionToken, expires);
+
+  return json(
+    {
+      status: 'ok',
+      user: {
+        email: user[0].email,
+        id: user[0].id,
+        name: user[0].name,
+      },
+    },
+    200,
+    { headers },
+  );
+}
+
+export async function handleLogout(request: Request): Promise<Response> {
+  await destroySession(request);
+
+  const headers = new Headers();
+  clearSessionCookies(headers);
+
+  return json({ status: 'ok' }, 200, { headers });
+}
+
 export async function handleRegister(request: Request): Promise<Response> {
   const parsedBody = await parseJson(request);
   if (!parsedBody.ok) {
@@ -94,6 +172,10 @@ export async function handleRegister(request: Request): Promise<Response> {
       passwordHash,
     })
     .returning({ id: users.id });
+
+  if (!createdUser) {
+    return json({ error: 'User creation failed.' }, 500);
+  }
 
   await db
     .insert(userRoles)
@@ -161,6 +243,10 @@ export async function handlePodsCreate(request: Request): Promise<Response> {
         description: pods.description,
       });
 
+    if (!createdPod) {
+      throw new Error('Pod creation failed.');
+    }
+
     await tx.insert(podMembers).values({
       podId: createdPod.id,
       userId: access.user.id,
@@ -211,19 +297,4 @@ export async function handleEventsIndex(request: Request): Promise<Response> {
       scheduledFor: event.scheduledFor?.toISOString() ?? null,
     })),
   });
-}
-
-export async function ensureAccessControlBootstrap(): Promise<void> {
-  const requiredPermissions = [
-    'dashboard.view',
-    'pods.create',
-    'api.access',
-    'api.pods.create',
-    'monitoring.pulse.view',
-    'monitoring.telescope.view',
-  ];
-
-  for (const name of requiredPermissions) {
-    await db.insert(permissions).values({ name }).onConflictDoNothing();
-  }
 }

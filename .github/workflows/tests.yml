@@ -17,54 +17,82 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    environment: Testing
-    strategy:
-      matrix:
-        php-version: ['8.4', '8.5']
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: poddashboard
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d poddashboard"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          php-version: ${{ matrix.php-version }}
-          extensions: mbstring, pdo_sqlite, sqlite3
-          tools: composer:v2
-          coverage: none
+          bun-version: latest
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
 
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: Add Flux credentials
+      - name: Run Doctor
         env:
-          FLUX_USERNAME: ${{ secrets.FLUX_USERNAME }}
-          FLUX_LICENSE_KEY: ${{ secrets.FLUX_LICENSE_KEY }}
+          AUTH_SECRET: ci-secret-2026
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/poddashboard
+        run: bun run scry:doctor
+
+      - name: Run Migrations
+        env:
+          AUTH_SECRET: ci-secret-2026
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/poddashboard
+        run: bun run db:migrate
+
+      - name: Seed Database
+        env:
+          AUTH_SECRET: ci-secret-2026
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/poddashboard
+        run: bun run db:seed
+
+      - name: Start App
+        env:
+          AUTH_SECRET: ci-secret-2026
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/poddashboard
         run: |
-          if [ -n "${FLUX_USERNAME:-}" ] && [ -n "${FLUX_LICENSE_KEY:-}" ]; then
-            composer config http-basic.composer.fluxui.dev "${FLUX_USERNAME}" "${FLUX_LICENSE_KEY}"
-          else
-            echo "Flux credentials not set; skipping composer auth config."
+          bun run dev > /tmp/poddashboard-dev.log 2>&1 &
+          echo $! > /tmp/poddashboard-dev.pid
+
+      - name: Wait For App
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:3001/health >/dev/null && curl -fsSI http://localhost:3000/ >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/poddashboard-dev.log
+          exit 1
+
+      - name: Run Smoke Check
+        env:
+          SMOKE_APP_URL: http://localhost:3000
+        run: bun run smoke
+
+      - name: Stop App
+        if: always()
+        run: |
+          if [ -f /tmp/poddashboard-dev.pid ]; then
+            kill "$(cat /tmp/poddashboard-dev.pid)" || true
           fi
 
-      - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Copy Environment File
-        run: cp .env.example .env
-
-      - name: Generate Application Key
-        run: php artisan key:generate
-
-      - name: Build Assets
-        run: npm run build
-
-      - name: Run Tests
-        run: php artisan test --compact
+      - name: Show App Log
+        if: failure()
+        run: cat /tmp/poddashboard-dev.log

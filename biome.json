@@ -21,6 +21,6 @@
     }
   },
   "files": {
-    "includes": ["**", "!dist", "!build", "!node_modules", "!.react-router"]
+    "includes": ["**", "!dist", "!build", "!node_modules", "!.nuxt", "!.output", "!.react-router"]
   }
 }

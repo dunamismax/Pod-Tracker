@@ -1,13 +1,15 @@
 import {
-  ensureAccessControlBootstrap,
   handleEventsIndex,
+  handleLogin,
+  handleLogout,
   handlePodsCreate,
   handlePodsIndex,
   handleRegister,
+  handleSession,
 } from './api';
-import { handleAuthRequest } from './auth';
 import { env } from './env';
 import { json } from './http';
+import { ensureAccessControlBootstrap } from './permissions';
 
 await ensureAccessControlBootstrap();
 
@@ -16,8 +18,16 @@ const server = Bun.serve({
   async fetch(request) {
     const url = new URL(request.url);
 
-    if (url.pathname.startsWith('/api/auth/')) {
-      return handleAuthRequest(request);
+    if (url.pathname === '/api/session' && request.method === 'GET') {
+      return handleSession(request);
+    }
+
+    if (url.pathname === '/api/login' && request.method === 'POST') {
+      return handleLogin(request);
+    }
+
+    if (url.pathname === '/api/logout' && request.method === 'POST') {
+      return handleLogout(request);
     }
 
     if (url.pathname === '/api/register' && request.method === 'POST') {

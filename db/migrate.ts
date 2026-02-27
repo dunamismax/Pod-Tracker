@@ -1,6 +1,6 @@
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
-import { db, pool } from '../server/db';
+import { db, pool } from '../backend/db';
 
 async function run() {
   await migrate(db, { migrationsFolder: './db/migrations' });

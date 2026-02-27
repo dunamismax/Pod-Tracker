@@ -5,11 +5,10 @@ PodDashboard is a Bun-first TypeScript app for pod management and upcoming event
 ## Stack
 
 - Bun runtime/package manager
-- Vite + React Router (framework mode, SPA-first)
-- React 19.2 + TypeScript
-- Tailwind CSS + shadcn/ui-style components
+- Nuxt 4 + Vue 3 + TypeScript
+- Tailwind CSS + Nuxt UI
 - Postgres + Drizzle ORM + drizzle-kit
-- Auth.js (credentials) + Zod validation
+- Credentials auth with Auth.js session tables, custom credentials endpoints, and Zod validation
 - Biome for lint/format
 
 ## Setup
@@ -21,32 +20,39 @@ bun run db:migrate
 bun run db:seed
 ```
 
+If you are pointing at an existing local Postgres container on a non-default port, override `DATABASE_URL` accordingly before running the DB commands.
+
 ## Run
 
 ```bash
 bun run dev
 ```
 
-- Frontend: `http://localhost:5173`
+- Frontend: `http://localhost:3000`
 - API/Auth: `http://localhost:3001`
+
+Nuxt proxies `/api/*` to the Bun backend, so the browser stays same-origin for app requests.
 
 ## Quality Gates
 
 ```bash
 bun run lint
 bun run typecheck
+bun run smoke
 bun run scry:doctor
 ```
 
 ## API
 
-Authenticated routes require a valid Auth.js session and permission grants.
+Authenticated routes require a valid session cookie and permission grants.
 
 - `GET /api/pods`
 - `POST /api/pods`
 - `GET /api/events`
 - `POST /api/register`
-- `ALL /api/auth/*` (Auth.js)
+- `GET /api/session`
+- `POST /api/login`
+- `POST /api/logout`
 
 ## Seeded User
 

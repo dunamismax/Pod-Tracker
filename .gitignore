@@ -8,6 +8,8 @@ dist
 build
 .build
 .react-router
+.nuxt
+.output
 
 npm-debug.log*
 yarn-debug.log*

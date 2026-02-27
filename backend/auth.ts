@@ -15,6 +15,7 @@ const credentialsSchema = z.object({
 
 export const authConfig: AuthConfig = {
   trustHost: true,
+  basePath: '/api/auth',
   secret: env.AUTH_SECRET,
   adapter: DrizzleAdapter(db),
   providers: [

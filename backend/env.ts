@@ -8,8 +8,8 @@ export const env = z
       .min(1)
       .default('postgres://postgres:postgres@localhost:5432/poddashboard'),
     AUTH_SECRET: z.string().min(1).default('dev-secret-change-me'),
-    AUTH_URL: z.string().url().default('http://localhost:5173'),
-    APP_URL: z.string().url().default('http://localhost:5173'),
+    AUTH_URL: z.string().url().default('http://localhost:3000'),
+    APP_URL: z.string().url().default('http://localhost:3000'),
     API_URL: z.string().url().default('http://localhost:3001'),
     PORT: z.coerce.number().int().positive().default(3001),
   })
