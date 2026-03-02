@@ -30,6 +30,7 @@ export const auth = betterAuth({
       maxAge: 60 * 5,
     },
   },
+  trustedOrigins: [env.APP_URL, env.APP_URL.replace('localhost', '127.0.0.1')],
   advanced: {
     database: {
       generateId: (options) => {
