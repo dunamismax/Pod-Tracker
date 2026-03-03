@@ -7,13 +7,17 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'default' | 'soft';
 };
 
-const sizeClasses: Record<string, string> = {
+type ButtonColor = NonNullable<ButtonProps['color']>;
+type ButtonVariant = NonNullable<ButtonProps['variant']>;
+type ButtonSize = NonNullable<ButtonProps['size']>;
+
+const sizeClasses: Record<ButtonSize, string> = {
   default: 'px-4 py-2 text-sm',
   lg: 'px-5 py-2.5 text-sm',
   xl: 'px-6 py-3 text-base',
 };
 
-function colorClasses(color: string, variant: string) {
+function colorClasses(color: ButtonColor, variant: ButtonVariant) {
   if (color === 'warning' && variant === 'default') {
     return 'bg-amber-500 text-white hover:bg-amber-400 active:bg-amber-600';
   }

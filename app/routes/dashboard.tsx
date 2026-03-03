@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { ConfirmDialog } from '~/components/confirm-dialog';
+import { useToast } from '~/components/toast';
 import { Badge } from '~/components/ui/badge';
 import { Button } from '~/components/ui/button';
 import { Card, CardBody } from '~/components/ui/card';
@@ -15,9 +17,11 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session, signOut } = useAuth();
+  const { toast } = useToast();
 
   const [podName, setPodName] = useState('');
   const [podDescription, setPodDescription] = useState('');
+  const [showSignOutDialog, setShowSignOutDialog] = useState(false);
 
   const canCreatePod = podName.trim().length >= 2;
 
@@ -34,10 +38,14 @@ export default function DashboardPage() {
   const createPod = useMutation({
     mutationFn: (body: { name: string; description: string }) =>
       apiFetch<{ pod: Pod }>('/api/pods', { method: 'POST', body }),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setPodName('');
       setPodDescription('');
       queryClient.invalidateQueries({ queryKey: ['pods'] });
+      toast(`Pod "${data.pod.name}" created.`);
+    },
+    onError: (err) => {
+      toast(getApiErrorMessage(err, 'Failed to create pod.'), 'error');
     },
   });
 
@@ -49,6 +57,10 @@ export default function DashboardPage() {
   async function handleSignOut() {
     await signOut();
     navigate('/login');
+  }
+
+  function confirmSignOut() {
+    setShowSignOutDialog(true);
   }
 
   const loading = podsQuery.isLoading || eventsQuery.isLoading;
@@ -94,7 +106,7 @@ export default function DashboardPage() {
               color="neutral"
               variant="soft"
               size="lg"
-              onClick={handleSignOut}
+              onClick={confirmSignOut}
             >
               Sign out
             </Button>
@@ -227,7 +239,9 @@ export default function DashboardPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200/80">
                   Schedule
                 </p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">Upcoming events</h2>
+                <h2 className="mt-2 text-2xl font-semibold text-white">
+                  Recent &amp; upcoming events
+                </h2>
               </div>
 
               {loading ? (
@@ -236,7 +250,8 @@ export default function DashboardPage() {
                 </div>
               ) : !events.length ? (
                 <div className="rounded-2xl border border-dashed border-white/10 px-4 py-5 text-sm text-slate-300">
-                  No upcoming events. Quiet is fine, but now you know it is quiet on purpose.
+                  No recent or upcoming events. Quiet is fine, but now you know it is quiet on
+                  purpose.
                 </div>
               ) : (
                 <ul className="grid gap-3 lg:grid-cols-2">
@@ -269,6 +284,18 @@ export default function DashboardPage() {
           </Card>
         </div>
       </section>
+
+      <ConfirmDialog
+        open={showSignOutDialog}
+        title="Sign out"
+        description="Are you sure you want to sign out?"
+        confirmLabel="Sign out"
+        onConfirm={() => {
+          setShowSignOutDialog(false);
+          handleSignOut();
+        }}
+        onCancel={() => setShowSignOutDialog(false)}
+      />
     </main>
   );
 }

@@ -1,5 +1,6 @@
 import { handleEventsIndex, handlePodsCreate, handlePodsIndex } from './api';
 import { auth } from './auth';
+import { csrfCookieHeader, generateCsrfToken, getCsrfCookie, validateCsrf } from './csrf';
 import { env } from './env';
 import { json } from './http';
 import { ensureAccessControlBootstrap } from './permissions';
@@ -15,7 +16,7 @@ function corsHeaders(request: Request): Record<string, string> {
     return {
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, x-csrf-token',
       'Access-Control-Allow-Credentials': 'true',
     };
   }
@@ -40,6 +41,15 @@ const server = Bun.serve({
         return json({ error: 'Too many requests. Try again later.' }, 429);
       }
 
+      // CSRF: reject mutating custom API requests without valid CSRF token
+      const isMutating =
+        request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE';
+      if (isMutating && url.pathname.startsWith('/api/') && !url.pathname.startsWith('/api/auth')) {
+        if (!validateCsrf(request)) {
+          return json({ error: 'Invalid CSRF token.' }, 403);
+        }
+      }
+
       let response: Response;
 
       // Better Auth handles all /api/auth/* routes
@@ -61,6 +71,11 @@ const server = Bun.serve({
       const headers = corsHeaders(request);
       for (const [key, value] of Object.entries(headers)) {
         response.headers.set(key, value);
+      }
+
+      // Ensure CSRF cookie is always set
+      if (!getCsrfCookie(request)) {
+        response.headers.append('Set-Cookie', csrfCookieHeader(generateCsrfToken()));
       }
 
       const ms = Date.now() - start;

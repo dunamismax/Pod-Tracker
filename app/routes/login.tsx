@@ -5,16 +5,37 @@ import { Card, CardBody } from '~/components/ui/card';
 import { Input } from '~/components/ui/input';
 import { authClient } from '~/lib/auth-client';
 
+function validateEmail(value: string): string | null {
+  if (!value.trim()) return 'Email is required.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Enter a valid email address.';
+  return null;
+}
+
+function validatePassword(value: string): string | null {
+  if (!value) return 'Password is required.';
+  if (value.length < 6) return 'Password must be at least 6 characters.';
+  return null;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const emailError = touched.email ? validateEmail(email) : null;
+  const passwordError = touched.password ? validatePassword(password) : null;
+  const hasFieldErrors = !!validateEmail(email) || !!validatePassword(password);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    setTouched({ email: true, password: true });
     setError(null);
+
+    if (hasFieldErrors) return;
+
     setPending(true);
 
     try {
@@ -58,7 +79,15 @@ export default function LoginPage() {
                 placeholder="test@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                aria-invalid={emailError ? true : undefined}
+                aria-describedby={emailError ? 'email-error' : undefined}
               />
+              {emailError && (
+                <p id="email-error" className="text-xs text-rose-300">
+                  {emailError}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -71,7 +100,15 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+                aria-invalid={passwordError ? true : undefined}
+                aria-describedby={passwordError ? 'password-error' : undefined}
               />
+              {passwordError && (
+                <p id="password-error" className="text-xs text-rose-300">
+                  {passwordError}
+                </p>
+              )}
             </div>
 
             {error && (

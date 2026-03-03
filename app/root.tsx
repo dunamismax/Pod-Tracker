@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
 import './app.css';
 import { ErrorBoundary } from '~/components/error-boundary';
+import { ToastProvider } from '~/components/toast';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,13 +40,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 export default function Root() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
-        <div className="min-h-screen" id="main-content">
-          <div className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            <Outlet />
+      <ToastProvider>
+        <ErrorBoundary>
+          <div className="min-h-screen" id="main-content">
+            <div className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+              <Outlet />
+            </div>
           </div>
-        </div>
-      </ErrorBoundary>
+        </ErrorBoundary>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

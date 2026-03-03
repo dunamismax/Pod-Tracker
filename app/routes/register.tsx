@@ -5,6 +5,24 @@ import { Card, CardBody } from '~/components/ui/card';
 import { Input } from '~/components/ui/input';
 import { authClient } from '~/lib/auth-client';
 
+function validateEmail(value: string): string | null {
+  if (!value.trim()) return 'Email is required.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Enter a valid email address.';
+  return null;
+}
+
+function validatePassword(value: string): string | null {
+  if (!value) return 'Password is required.';
+  if (value.length < 6) return 'Password must be at least 6 characters.';
+  return null;
+}
+
+function validateConfirmation(password: string, confirmation: string): string | null {
+  if (!confirmation) return 'Please confirm your password.';
+  if (password !== confirmation) return 'Passwords do not match.';
+  return null;
+}
+
 export default function RegisterPage() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
@@ -13,15 +31,24 @@ export default function RegisterPage() {
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const emailError = touched.email ? validateEmail(email) : null;
+  const passwordError = touched.password ? validatePassword(password) : null;
+  const confirmError = touched.passwordConfirmation
+    ? validateConfirmation(password, passwordConfirmation)
+    : null;
+  const hasFieldErrors =
+    !!validateEmail(email) ||
+    !!validatePassword(password) ||
+    !!validateConfirmation(password, passwordConfirmation);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    setTouched({ email: true, password: true, passwordConfirmation: true });
     setError(null);
 
-    if (password !== passwordConfirmation) {
-      setError('Password confirmation does not match.');
-      return;
-    }
+    if (hasFieldErrors) return;
 
     setPending(true);
 
@@ -82,7 +109,15 @@ export default function RegisterPage() {
                 placeholder="test@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                aria-invalid={emailError ? true : undefined}
+                aria-describedby={emailError ? 'email-error' : undefined}
               />
+              {emailError && (
+                <p id="email-error" className="text-xs text-rose-300">
+                  {emailError}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -94,7 +129,15 @@ export default function RegisterPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+                aria-invalid={passwordError ? true : undefined}
+                aria-describedby={passwordError ? 'password-error' : undefined}
               />
+              {passwordError && (
+                <p id="password-error" className="text-xs text-rose-300">
+                  {passwordError}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -106,7 +149,15 @@ export default function RegisterPage() {
                 type="password"
                 value={passwordConfirmation}
                 onChange={(e) => setPasswordConfirmation(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, passwordConfirmation: true }))}
+                aria-invalid={confirmError ? true : undefined}
+                aria-describedby={confirmError ? 'confirm-error' : undefined}
               />
+              {confirmError && (
+                <p id="confirm-error" className="text-xs text-rose-300">
+                  {confirmError}
+                </p>
+              )}
             </div>
 
             {error && (

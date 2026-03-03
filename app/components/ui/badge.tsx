@@ -7,7 +7,10 @@ type BadgeProps = {
   variant?: 'outline' | 'soft';
 };
 
-function colorClasses(color: string, variant: string) {
+type BadgeColor = NonNullable<BadgeProps['color']>;
+type BadgeVariant = NonNullable<BadgeProps['variant']>;
+
+function colorClasses(color: BadgeColor, variant: BadgeVariant) {
   if (color === 'info' && variant === 'soft') {
     return 'bg-cyan-500/15 text-cyan-200';
   }
