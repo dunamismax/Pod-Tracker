@@ -31,6 +31,9 @@ bun run dev
 
 Open [http://localhost:3000](http://localhost:3000). The API runs on port 3001 (proxied automatically in dev).
 
+For production with the default split deployment, keep `APP_URL=http://localhost:3000`,
+`API_URL=http://localhost:3001`, and set `VITE_API_URL=http://localhost:3001` before `bun run build`.
+
 ### Seeded User
 
 `bun run db:seed` creates a test account:
@@ -47,7 +50,7 @@ Open [http://localhost:3000](http://localhost:3000). The API runs on port 3001 (
 | `bun run dev:api` | Start only the API server (with watch) |
 | `bun run dev:web` | Start only the Vite dev server |
 | `bun run build` | Production build |
-| `bun run start` | Start production servers |
+| `bun run start` | Start the production API plus the SPA static server |
 | `bun run lint` | Biome lint check |
 | `bun run format` | Biome auto-format |
 | `bun run typecheck` | TypeScript type check |

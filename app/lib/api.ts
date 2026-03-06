@@ -1,3 +1,5 @@
+import { toApiUrl } from './api-base';
+
 type ApiFetchOptions = {
   body?: Record<string, unknown>;
   method?: string;
@@ -34,7 +36,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     init.body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(path, init);
+  const response = await fetch(toApiUrl(path), init);
 
   if (!response.ok) {
     const data = await response.json().catch(() => null);

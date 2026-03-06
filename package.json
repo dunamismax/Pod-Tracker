@@ -9,7 +9,7 @@
     "build": "react-router build",
     "start": "concurrently -c \"#f59e0b,#0ea5e9\" \"\\\"$npm_execpath\\\" run start:api\" \"\\\"$npm_execpath\\\" run start:web\" --names=api,web",
     "start:api": "\"$npm_execpath\" run backend/index.ts",
-    "start:web": "react-router-serve ./build/server/index.js",
+    "start:web": "\"$npm_execpath\" run scripts/web-server.ts",
     "lint": "biome check .",
     "format": "biome format --write .",
     "smoke": "\"$npm_execpath\" run scripts/smoke.ts",
