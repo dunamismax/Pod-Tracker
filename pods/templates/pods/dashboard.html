@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% load tz %}
 
 {% block title %}PodWatch{% endblock %}
 
 {% block content %}
+  {% get_current_timezone as CURRENT_TIME_ZONE %}
   <section class="hero">
     <p class="eyebrow">Pod Scheduling Board</p>
     <h1>PodWatch</h1>
@@ -46,6 +48,9 @@
 
         <form action="{% url 'pods:create_pod' %}" method="post">
           {% csrf_token %}
+          {% for hidden in pod_form.hidden_fields %}
+            {{ hidden }}
+          {% endfor %}
           {% if pod_form.non_field_errors %}
             <ul class="error-list">
               {% for error in pod_form.non_field_errors %}
@@ -54,7 +59,7 @@
             </ul>
           {% endif %}
 
-          {% for field in pod_form %}
+          {% for field in pod_form.visible_fields %}
             <div class="field">
               <label for="{{ field.id_for_label }}">{{ field.label }}</label>
               {{ field }}
@@ -81,9 +86,15 @@
         <p class="section-copy">
           Add a concrete meeting to a pod. If there are no pods yet, create one first.
         </p>
+        <p class="section-copy">
+          Times are shown in {{ CURRENT_TIME_ZONE }}.
+        </p>
 
         <form action="{% url 'pods:create_event' %}" method="post">
           {% csrf_token %}
+          {% for hidden in event_form.hidden_fields %}
+            {{ hidden }}
+          {% endfor %}
           {% if event_form.non_field_errors %}
             <ul class="error-list">
               {% for error in event_form.non_field_errors %}
@@ -92,7 +103,7 @@
             </ul>
           {% endif %}
 
-          {% for field in event_form %}
+          {% for field in event_form.visible_fields %}
             <div class="field">
               <label for="{{ field.id_for_label }}">{{ field.label }}</label>
               {{ field }}
@@ -156,7 +167,9 @@
                   <h3>{{ event.title }}</h3>
                   <span class="chip">{{ event.pod.name }}</span>
                 </div>
-                <p class="meta">{{ event.scheduled_for|date:"M j, Y g:i A" }}</p>
+                <p class="meta">
+                  <time datetime="{{ event.scheduled_for|date:'c' }}">{{ event.scheduled_for|date:"M j, Y g:i A T" }}</time>
+                </p>
                 {% if event.location %}
                   <p class="meta">Location: {{ event.location }}</p>
                 {% endif %}

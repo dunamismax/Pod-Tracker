@@ -2,8 +2,11 @@
 import os
 import sys
 
+from podwatch.env import load_dotenv
+
 
 def main() -> None:
+    load_dotenv()
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "podwatch.settings")
     from django.core.management import execute_from_command_line
 

@@ -11,5 +11,46 @@
     <div class="page">
       {% block content %}{% endblock %}
     </div>
+    <script>
+      (function () {
+        const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!timezoneName) {
+          return;
+        }
+
+        const cookieName = "podwatch_timezone";
+        const reloadMarker = "podwatch-timezone-sync";
+        const currentCookie = document.cookie
+          .split("; ")
+          .find((entry) => entry.startsWith(cookieName + "="));
+        const currentTimezone = currentCookie
+          ? decodeURIComponent(currentCookie.split("=", 2)[1])
+          : "";
+        const cookieValue =
+          cookieName +
+          "=" +
+          encodeURIComponent(timezoneName) +
+          "; Path=/; Max-Age=31536000; SameSite=Lax" +
+          (window.location.protocol === "https:" ? "; Secure" : "");
+
+        document
+          .querySelectorAll('input[name="timezone"]')
+          .forEach((input) => (input.value = timezoneName));
+
+        if (currentTimezone === timezoneName) {
+          window.sessionStorage.removeItem(reloadMarker);
+          return;
+        }
+
+        document.cookie = cookieValue;
+
+        if (window.sessionStorage.getItem(reloadMarker) === timezoneName) {
+          return;
+        }
+
+        window.sessionStorage.setItem(reloadMarker, timezoneName);
+        window.location.reload();
+      })();
+    </script>
   </body>
 </html>

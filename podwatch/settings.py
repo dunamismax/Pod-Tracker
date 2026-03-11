@@ -1,8 +1,8 @@
 import os
-from pathlib import Path
 
+from .env import BASE_DIR, load_dotenv
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv()
 
 
 def env_flag(name: str, default: bool = False) -> bool:
@@ -12,6 +12,20 @@ def env_flag(name: str, default: bool = False) -> bool:
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def env_int(name: str, default: int) -> int:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+    return int(raw_value)
+
+
+def env_list(name: str, default: list[str]) -> list[str]:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+    return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
     "podwatch-dev-secret-key-change-me",
@@ -19,11 +33,8 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = env_flag("DJANGO_DEBUG", default=True)
 
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
-    if host.strip()
-]
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", ["127.0.0.1", "localhost"])
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", [])
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
@@ -36,6 +47,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "podwatch.middleware.BrowserTimezoneMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -70,7 +82,7 @@ DATABASES = {
 }
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+TIME_ZONE = os.environ.get("DJANGO_TIME_ZONE", "UTC")
 USE_I18N = True
 USE_TZ = True
 
