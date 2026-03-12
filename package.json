@@ -1,0 +1,28 @@
+{
+  "name": "podwatch",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "dev": "bun run --cwd apps/web dev",
+    "build": "bun run --cwd apps/web build",
+    "preview": "bun run --cwd apps/web preview",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "check": "biome check . && pnpm -r --if-present typecheck && pnpm -r --if-present test",
+    "db:generate": "bun run --cwd packages/db generate",
+    "db:push": "bun run --cwd packages/db push",
+    "db:studio": "bun run --cwd packages/db studio"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "protobufjs"
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "name": "@podwatch/web",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "bunx --bun vite dev --port 3000",
+    "build": "bunx --bun vite build",
+    "preview": "bunx --bun vite preview",
+    "test": "bunx --bun vitest run",
+    "typecheck": "bunx --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@podwatch/db": "workspace:*",
+    "@podwatch/domain": "workspace:*",
+    "@podwatch/observability": "workspace:*",
+    "@mastra/core": "^1.12.0",
+    "@tanstack/ai": "^0.6.3",
+    "@tanstack/ai-client": "^0.6.0",
+    "@tanstack/ai-openai": "^0.6.0",
+    "@tanstack/ai-react": "^0.6.4",
+    "@tanstack/react-devtools": "latest",
+    "@tanstack/react-query": "^5.90.20",
+    "@tanstack/react-query-devtools": "^5.90.20",
+    "@tanstack/react-router": "latest",
+    "@tanstack/react-router-devtools": "latest",
+    "@tanstack/react-router-ssr-query": "latest",
+    "@tanstack/react-start": "latest",
+    "@tanstack/router-plugin": "^1.166.7",
+    "better-auth": "^1.5.5",
+    "effect": "^3.19.19",
+    "lucide-react": "^0.545.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@tanstack/devtools-vite": "latest",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.4",
+    "jsdom": "^28.1.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.3.1",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: podwatch
+      POSTGRES_USER: podwatch
+      POSTGRES_PASSWORD: podwatch
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U podwatch -d podwatch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:

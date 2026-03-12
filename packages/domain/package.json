@@ -1,0 +1,20 @@
+{
+  "name": "@podwatch/domain",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bunx --bun vitest run",
+    "typecheck": "bunx --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "^3.19.19",
+    "@js-temporal/polyfill": "^0.5.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

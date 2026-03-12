@@ -1,0 +1,25 @@
+{
+  "name": "@podwatch/db",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "push": "drizzle-kit push",
+    "studio": "drizzle-kit studio",
+    "typecheck": "bunx --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@podwatch/domain": "workspace:*",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/pg": "^8.15.6",
+    "drizzle-kit": "^0.31.9",
+    "typescript": "^5.9.2"
+  }
+}
