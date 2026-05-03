@@ -95,6 +95,7 @@ Reference links:
 - WotC-owned names, card text, art, and symbols require fan-content care. Do not place core access behind a paywall without legal review.
 - AI output is advice, not rules authority. Commander legality and card facts must come from deterministic data and source-backed rules, not model guesses.
 - Every score must have evidence, a rubric version, and enough explanation that users can challenge it.
+- Salt score, salt rating, and overall social friction are first-class v1 scoring outputs. They must be evidence-backed, versioned with the rubric, and presented as conversation aids rather than moral judgments about a player or deck.
 - The UX must be fast on a phone at a table, not merely pretty on a desktop monitor.
 
 ## Target Stack
@@ -130,6 +131,7 @@ Reference links:
 - Prompt, rubric, and model versioning in the database.
 - Replayable analysis runs.
 - Evaluation fixtures for known decks across precon, casual, upgraded, high-power, and cEDH-like ranges.
+- Salt and social-friction fixtures for high-friction cards, play patterns, combos, stax, mass land denial, extra turns, theft, chaos, repetitive locks, and mismatch-prone decks.
 - Cost, token, latency, and failure telemetry per analysis run.
 
 ### Data Sources
@@ -282,13 +284,14 @@ ideal-magic/
 
 ### Work Checklist
 
-- [ ] Model users, decks, deck cards, commanders, provider links, card printings, oracle cards, sets, rulings, legality snapshots, analysis runs, scorecards, pod evaluations, and audit events.
+- [ ] Model users, decks, deck cards, commanders, provider links, card printings, oracle cards, sets, rulings, legality snapshots, analysis runs, scorecards, pod evaluations, salt/social-friction evidence, and audit events.
 - [ ] Add database indexes for deck ownership, card lookup, provider IDs, card names, oracle IDs, and analysis history.
 - [ ] Build Scryfall bulk-data ingestion with polite user-agent headers and rate-limit discipline.
 - [ ] Store source snapshot metadata for every card corpus refresh.
 - [ ] Normalize card names, faces, color identity, mana value, type lines, oracle text, legalities, and image URIs.
 - [ ] Add Commander banlist and rules snapshot storage.
-- [ ] Add internal card tags for ramp, fast mana, tutors, draw, protection, removal, stack interaction, board wipes, stax, combos, graveyard use, lands, and win conditions.
+- [ ] Add internal card tags for ramp, fast mana, tutors, draw, protection, removal, stack interaction, board wipes, stax, combos, graveyard use, lands, win conditions, salt drivers, and social-friction patterns.
+- [ ] Add curated salt taxonomy and override data for cards and play patterns that deterministic card facts cannot classify reliably.
 - [ ] Add curated override files or admin screens for tags the card corpus cannot infer reliably.
 - [ ] Add import fixtures for representative Commander decks.
 - [ ] Add data refresh jobs through Solid Queue.
@@ -298,12 +301,14 @@ ideal-magic/
 - [ ] The app can answer card facts without calling OpenAI.
 - [ ] Card data refreshes are repeatable and auditable.
 - [ ] Commander legality checks have deterministic source data.
+- [ ] Salt and social-friction tags are source-controlled, reviewable, and separated from raw Scryfall card facts.
 
 ### Verification
 
 - [ ] Card corpus unit tests.
 - [ ] Scryfall ingestion tests against fixture payloads.
 - [ ] Commander legality tests.
+- [ ] Salt taxonomy and override tests.
 - [ ] Database migration reset from scratch.
 - [ ] Background job smoke test for data refresh.
 
@@ -396,6 +401,9 @@ ideal-magic/
 - [ ] Compute mana curve, color requirements, land count, source count, ramp count, draw count, tutor count, interaction count, wipe count, protection count, graveyard dependence, and win condition markers.
 - [ ] Detect known combos through a curated combo graph.
 - [ ] Detect fast mana and high-power staples through tag rules.
+- [ ] Compute deterministic salt score from salt-tagged cards, high-friction mechanics, denial density, combo compactness, repetitive locks, extra-turn loops, theft/control effects, chaos effects, mass land denial, and expected recovery burden on opponents.
+- [ ] Compute salt rating bands from salt score with stable labels that are clear without being inflammatory.
+- [ ] Compute overall social friction score from salt, speed mismatch risk, power ambiguity, interaction asymmetry, stax/lock likelihood, combo opacity, game-length pressure, and Rule 0 disclosure needs.
 - [ ] Estimate speed from ramp, tutors, curve, win conditions, and goldfish heuristics.
 - [ ] Estimate consistency from mana, redundancy, card draw, tutors, curve, and opening-hand heuristics.
 - [ ] Estimate interaction from count, type mix, mana efficiency, and coverage.
@@ -408,12 +416,14 @@ ideal-magic/
 
 - [ ] Every deck can receive a deterministic score draft.
 - [ ] Every deterministic score exposes the facts that drove it.
+- [ ] Every deck can receive salt score, salt rating, and overall social friction outputs without calling OpenAI.
 - [ ] The app can run baseline analysis while OpenAI is disabled.
 
 ### Verification
 
 - [ ] Unit tests for feature extraction.
 - [ ] Commander legality regression tests.
+- [ ] Salt score, salt rating, and social-friction scoring tests against calibrated fixtures.
 - [ ] Benchmark deck score snapshot tests.
 - [ ] Performance test for large batch analysis.
 
@@ -428,10 +438,10 @@ ideal-magic/
 ### Work Checklist
 
 - [ ] Create an OpenAI client service for Responses API calls.
-- [ ] Define JSON schema for AI scorecards.
+- [ ] Define JSON schema for AI scorecards, including salt score, salt rating, social friction score, friction drivers, and Rule 0 talking points.
 - [ ] Define prompt versions for single-deck analysis.
 - [ ] Define prompt versions for pod analysis.
-- [ ] Pass deterministic feature vectors, decklist summaries, commander identity, combo candidates, and rubric text to the model.
+- [ ] Pass deterministic feature vectors, decklist summaries, commander identity, combo candidates, salt/social-friction evidence, and rubric text to the model.
 - [ ] Instruct the model to cite only provided facts and mark uncertainty.
 - [ ] Add retries, timeouts, request IDs, and failure states.
 - [ ] Add moderation or abuse safeguards for user-provided deck descriptions and prompts.
@@ -446,6 +456,7 @@ ideal-magic/
 - [ ] AI analysis returns valid structured scorecards.
 - [ ] Invalid model output is rejected and retried or surfaced as a failed run.
 - [ ] Deterministic facts remain visible beside AI interpretation.
+- [ ] AI salt/social-friction explanations cite deterministic evidence and do not shame players for deck choices.
 - [ ] Cost and token usage are stored per run.
 
 ### Verification
@@ -468,10 +479,11 @@ ideal-magic/
 
 - [ ] Build dashboard with recent decks, analyses, imports, and queued jobs.
 - [ ] Build deck detail page with commander, colors, source, card list, tags, curve, and import history.
-- [ ] Build analysis run page with power, speed, interaction, and consistency scores.
+- [ ] Build analysis run page with power, speed, interaction, consistency, salt score, salt rating, and overall social friction scores.
 - [ ] Show confidence, evidence, and improvement priorities for each score.
+- [ ] Show salt and social-friction evidence with neutral language, card/play-pattern drivers, and practical table-disclosure guidance.
 - [ ] Add "what changed since last analysis" diffs.
-- [ ] Add recommendation sections for mana, draw, ramp, interaction, win conditions, and social fit.
+- [ ] Add recommendation sections for mana, draw, ramp, interaction, win conditions, salt reduction, and social fit.
 - [ ] Add user feedback controls for score agreement and notes.
 - [ ] Add shareable public analysis links with privacy controls.
 - [ ] Add export to Markdown, text, and JSON.
@@ -483,12 +495,14 @@ ideal-magic/
 
 - [ ] Users can understand a deck's strengths and weaknesses within one screen.
 - [ ] Users can drill into score evidence without losing context.
+- [ ] Users can understand why a deck may feel salty or socially high-friction without the UI treating salt as inherently bad.
 - [ ] The UI remains usable on phone, tablet, and desktop widths.
 
 ### Verification
 
 - [ ] Component tests.
 - [ ] System tests for import to analysis completion.
+- [ ] System tests for salt/social-friction score display, evidence drilldown, and export content.
 - [ ] Playwright or Rails system screenshots for mobile and desktop.
 - [ ] Accessibility checks for keyboard navigation, labels, contrast, and reduced motion.
 
@@ -506,8 +520,9 @@ ideal-magic/
 - [ ] Let users create a pod from 2 to 4 decks for v1.
 - [ ] Support guest deck submission by public link or paste.
 - [ ] Compute score spread, average, outliers, and matchup warnings.
+- [ ] Compute pod-level salt spread, average social friction, friction outliers, and mismatch warnings.
 - [ ] Detect likely archenemy decks, pubstomp risks, durdle risks, and interaction gaps.
-- [ ] Generate a Rule 0 brief with power band, speed expectations, combo/stax notes, and suggested swaps.
+- [ ] Generate a Rule 0 brief with power band, speed expectations, combo/stax notes, salt/social-friction notes, and suggested swaps.
 - [ ] Show pod balance visually without hiding details.
 - [ ] Add printable and shareable pod summary.
 - [ ] Add "find closer decks from my library" recommendations.
@@ -516,12 +531,14 @@ ideal-magic/
 
 - [ ] A pod can be created, analyzed, shared, and revised.
 - [ ] Mismatch warnings are specific and evidence-backed.
+- [ ] Pod salt/social-friction warnings identify likely table experience issues without overstating certainty.
 - [ ] Pod analysis helps players choose decks, not just assign numbers.
 
 ### Verification
 
 - [ ] Pod model and service tests.
 - [ ] Pod UI system tests.
+- [ ] Pod salt/social-friction fixture tests across low-salt, mixed-salt, and high-friction pods.
 - [ ] Benchmark pod fixture tests across balanced and mismatched pods.
 
 ## Phase 9 - Build The PWA Experience
@@ -650,8 +667,11 @@ ideal-magic/
 
 - [ ] Recruit beta users with different Commander metas.
 - [ ] Collect score disagreement feedback.
+- [ ] Collect salt score, salt rating, and social-friction disagreement feedback.
 - [ ] Create calibration decks for each power band.
+- [ ] Create calibration decks for each salt rating and social-friction band.
 - [ ] Tune deterministic scoring weights.
+- [ ] Tune salt/social-friction weights separately from raw power so salty casual decks and clean high-power decks can be represented accurately.
 - [ ] Tune AI prompt and rubric versions.
 - [ ] Add changelog for scoring rubric changes.
 - [ ] Define v1 launch feature set and freeze scope.
@@ -669,6 +689,7 @@ ideal-magic/
 ### Verification
 
 - [ ] Benchmark suite score review.
+- [ ] Salt/social-friction calibration review with real Commander players across multiple metas.
 - [ ] Beta feedback review.
 - [ ] Full `bin/verify`.
 - [ ] Production smoke test.
@@ -705,7 +726,27 @@ Inputs include mana base quality, land count, color source count, card draw, sel
 
 Pod fit measures whether multiple decks are likely to produce a satisfying game together.
 
-Inputs include score spread, speed spread, combo and stax profile, interaction distribution, win-condition clarity, and social friction flags.
+Inputs include score spread, speed spread, combo and stax profile, interaction distribution, win-condition clarity, salt spread, and social friction flags.
+
+### Salt Score And Salt Rating
+
+Salt score measures how likely a deck's cards and play patterns are to create frustration, resentment, or Rule 0 concern at a typical Commander table. Salt score is stored internally on a 0-100 scale. Salt rating is the human-readable band derived from the salt score.
+
+Inputs include salt-tagged cards, stax and lock density, mass land denial, extra-turn loops, theft and control effects, chaos effects, tutor-to-combo pressure, deterministic win lines that are hard to interact with, repetitive play patterns, game-length extension, and the amount of table recovery burden imposed on opponents.
+
+Salt rating labels must be neutral and useful. They should describe expected table impact rather than insult the deck or player.
+
+### Overall Social Friction
+
+Overall social friction measures how much Rule 0 conversation a deck or pod likely needs before play. It is related to salt, but not identical: a high-power cEDH deck can be low-friction in the right pod, while a casual deck can be high-friction if its game plan creates slow, repetitive, or unclear experiences.
+
+Inputs include salt score, salt rating, power/speed mismatch risk, combo opacity, stax/lock likelihood, interaction asymmetry, commander reputation, game-length pressure, archetype expectations, and whether the deck's win conditions are easy for opponents to understand.
+
+Social friction outputs must include practical disclosure prompts and suggested pod adjustments. They must not present social friction as a moral verdict.
+
+### Documentation Requirement
+
+When salt score, salt rating, or social friction work begins, update `docs/analysis-rubric.md`, `README.md`, exported score schemas, and any build/verify pipeline documentation in the same tranche so the product promise, rubric, UI, API/export behavior, and tests agree.
 
 ## V1 Non-Goals
 
