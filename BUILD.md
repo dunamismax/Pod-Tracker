@@ -36,9 +36,20 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo is currently a docs-only product-charter repository. `README.md`, `BUILD.md`, repo-local `AGENTS.md`, and Phase 0 docs exist.
+The repo now contains a verified Rails foundation scaffolded on 2026-05-03.
 
-No Rails app, database schema, Docker runtime, deployment files, analysis engine, provider integration implementation, PWA assets, or production configuration exist yet.
+Shipped foundation:
+
+- Ruby 4.0.3 is pinned in `.ruby-version`, `.mise.toml`, and the Docker base image.
+- Rails 8.1.3 is pinned in `Gemfile.lock`.
+- PostgreSQL is configured for development, test, and production.
+- Hotwire, Turbo, Stimulus, Tailwind CSS v4, ViewComponent, Propshaft, Puma, Thruster, Solid Queue, Solid Cache, and Solid Cable are installed.
+- Rails authentication generator output exists for users, sessions, and password reset.
+- Minitest is the primary test framework.
+- Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
+- `.env.example`, `/up`, `/ready`, and an authenticated dashboard root route exist.
+
+No deck import, card corpus, scoring engine, OpenAI evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison, PWA offline behavior, or production configuration exists yet.
 
 GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
@@ -46,8 +57,8 @@ GitHub repository visibility was verified as public on 2026-05-03 through `gh re
 
 These references were checked while drafting this plan. Agents must re-check current versions before scaffolding or implementing external integrations.
 
-- Ruby's public site reported Ruby 4.0.3 as the latest stable version.
-- RubyGems listed Rails 8.1.3 as the latest Rails gem release.
+- Ruby's public site reported Ruby 4.0.3 as the latest stable version. Re-checked before scaffolding on 2026-05-03.
+- RubyGems listed Rails 8.1.3 as the latest Rails gem release. Re-checked before scaffolding on 2026-05-03.
 - Rails 8.0 introduced the default authentication generator, Propshaft by default, Solid Cable, Solid Cache, and Solid Queue.
 - Rails 8.1 release notes list Active Job Continuations, Structured Event Reporting, Local CI, Markdown rendering, command-line credentials fetching, and registry-free Kamal deployment improvements.
 - The OpenAI API authenticates with API keys. API keys must stay server-side and must not be exposed to browsers.
@@ -178,7 +189,7 @@ ideal-magic/
 ## Phase Status Summary
 
 - [x] Phase 0 - Freeze product charter and repo rules.
-- [ ] Phase 1 - Scaffold the Rails foundation.
+- [x] Phase 1 - Scaffold the Rails foundation.
 - [ ] Phase 2 - Build the data model and card corpus pipeline.
 - [ ] Phase 3 - Build authentication, accounts, and AI billing boundaries.
 - [ ] Phase 4 - Build deck import and provider adapters.
@@ -226,40 +237,40 @@ ideal-magic/
 
 ### Objectives
 
-- [ ] Create a modern Rails app with boring local startup.
-- [ ] Pin current stable Ruby and Rails versions after live verification.
-- [ ] Establish quality gates before feature work.
+- [x] Create a modern Rails app with boring local startup.
+- [x] Pin current stable Ruby and Rails versions after live verification.
+- [x] Establish quality gates before feature work.
 
 ### Work Checklist
 
-- [ ] Re-check latest stable Ruby and Rails versions from official sources.
-- [ ] Install or select the verified Ruby version locally.
-- [ ] Scaffold Rails in the repo root with PostgreSQL and Tailwind CSS.
-- [ ] Pin `.ruby-version`, `Gemfile`, `Gemfile.lock`, and Docker base image consistently.
-- [ ] Add Hotwire, Stimulus, Tailwind, and the chosen component layer.
-- [ ] Add Rails authentication generator output or an explicit auth baseline.
-- [ ] Add Brakeman, RuboCop, ERB linting, and bundle audit tooling.
-- [ ] Add Minitest or RSpec decision and stick to one primary test framework.
-- [ ] Add root scripts for setup, lint, test, security, build, and verify.
-- [ ] Add `.env.example` without secrets.
-- [ ] Add health and readiness endpoints.
-- [ ] Add a simple home/dashboard route that proves the app boots.
+- [x] Re-check latest stable Ruby and Rails versions from official sources.
+- [x] Install or select the verified Ruby version locally.
+- [x] Scaffold Rails in the repo root with PostgreSQL and Tailwind CSS.
+- [x] Pin `.ruby-version`, `Gemfile`, `Gemfile.lock`, and Docker base image consistently.
+- [x] Add Hotwire, Stimulus, Tailwind, and the chosen component layer.
+- [x] Add Rails authentication generator output or an explicit auth baseline.
+- [x] Add Brakeman, RuboCop, ERB linting, and bundle audit tooling.
+- [x] Add Minitest or RSpec decision and stick to one primary test framework.
+- [x] Add root scripts for setup, lint, test, security, build, and verify.
+- [x] Add `.env.example` without secrets.
+- [x] Add health and readiness endpoints.
+- [x] Add a simple home/dashboard route that proves the app boots.
 
 ### Exit Criteria
 
-- [ ] `bin/setup` prepares a fresh development environment.
-- [ ] `bin/dev` starts the local web app.
-- [ ] The root verify command runs all current checks.
-- [ ] The app can connect to PostgreSQL locally.
+- [x] `bin/setup` prepares a fresh development environment.
+- [x] `bin/dev` starts the local web app.
+- [x] The root verify command runs all current checks.
+- [x] The app can connect to PostgreSQL locally.
 
 ### Verification
 
-- [ ] `bundle exec rubocop`
-- [ ] `bundle exec brakeman`
-- [ ] `bin/rails test`
-- [ ] `bin/rails db:prepare`
-- [ ] `bin/rails assets:precompile`
-- [ ] `bin/verify`
+- [x] `bundle exec rubocop`
+- [x] `bundle exec brakeman`
+- [x] `bin/rails test`
+- [x] `bin/rails db:prepare`
+- [x] `bin/rails assets:precompile`
+- [x] `bin/verify`
 
 ## Phase 2 - Build The Data Model And Card Corpus Pipeline
 

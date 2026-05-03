@@ -1,6 +1,6 @@
 # Ideal Magic
 
-Ideal Magic is a planned Ruby on Rails web app for AI-assisted Magic: The Gathering Commander deck and pod evaluation.
+Ideal Magic is a Ruby on Rails web app for AI-assisted Magic: The Gathering Commander deck and pod evaluation.
 
 The goal is to build a better, more transparent version of the deck-checking experience: import decks from public Archidekt or Moxfield links, analyze them with deterministic Commander heuristics plus OpenAI-backed evaluation, and return clear scores for power, speed, interaction, consistency, and pod fit.
 
@@ -8,7 +8,9 @@ Ideal Magic will be hosted at `ideal-magic.com` on Stephen's Ubuntu VM behind Ca
 
 ## Current Status
 
-This repository is at the planning and product-charter stage. The Rails application has not been scaffolded yet.
+This repository has a verified Rails foundation. The app currently boots with Ruby 4.0.3, Rails 8.1.3, PostgreSQL, Hotwire, Tailwind CSS v4, ViewComponent, Solid Queue/Cache/Cable, Rails authentication, and baseline quality gates.
+
+No deck import, card corpus, scoring engine, OpenAI evaluation pipeline, pod comparison, PWA offline behavior, Docker Compose runtime, or production deployment configuration has shipped yet.
 
 Current stable docs:
 
@@ -59,18 +61,18 @@ Ideal Magic will store scores internally on a 0-100 scale and display them as fr
 
 Each score should include confidence, evidence, and suggested improvements.
 
-## Planned Stack
+## Stack
 
-- Ruby latest stable at scaffold time.
-- Rails latest stable at scaffold time.
+- Ruby 4.0.3, pinned in `.ruby-version`, `.mise.toml`, and the Docker base image.
+- Rails 8.1.3, pinned in `Gemfile.lock`.
 - PostgreSQL for durable data.
 - Rails authentication as the baseline account system.
-- Hotwire, Turbo, Stimulus, Tailwind CSS v4, and Rails-native components for the UI.
+- Hotwire, Turbo, Stimulus, Tailwind CSS v4, and ViewComponent for the UI.
 - Solid Queue for background deck analysis.
-- Solid Cache and Solid Cable where they earn their keep.
+- Solid Cache and Solid Cable are installed with the Rails foundation.
 - Scryfall bulk data for card facts.
 - OpenAI Responses API for structured AI evaluation.
-- Docker Compose for local and self-hosted runtime.
+- Docker image support is scaffolded; Docker Compose is not implemented yet.
 - Caddy for TLS and reverse proxy at `ideal-magic.com`.
 - systemd for service lifecycle and backup timers on the Ubuntu host.
 
@@ -129,15 +131,26 @@ Kamal can be evaluated later, but the default path should stay inspectable throu
 
 ## Development
 
-The app has not been scaffolded yet. The first implementation phase should create the Rails foundation and then update this section with real commands.
+Use `mise` or another Ruby version manager that can select Ruby 4.0.3. This repo includes `.ruby-version` and `.mise.toml`; with `mise`, run `mise trust` once for this checkout. If your shell does not auto-activate `mise`, prefix commands with `mise exec --`.
 
-Expected future commands:
+Current commands:
 
 ```sh
 bin/setup
 bin/dev
-bin/rails test
+bin/test
+bin/lint
+bin/security
+bin/build
 bin/verify
+```
+
+Useful Rails commands:
+
+```sh
+bin/rails db:prepare
+bin/rails test
+bin/rails assets:precompile
 ```
 
 ## Project Boundary

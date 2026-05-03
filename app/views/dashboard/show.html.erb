@@ -1,0 +1,36 @@
+<section class="grid w-full gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+  <div class="space-y-6">
+    <div class="space-y-3">
+      <p class="text-sm font-medium uppercase tracking-wide text-emerald-300">Commander analysis workspace</p>
+      <h1 class="text-3xl font-semibold text-white sm:text-4xl">Ideal Magic</h1>
+      <p class="max-w-2xl text-base leading-7 text-zinc-300">
+        Import Commander decks, run deterministic checks, and build evidence-backed pod evaluations.
+      </p>
+    </div>
+
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+      <h2 class="text-lg font-medium text-white">Deck intake</h2>
+      <p class="mt-2 text-sm leading-6 text-zinc-400">
+        Pasted decklists, text exports, and public provider URLs will land here as the import pipeline comes online.
+      </p>
+    </div>
+  </div>
+
+  <aside class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+    <h2 class="text-lg font-medium text-white">Foundation status</h2>
+    <dl class="mt-4 space-y-3 text-sm">
+      <div class="flex items-center justify-between gap-4">
+        <dt class="text-zinc-400">Rails</dt>
+        <dd class="font-medium text-zinc-100"><%= Rails.version %></dd>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <dt class="text-zinc-400">Ruby</dt>
+        <dd class="font-medium text-zinc-100"><%= RUBY_VERSION %></dd>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <dt class="text-zinc-400">Database</dt>
+        <dd class="font-medium text-zinc-100">PostgreSQL</dd>
+      </div>
+    </dl>
+  </aside>
+</section>

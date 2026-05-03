@@ -2,7 +2,7 @@
 
 Ideal Magic's target deployment is a single self-hosted Ubuntu VM serving `ideal-magic.com` behind Caddy-managed TLS.
 
-This document describes the intended production shape. It is not a runbook yet because the Rails app has not been scaffolded.
+This document describes the intended production shape. It is not a runbook yet because the Docker Compose, Caddy, systemd, backup, and production deploy files have not been implemented.
 
 ## Target Architecture
 
@@ -51,7 +51,7 @@ The intended deploy flow:
 5. Check health endpoint.
 6. Check logs for boot or migration errors.
 
-The actual commands should be written after the Rails scaffold and Docker runtime exist.
+The actual commands should be written after the Docker runtime exists.
 
 ## Backups And Restore
 
@@ -69,10 +69,9 @@ Backups are not complete until restore has been tested.
 
 ## Health Checks
 
-The app should expose health and readiness endpoints:
+The app exposes health and readiness endpoints:
 
-- Liveness for process boot.
-- Readiness for database connectivity and required runtime dependencies.
+- `/up` for process boot.
+- `/ready` for database connectivity.
 
 Caddy and deployment scripts should use these endpoints once implemented.
-
