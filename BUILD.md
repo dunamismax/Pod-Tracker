@@ -1,6 +1,7 @@
 # BUILD.md
 
 Last drafted: 2026-05-03
+Last updated: 2026-05-03
 
 ## Agent Operating Rules
 
@@ -35,9 +36,11 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo is currently an empty Git repository with planning docs being added first.
+The repo is currently a docs-only product-charter repository. `README.md`, `BUILD.md`, repo-local `AGENTS.md`, and Phase 0 docs exist.
 
-No Rails app, database schema, Docker runtime, deployment files, analysis engine, provider integrations, PWA assets, or production configuration exist yet.
+No Rails app, database schema, Docker runtime, deployment files, analysis engine, provider integration implementation, PWA assets, or production configuration exist yet.
+
+GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
 ## Current External Truth To Preserve
 
@@ -141,6 +144,7 @@ Reference links:
 
 ```text
 ideal-magic/
+  AGENTS.md
   app/
     components/
     controllers/
@@ -173,7 +177,7 @@ ideal-magic/
 
 ## Phase Status Summary
 
-- [ ] Phase 0 - Freeze product charter and repo rules.
+- [x] Phase 0 - Freeze product charter and repo rules.
 - [ ] Phase 1 - Scaffold the Rails foundation.
 - [ ] Phase 2 - Build the data model and card corpus pipeline.
 - [ ] Phase 3 - Build authentication, accounts, and AI billing boundaries.
@@ -191,32 +195,32 @@ ideal-magic/
 
 ### Objectives
 
-- [ ] Turn the idea into stable product, architecture, and operating guidance.
-- [ ] Make future agents start from the same constraints.
-- [ ] Capture legal, provider, and OpenAI feasibility boundaries before code exists.
+- [x] Turn the idea into stable product, architecture, and operating guidance.
+- [x] Make future agents start from the same constraints.
+- [x] Capture legal, provider, and OpenAI feasibility boundaries before code exists.
 
 ### Work Checklist
 
-- [ ] Confirm the app name, domain, and product positioning in `README.md`.
-- [ ] Add repo-local `AGENTS.md` if Stephen wants repo-specific rules beyond `/Users/sawyer/github/AGENTS.md`.
-- [ ] Create `docs/analysis-rubric.md` with the first scoring rubric.
-- [ ] Create `docs/provider-integrations.md` with the allowed provider integration policy.
-- [ ] Create `docs/security.md` with auth, token, secret, and privacy rules.
-- [ ] Create `docs/deployment.md` with the intended Ubuntu, Caddy, Docker Compose, and systemd shape.
-- [ ] Add a WotC fan-content disclaimer plan.
-- [ ] Decide whether the repo is private or public.
-- [ ] Decide the license or explicitly mark licensing as pending.
+- [x] Confirm the app name, domain, and product positioning in `README.md`.
+- [x] Add repo-local `AGENTS.md` if Stephen wants repo-specific rules beyond `/Users/sawyer/github/AGENTS.md`.
+- [x] Create `docs/analysis-rubric.md` with the first scoring rubric.
+- [x] Create `docs/provider-integrations.md` with the allowed provider integration policy.
+- [x] Create `docs/security.md` with auth, token, secret, and privacy rules.
+- [x] Create `docs/deployment.md` with the intended Ubuntu, Caddy, Docker Compose, and systemd shape.
+- [x] Add a WotC fan-content disclaimer plan.
+- [x] Decide whether the repo is private or public.
+- [x] Decide the license or explicitly mark licensing as pending.
 
 ### Exit Criteria
 
-- [ ] A future agent can answer what Ideal Magic is, what v1 must ship, and what is out of scope.
-- [ ] A future agent cannot accidentally plan around unsupported ChatGPT subscription passthrough.
-- [ ] The legal and provider boundaries are written before implementation.
+- [x] A future agent can answer what Ideal Magic is, what v1 must ship, and what is out of scope.
+- [x] A future agent cannot accidentally plan around unsupported ChatGPT subscription passthrough.
+- [x] The legal and provider boundaries are written before implementation.
 
 ### Verification
 
-- [ ] `rg -n "ChatGPT subscription|OpenAI|Moxfield|Archidekt|Fan Content|Commander" README.md BUILD.md docs`
-- [ ] `git diff --check`
+- [x] `rg -n "ChatGPT subscription|OpenAI|Moxfield|Archidekt|Fan Content|Commander" README.md BUILD.md docs`
+- [x] `git diff --check`
 
 ## Phase 1 - Scaffold The Rails Foundation
 

@@ -8,7 +8,16 @@ Ideal Magic will be hosted at `ideal-magic.com` on Stephen's Ubuntu VM behind Ca
 
 ## Current Status
 
-This repository is at the planning stage. The Rails application has not been scaffolded yet.
+This repository is at the planning and product-charter stage. The Rails application has not been scaffolded yet.
+
+Current stable docs:
+
+- [BUILD.md](/Users/sawyer/github/ideal-magic/BUILD.md) - active build execution manual.
+- [AGENTS.md](/Users/sawyer/github/ideal-magic/AGENTS.md) - repo-local operating rules.
+- [docs/analysis-rubric.md](/Users/sawyer/github/ideal-magic/docs/analysis-rubric.md) - initial score rubric.
+- [docs/provider-integrations.md](/Users/sawyer/github/ideal-magic/docs/provider-integrations.md) - allowed provider integration policy.
+- [docs/security.md](/Users/sawyer/github/ideal-magic/docs/security.md) - auth, secret, privacy, and fan-content boundaries.
+- [docs/deployment.md](/Users/sawyer/github/ideal-magic/docs/deployment.md) - intended self-hosted deployment shape.
 
 Build execution lives in [BUILD.md](/Users/sawyer/github/ideal-magic/BUILD.md). Future agents should treat that file as the active implementation manual until the app is built and these stable docs describe shipped behavior.
 
@@ -100,6 +109,12 @@ Archidekt and Moxfield integrations should start with public deck URLs and expor
 Ideal Magic is unofficial fan content. It is not approved, endorsed, or sponsored by Wizards of the Coast.
 
 Portions of Magic: The Gathering materials are property of Wizards of the Coast LLC. Any use of card names, card text, images, or related material must follow Wizards' Fan Content Policy and source-specific data terms.
+
+The public app must include the fan-content notice on public legal/footer surfaces before launch.
+
+## Repo Status
+
+The GitHub repository is public as of 2026-05-03. No license file is present yet, so licensing is pending and reuse terms are not granted until Stephen chooses and commits a license.
 
 ## Deployment Target
 
