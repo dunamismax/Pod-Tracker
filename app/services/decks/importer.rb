@@ -36,6 +36,16 @@ module Decks
       )
     end
 
+    def self.import_moxfield_url(user:, url:, name: nil, commander_hint: nil, adapter: Adapters::Moxfield.new)
+      new.import(
+        user: user,
+        adapter: adapter,
+        payload: url,
+        name: name,
+        commander_hint: commander_hint
+      )
+    end
+
     def import(user:, adapter:, payload:, name: nil, commander_hint: nil)
       parsed = adapter.parse(payload)
       parsed_with_hint = apply_commander_hint(parsed, commander_hint)
@@ -52,7 +62,9 @@ module Decks
       Result.new(deck: deck, parsed: parsed_with_hint, error_messages: [])
     rescue Adapters::TextFile::InvalidFile,
            Adapters::Archidekt::InvalidUrl,
-           Adapters::Archidekt::FetchFailed => e
+           Adapters::Archidekt::FetchFailed,
+           Adapters::Moxfield::InvalidUrl,
+           Adapters::Moxfield::FetchFailed => e
       Result.new(deck: nil, parsed: nil, error_messages: [ e.message ])
     rescue ActiveRecord::RecordInvalid => e
       Result.new(deck: nil, parsed: parsed, error_messages: Array(e.record&.errors&.full_messages || [ e.message ]))

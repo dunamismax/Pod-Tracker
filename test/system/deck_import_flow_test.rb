@@ -72,6 +72,45 @@ class DeckImportFlowTest < ApplicationSystemTestCase
     Decks::Adapters::Archidekt.client_factory = previous if previous
   end
 
+  test "user imports a deck from a Moxfield URL" do
+    user = users(:one)
+    sign_in_through_ui(user)
+
+    json = {
+      "name" => "URL Moxfield Atraxa",
+      "boards" => {
+        "commanders" => {
+          "cards" => {
+            "atraxa" => { "quantity" => 1, "card" => { "name" => "Atraxa, Praetors' Voice" } }
+          }
+        },
+        "mainboard" => {
+          "cards" => {
+            "sol" => { "quantity" => 1, "card" => { "name" => "Sol Ring" } },
+            "signet" => { "quantity" => 1, "card" => { "name" => "Arcane Signet" } }
+          }
+        }
+      }
+    }
+
+    previous = Decks::Adapters::Moxfield.client_factory
+    stub_class = Class.new do
+      define_method(:fetch_deck) { |_slug| json }
+    end
+    Decks::Adapters::Moxfield.client_factory = -> { stub_class.new }
+
+    visit new_deck_path
+    fill_in "Moxfield deck URL (optional)", with: "https://www.moxfield.com/decks/abcDEF123_-x"
+    click_button "Import deck"
+
+    assert_text "Deck imported."
+    assert_text "URL Moxfield Atraxa"
+    assert_text "Atraxa, Praetors' Voice"
+    assert_text "Sol Ring"
+  ensure
+    Decks::Adapters::Moxfield.client_factory = previous if previous
+  end
+
   test "user uploads a text file decklist" do
     user = users(:one)
     sign_in_through_ui(user)

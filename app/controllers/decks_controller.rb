@@ -31,6 +31,13 @@ class DecksController < ApplicationController
           name: @form.name,
           commander_hint: @form.commander_hint
         )
+      elsif @form.moxfield_url_provided?
+        Decks::Importer.import_moxfield_url(
+          user: current_user,
+          url: @form.normalized_moxfield_url,
+          name: @form.name,
+          commander_hint: @form.commander_hint
+        )
       elsif @form.upload_provided?
         Decks::Importer.import_text_file(
           user: current_user,
@@ -73,7 +80,7 @@ class DecksController < ApplicationController
     end
 
     def import_params
-      params.require(:deck_import_form).permit(:decklist, :name, :commander_hint, :decklist_file, :archidekt_url)
+      params.require(:deck_import_form).permit(:decklist, :name, :commander_hint, :decklist_file, :archidekt_url, :moxfield_url)
     end
 
     def record_audit(name, deck:, parsed:)

@@ -9,6 +9,7 @@ class DeckImportForm
   attribute :commander_hint, :string
   attribute :decklist_file
   attribute :archidekt_url, :string
+  attribute :moxfield_url, :string
 
   validate :decklist_file_or_url_present
   validate :decklist_size_within_limit
@@ -39,10 +40,18 @@ class DeckImportForm
     archidekt_url.to_s.strip
   end
 
+  def moxfield_url_provided?
+    moxfield_url.to_s.strip.present?
+  end
+
+  def normalized_moxfield_url
+    moxfield_url.to_s.strip
+  end
+
   private
 
   def decklist_file_or_url_present
-    return if pasted_text_provided? || upload_provided? || archidekt_url_provided?
+    return if pasted_text_provided? || upload_provided? || archidekt_url_provided? || moxfield_url_provided?
 
     errors.add(:decklist, "is required")
   end

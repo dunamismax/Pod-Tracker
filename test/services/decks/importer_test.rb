@@ -149,7 +149,74 @@ module Decks
       assert_includes result.error_messages.join(" ").downcase, "not found"
     end
 
+    test "imports a Moxfield deck URL with a fake client" do
+      adapter = Adapters::Moxfield.new(client: stub_moxfield_client)
+
+      result = Importer.import_moxfield_url(
+        user: @user,
+        url: "https://www.moxfield.com/decks/Bq8YrKpmnEKQTd-ZHBHQXg",
+        adapter: adapter
+      )
+
+      assert result.success?, result.error_messages.inspect
+      assert_equal "moxfield_url", result.deck.source_type
+      assert_equal "Atraxa Moxfield Sample", result.deck.name
+      assert_equal [ "Atraxa, Praetors' Voice" ], result.deck.commander_names
+      assert_equal "https://www.moxfield.com/decks/Bq8YrKpmnEKQTd-ZHBHQXg", result.deck.import_metadata["source_url"]
+      assert_equal "Bq8YrKpmnEKQTd-ZHBHQXg", result.deck.import_metadata.dig("source_metadata", "moxfield_deck_id")
+      assert_equal 2, result.deck.deck_cards.where(board: "main").sum(:quantity)
+    end
+
+    test "import_moxfield_url surfaces invalid URLs" do
+      adapter = Adapters::Moxfield.new(client: stub_moxfield_client)
+      result = Importer.import_moxfield_url(
+        user: @user,
+        url: "https://archidekt.com/decks/abc",
+        adapter: adapter
+      )
+      refute result.success?
+      assert_nil result.deck
+      assert_includes result.error_messages.join(" "), "Moxfield"
+    end
+
+    test "import_moxfield_url surfaces fetch failures" do
+      client = Class.new do
+        def fetch_deck(_slug) = raise Decks::MoxfieldClient::NotFoundError, "missing"
+      end.new
+      adapter = Adapters::Moxfield.new(client: client)
+      result = Importer.import_moxfield_url(
+        user: @user,
+        url: "https://www.moxfield.com/decks/abc",
+        adapter: adapter
+      )
+      refute result.success?
+      assert_includes result.error_messages.join(" ").downcase, "not found"
+    end
+
     private
+
+    def stub_moxfield_client
+      json = {
+        "name" => "Atraxa Moxfield Sample",
+        "boards" => {
+          "commanders" => {
+            "cards" => {
+              "atraxa" => { "quantity" => 1, "card" => { "name" => "Atraxa, Praetors' Voice" } }
+            }
+          },
+          "mainboard" => {
+            "cards" => {
+              "sol" => { "quantity" => 1, "card" => { "name" => "Sol Ring" } },
+              "signet" => { "quantity" => 1, "card" => { "name" => "Arcane Signet" } }
+            }
+          }
+        }
+      }
+      Class.new do
+        define_method(:fetch_deck) { |_slug| json }
+      end.new
+    end
+
 
     def stub_archidekt_client
       json = {

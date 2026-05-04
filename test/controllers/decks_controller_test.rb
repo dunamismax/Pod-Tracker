@@ -117,6 +117,40 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
     assert_select "li", /Archidekt/
   end
 
+  test "imports a deck from a Moxfield URL using the configured client factory" do
+    sign_in_as(@user)
+
+    with_moxfield_stub_client(moxfield_sample_json) do
+      assert_difference -> { @user.decks.count } => 1,
+                        -> { AuditEvent.where(event_name: "deck.imported").count } => 1 do
+        post decks_path, params: {
+          deck_import_form: { moxfield_url: "https://www.moxfield.com/decks/abcDEF123_-x", name: "Moxfield Atraxa" }
+        }
+      end
+    end
+
+    deck = @user.decks.order(:id).last
+    assert_redirected_to deck_path(deck)
+    assert_equal "moxfield_url", deck.source_type
+    assert_equal "Moxfield Atraxa", deck.name
+    assert_equal "https://www.moxfield.com/decks/abcDEF123_-x", deck.import_metadata["source_url"]
+  end
+
+  test "rejects a non-Moxfield URL submitted as moxfield_url" do
+    sign_in_as(@user)
+
+    with_moxfield_stub_client(moxfield_sample_json) do
+      assert_no_difference -> { Deck.count } do
+        post decks_path, params: {
+          deck_import_form: { moxfield_url: "https://archidekt.com/decks/12345" }
+        }
+      end
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "li", /Moxfield/
+  end
+
   test "rejects an uploaded file with an unsupported extension" do
     sign_in_as(@user)
 
@@ -202,6 +236,36 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
       yield
     ensure
       Decks::Adapters::Archidekt.client_factory = previous
+    end
+
+    def moxfield_sample_json
+      {
+        "name" => "Moxfield URL Sample",
+        "boards" => {
+          "commanders" => {
+            "cards" => {
+              "atraxa" => { "quantity" => 1, "card" => { "name" => "Atraxa, Praetors' Voice" } }
+            }
+          },
+          "mainboard" => {
+            "cards" => {
+              "sol" => { "quantity" => 1, "card" => { "name" => "Sol Ring" } },
+              "signet" => { "quantity" => 1, "card" => { "name" => "Arcane Signet" } }
+            }
+          }
+        }
+      }
+    end
+
+    def with_moxfield_stub_client(json)
+      previous = Decks::Adapters::Moxfield.client_factory
+      stub_class = Class.new do
+        define_method(:fetch_deck) { |_slug| json }
+      end
+      Decks::Adapters::Moxfield.client_factory = -> { stub_class.new }
+      yield
+    ensure
+      Decks::Adapters::Moxfield.client_factory = previous
     end
 
     def fixture_text_file(name, content, content_type: "text/plain")

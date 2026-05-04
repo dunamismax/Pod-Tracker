@@ -4,7 +4,7 @@
   <div>
     <h1 class="text-2xl font-semibold text-white">Import a Commander deck</h1>
     <p class="mt-1 text-sm text-zinc-400">
-      Paste a public Archidekt deck URL, upload a plain-text decklist file, or paste a decklist. Use a <code class="rounded bg-zinc-800 px-1 text-xs">Commander</code> header for your commander, or pick one in the form below. Archidekt URL takes precedence, then upload, then paste.
+      Paste a public Archidekt or Moxfield deck URL, upload a plain-text decklist file, or paste a decklist. Use a <code class="rounded bg-zinc-800 px-1 text-xs">Commander</code> header for your commander, or pick one in the form below. Archidekt URL takes precedence, then Moxfield URL, then upload, then paste.
     </p>
   </div>
 
@@ -34,6 +34,14 @@
       <%= form.url_field :archidekt_url, class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100", placeholder: "https://archidekt.com/decks/12345" %>
       <p class="mt-1 text-xs text-zinc-500">
         Public Archidekt decks only. If a URL is provided it overrides any file upload or pasted text.
+      </p>
+    </div>
+
+    <div>
+      <%= form.label :moxfield_url, "Moxfield deck URL (optional)", class: "block text-sm font-medium text-zinc-300" %>
+      <%= form.url_field :moxfield_url, class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100", placeholder: "https://www.moxfield.com/decks/abc123" %>
+      <p class="mt-1 text-xs text-zinc-500">
+        Public Moxfield decks only. Used when no Archidekt URL is supplied; takes precedence over file upload and pasted text.
       </p>
     </div>
 
