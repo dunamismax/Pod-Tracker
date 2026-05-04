@@ -39,7 +39,7 @@
 
   <h2 class="font-bold text-2xl mt-10">Codex account</h2>
 
-  <% if @codex_account.present? %>
+  <% if @codex_account&.connected? %>
     <dl class="my-4 space-y-3 text-sm">
       <div class="flex justify-between gap-4">
         <dt class="text-zinc-400">Status</dt>
@@ -68,11 +68,23 @@
         </div>
       <% end %>
     </dl>
-    <% if @codex_account.credential_present? %>
-      <%= button_to "Disconnect Codex account", account_codex_account_path, method: :delete, data: { turbo_confirm: "Disconnect this Codex account? Stored credentials will be erased." }, class: "rounded-md px-3.5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-medium cursor-pointer text-sm" %>
-    <% end %>
+    <div class="flex flex-wrap gap-3 text-sm">
+      <%= button_to "Refresh status", refresh_account_codex_account_path, method: :post, class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium cursor-pointer" %>
+      <%= button_to "Sign out of Codex", logout_account_codex_account_path, method: :post, data: { turbo_confirm: "Sign out of Codex on the App Server and clear stored credentials?" }, class: "rounded-md px-3.5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-medium cursor-pointer" %>
+      <%= button_to "Disconnect locally", account_codex_account_path, method: :delete, data: { turbo_confirm: "Disconnect this Codex account locally? Stored credentials will be erased." }, class: "rounded-md px-3.5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-medium cursor-pointer" %>
+    </div>
+  <% elsif @active_codex_login.present? %>
+    <p class="my-4 text-sm text-zinc-400">A Codex sign-in is in progress.</p>
+    <%= link_to "Continue sign-in", account_codex_login_path(@active_codex_login), class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium" %>
   <% else %>
-    <p class="my-4 text-sm text-zinc-400">No Codex account is connected. AI evaluation requires connecting a ChatGPT/Codex account through the documented Codex App Server flow. The connection UI ships in a later tranche.</p>
+    <p class="my-4 text-sm text-zinc-400">
+      <% if @codex_account&.disconnected? %>
+        Your Codex account is disconnected. Reconnect to enable AI evaluation.
+      <% else %>
+        No Codex account is connected. AI evaluation requires connecting a ChatGPT/Codex account through the documented Codex App Server flow. Ideal Magic never collects ChatGPT passwords or stores OpenAI API keys in your browser.
+      <% end %>
+    </p>
+    <%= link_to "Connect Codex account", new_account_codex_login_path, class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium" %>
   <% end %>
 
   <h2 class="font-bold text-2xl mt-10">Account actions</h2>
