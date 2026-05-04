@@ -53,4 +53,16 @@ Rails.application.configure do
 
   # Encrypt encrypted attributes loaded from fixtures so model decryption works in tests.
   config.active_record.encryption.encrypt_fixtures = true
+
+  # The Rails 8.1 default fixture FK verification rewrites pg_constraint, which
+  # requires a PostgreSQL superuser. Skip it so tests can run under the same
+  # least-privilege role used in production.
+  config.active_record.verify_foreign_keys_for_fixtures = false
+
+  # Deterministic Active Record encryption keys for the test environment.
+  # Production reads keys from encrypted credentials; tests need stable values
+  # so encrypted columns survive fixture loads and round-trip through models.
+  config.active_record.encryption.primary_key = "ideal_magic_test_primary_key_padding_xxxxxx"
+  config.active_record.encryption.deterministic_key = "ideal_magic_test_deterministic_key_padding_xx"
+  config.active_record.encryption.key_derivation_salt = "ideal_magic_test_key_derivation_salt_padding"
 end

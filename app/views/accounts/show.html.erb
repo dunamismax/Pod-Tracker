@@ -87,6 +87,49 @@
     <%= link_to "Connect Codex account", new_account_codex_login_path, class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium" %>
   <% end %>
 
+  <h2 class="font-bold text-2xl mt-10">AI evaluation availability</h2>
+  <p class="my-3 text-sm text-zinc-400">
+    Daily caps protect both your account and the shared Codex rate-limit budget. Expected analysis runtimes are estimates from the deterministic plus AI pipeline, not promises.
+  </p>
+  <% if @analysis_quota %>
+    <dl class="my-4 space-y-3 text-sm">
+      <div class="flex justify-between gap-4">
+        <dt class="text-zinc-400">Your daily AI analyses</dt>
+        <dd class="font-medium text-zinc-100">
+          <%= @analysis_quota.user_used %> of <%= @analysis_quota.user_limit %> used
+          (<%= @analysis_quota.user_remaining %> remaining)
+        </dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-zinc-400">Site-wide daily AI analyses</dt>
+        <dd class="font-medium text-zinc-100">
+          <%= @analysis_quota.global_used %> of <%= @analysis_quota.global_limit %> used
+        </dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-zinc-400">Expected runtime</dt>
+        <dd class="font-medium text-zinc-100">~<%= @analysis_quota.expected_runtime_seconds %> seconds per AI analysis</dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-zinc-400">Codex rate limit</dt>
+        <dd class="font-medium text-zinc-100"><%= @analysis_quota.rate_limit_summary %></dd>
+      </div>
+      <% if @analysis_quota.blocked? %>
+        <div class="flex justify-between gap-4">
+          <dt class="text-zinc-400">Status</dt>
+          <dd class="font-medium text-amber-300">
+            New AI analyses are paused: <%= @analysis_quota.reasons.map { |r| r.to_s.humanize.downcase }.join(", ") %>.
+          </dd>
+        </div>
+      <% else %>
+        <div class="flex justify-between gap-4">
+          <dt class="text-zinc-400">Status</dt>
+          <dd class="font-medium text-emerald-300">Ready to run a new AI analysis.</dd>
+        </div>
+      <% end %>
+    </dl>
+  <% end %>
+
   <h2 class="font-bold text-2xl mt-10">Provider account links</h2>
   <p class="my-3 text-sm text-zinc-400">
     Public deck-host profile links you have recorded. Ideal Magic does not collect provider passwords; deck import still relies on public deck URLs and pasted lists.
