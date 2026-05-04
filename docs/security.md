@@ -40,6 +40,14 @@ Blocked modes:
 
 Codex account login, logout, token-cache creation, refresh failure, and deletion should be audit logged without logging credential values.
 
+Implemented credential-handling review as of 2026-05-04:
+
+- `CodexAccount` stores the opaque credential payload in an Active Record encrypted column and keeps one account record per user.
+- Local disconnect and remote logout flows call `CodexAccount#disconnect!`, which clears credential payloads, credential metadata, rate-limit snapshots, expiration data, and error state before recording audit events.
+- Account export exposes Codex account status, auth mode, displayed email, plan type, rate-limit snapshots, timestamp metadata, and credential metadata key names only. It does not export the encrypted credential body.
+- Account pages render Codex status, plan, displayed email, quota state, and rate-limit summaries, but not credential payloads or credential metadata values.
+- The default Codex App Server transport is fail-closed in development and test unless a test injects a fake transport.
+
 ## Privacy
 
 Users should control whether deck analyses, decks, pods, sessions, and public summaries are private, shared by link, or public. Defaults should favor privacy until the sharing model is implemented and visible.
