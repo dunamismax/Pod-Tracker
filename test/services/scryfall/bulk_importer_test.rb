@@ -65,12 +65,67 @@ module Scryfall
       assert_equal(set_id, set.scryfall_id)
       assert_equal("Commander Masters", set.name)
       assert_equal("sol ring", oracle.normalized_name)
+      assert_equal("{1}", oracle.mana_cost)
+      assert_equal(1.0, oracle.mana_value)
       assert_equal("{T}: Add {C}{C}.", oracle.oracle_text)
       assert_equal({ "commander" => "legal" }, oracle.legalities)
       assert_equal(set, printing.card_set)
       assert_equal(oracle, printing.oracle_card)
       assert_equal("703", printing.collector_number)
       assert_equal("https://cards.scryfall.io/normal/front/example.jpg", printing.image_uris.fetch("normal"))
+    end
+
+    test "imports normalized multi-faced card facts and face image uris" do
+      bulk_object = {
+        "type" => "default_cards",
+        "download_uri" => "https://data.scryfall.io/default-cards/faces.json"
+      }
+      split_card = scryfall_card(
+        "id" => SecureRandom.uuid,
+        "oracle_id" => SecureRandom.uuid,
+        "set_id" => SecureRandom.uuid,
+        "name" => "Wear // Tear",
+        "layout" => "split",
+        "mana_cost" => "{1}{R} // {W}",
+        "cmc" => 3.0,
+        "type_line" => "Instant // Instant",
+        "colors" => [ "R", "W" ],
+        "color_identity" => [ "R", "W" ],
+        "collector_number" => "229",
+        "legalities" => { "legacy" => "legal", "commander" => "legal" },
+        "card_faces" => [
+          {
+            "name" => "Wear",
+            "mana_cost" => "{1}{R}",
+            "type_line" => "Instant",
+            "oracle_text" => "Destroy target artifact.",
+            "colors" => [ "R" ],
+            "image_uris" => { "normal" => "https://cards.scryfall.io/normal/front/wear.jpg" }
+          },
+          {
+            "name" => "Tear",
+            "mana_cost" => "{W}",
+            "type_line" => "Instant",
+            "oracle_text" => "Destroy target enchantment.",
+            "colors" => [ "W" ],
+            "image_uris" => { "normal" => "https://cards.scryfall.io/normal/front/tear.jpg" }
+          }
+        ]
+      )
+
+      BulkImporter.new.import!(
+        source_io: StringIO.new([ split_card ].to_json),
+        bulk_object: bulk_object
+      )
+
+      oracle = OracleCard.find_by!(name: "Wear // Tear")
+      printing = CardPrinting.find_by!(name: "Wear // Tear")
+
+      assert_equal([ "W", "R" ], oracle.colors)
+      assert_equal([ "W", "R" ], oracle.color_identity)
+      assert_equal("wear", oracle.faces.first.fetch("normalized_name"))
+      assert_equal("Destroy target enchantment.", oracle.faces.second.fetch("oracle_text"))
+      assert_equal("https://cards.scryfall.io/normal/front/wear.jpg", printing.image_uris.fetch("faces").first.fetch("image_uris").fetch("normal"))
     end
 
     test "marks refresh failed when an import object is invalid" do

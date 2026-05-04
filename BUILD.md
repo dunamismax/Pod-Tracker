@@ -36,7 +36,7 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, and the first Scryfall card corpus ingestion tranche completed on 2026-05-04.
+The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, and the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04.
 
 Shipped foundation:
 
@@ -46,7 +46,7 @@ Shipped foundation:
 - Hotwire, Turbo, Stimulus, Tailwind CSS v4, ViewComponent, Propshaft, Puma, Thruster, Solid Queue, Solid Cache, and Solid Cable are installed.
 - Rails authentication generator output exists for users, sessions, and password reset.
 - Domain models and migrations exist for decks, deck cards, commanders, provider links, card sets, oracle cards, card printings, rulings, legality snapshots, analysis runs, scorecards, pod evaluations, salt/social-friction evidence, audit events, and card corpus refresh metadata.
-- Fixture-tested Scryfall bulk-data ingestion exists for the `default_cards` bulk file, including polite `User-Agent` and `Accept` headers, API request throttling, streaming top-level JSON array parsing, and upserts for card sets, oracle cards, and card printings.
+- Fixture-tested Scryfall bulk-data ingestion exists for the `default_cards` bulk file, including polite `User-Agent` and `Accept` headers, API request throttling, streaming top-level JSON array parsing, normalized single-face and multi-face card facts, and upserts for card sets, oracle cards, and card printings.
 - Lookup and history indexes exist for deck ownership, provider IDs and URLs, normalized card names, Scryfall oracle and printing IDs, analysis history, scorecard ownership, legality snapshots, and audit events.
 - Minitest is the primary test framework.
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
@@ -299,7 +299,7 @@ ideal-magic/
 - [x] Add database indexes for deck ownership, card lookup, provider IDs, card names, oracle IDs, and analysis history.
 - [x] Build Scryfall bulk-data ingestion with polite user-agent headers and rate-limit discipline.
 - [x] Store source snapshot metadata for every card corpus refresh.
-- [ ] Normalize card names, faces, color identity, mana value, type lines, oracle text, legalities, and image URIs.
+- [x] Normalize card names, faces, color identity, mana value, type lines, oracle text, legalities, and image URIs.
 - [ ] Add Commander banlist and rules snapshot storage.
 - [ ] Add internal card tags for ramp, fast mana, tutors, draw, protection, removal, stack interaction, board wipes, stax, combos, graveyard use, lands, win conditions, salt drivers, and social-friction patterns.
 - [ ] Add curated salt taxonomy and override data for cards and play patterns that deterministic card facts cannot classify reliably.
