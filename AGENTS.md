@@ -129,6 +129,7 @@ Stephen's standard repo setup is dual-push SSH on `origin`: one fetch URL plus m
 - Validate or normalize that setup when appropriate.
 - Before making code changes, run `git pull` from the GitHub remote to get latest upstream. If the GitHub remote is missing, ambiguous, or unavailable, stop and ask before editing.
 - For routine pushes, prefer `git push origin <branch>`; this hits all configured push URLs.
+- `--force-with-lease` only checks the lease against the first push URL. On this dual-push setup the second remote (Codeberg) will reject with `stale info` even when the first (GitHub) accepts. If a force-push is genuinely needed, push GitHub with `--force-with-lease`, then push the Codeberg URL by name with plain `--force`.
 - After each coding pass, commit completed work, push the current branch, and verify both remotes are current.
 - Attribute committed or shipped work to the **`dunamismax`** GitHub identity only. Use the repo's existing `user.name` / `user.email` (canonical: `dunamismax` / `dunamismax@tutamail.com`). Do **not** override with `-c user.name=...` / `-c user.email=...` and do **not** commit under `stephenvsawyer` or `stephenvsawyer@gmail.com` — that is Stephen's separate private account and must never appear as an author on this repo.
 - If `git config user.email` resolves to anything other than a `dunamismax`-owned address, stop and ask before committing.
@@ -144,7 +145,7 @@ For code work, run the narrowest useful command first, then broaden as needed. `
 
 ### Running Tests On This VM
 
-Two gotchas because the production app and the working tree live on the same machine:
+Three gotchas because the production app and the working tree live on the same machine:
 
 1. **The bundle is pinned to production groups.** `/.bundle/config` carries `BUNDLE_WITHOUT: "development:test"` (set by `bin/redeploy`). Tests need `debug`, `capybara`, `rubocop`, etc., so first run:
 
@@ -155,7 +156,9 @@ Two gotchas because the production app and the working tree live on the same mac
 
    This is non-destructive: `bin/redeploy` resets the `without` flag itself and only runs `bundle check`, so dev/test gems sit harmlessly in the shared gem path until the next deploy.
 
-2. **The test database has no default role.** `config/database.yml`'s `test:` block omits username/password, so Active Record connects as OS-user `sawyer` and dies with `FATAL: role "sawyer" does not exist`. Export `DATABASE_URL` pointing at the `ideal_magic` role before running anything that touches the DB:
+2. **`ostruct` is no longer a default gem on Ruby 4.0.** `require "ostruct"` will crash a test with `LoadError` (the trace points at bootsnap/zeitwerk and looks like a load-path bug — it isn't). Use `Struct.new` for ad-hoc test doubles instead of pulling `ostruct` into the Gemfile.
+
+3. **The test database has no default role.** `config/database.yml`'s `test:` block omits username/password, so Active Record connects as OS-user `sawyer` and dies with `FATAL: role "sawyer" does not exist`. Export `DATABASE_URL` pointing at the `ideal_magic` role before running anything that touches the DB:
 
    ```sh
    export DATABASE_URL="postgres://ideal_magic:$(. /etc/ideal-magic-web/env; echo "$IDEAL_MAGIC_DATABASE_PASSWORD")@localhost/ideal_magic_test"
