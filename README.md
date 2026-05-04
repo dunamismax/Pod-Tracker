@@ -1,170 +1,92 @@
 # Ideal Magic
 
-Ideal Magic is a Ruby on Rails web app for AI-assisted Magic: The Gathering Commander deck, collection, pod, and playgroup intelligence.
+The serious Commander companion: import a deck, get an honest read on it, build pods that actually feel fair, remember every game night, and turn your real playgroup into useful tuning advice.
 
-The goal is to build the best Commander tool on the internet: import decks, track the cards you own, analyze decks with deterministic Commander heuristics plus Codex-backed OpenAI evaluation, compare pods, record real game-night results, preserve matchup notes, and turn a playgroup's actual meta into useful tuning advice.
+Ideal Magic is a web app for Magic: The Gathering Commander players who want more than a power level guess. It scores decks from real evidence, compares pods before the cards hit the table, and remembers what happened the last time these commanders met.
 
-Ideal Magic will be hosted at `ideal-magic.com` on Stephen's Ubuntu VM behind Caddy.
+Live at [ideal-magic.com](https://ideal-magic.com) (when deployed).
 
-## Current Status
+## What Ideal Magic Does
 
-This repository has a verified Rails foundation, a complete Phase 2 data model and card corpus pipeline, and the first three Phase 3 account tranches. The app currently boots with Ruby 4.0.3, Rails 8.1.3, PostgreSQL, Hotwire, Tailwind CSS v4, ViewComponent, Solid Queue/Cache/Cable, Rails authentication, baseline quality gates, schema/model coverage for decks, card corpus records, analysis runs, scorecards, pod evaluations, salt/social-friction evidence, provider links, legality snapshots, and audit events, plus fixture-tested Scryfall bulk-data ingestion for card sets, oracle cards, card printings, refresh snapshot metadata, normalized single-face and multi-face card facts, source-controlled Commander rules and banlist snapshot storage, a source-controlled internal card tag taxonomy with curated overrides covering role, salt-driver, and social-friction tags, source-controlled representative Commander deck fixtures with a pasted-decklist parser and fixture loader service, a deterministic Commander legality engine that evaluates deck size, banlist membership, singleton rules with basic-land and card-text exemptions, commander type-line, and color-identity violations, a Solid Queue Scryfall card corpus refresh job wired into the recurring schedule, self-service email/password registration with account settings for display name, timezone, and preferred units plus tokenized email verification, password-confirmed account deletion with a JSON account data export that bundles the account profile, decks, analysis runs and scorecards, pod evaluations, and audit events into a downloadable file, and per-user encrypted Codex account credential storage with a user-driven disconnect flow that clears the stored token, resets rate-limit and metadata snapshots, and records an audit event.
+- **Import a deck** by paste, text export, or public Archidekt / Moxfield URL.
+- **Score it honestly** on Power, Speed, Interaction, Consistency, Salt, and Social Friction — every score backed by the cards and patterns that drove it.
+- **See your collection** mapped against every deck so you know what you already own, what you're missing, and which cards your library is hungry for.
+- **Compare pods** of 2 to 4 decks before a game starts and produce a Rule 0 brief.
+- **Run game nights** with player check-in, deck registration, pod seating, and result recording.
+- **Keep a matchup journal** tied to decks, commanders, opponents, pods, and sessions.
+- **Watch your meta** evolve over time across decks, commanders, players, win conditions, and friction.
+- **Get tuning advice** that uses the cards you actually own and the games you actually played.
+- **Install as a PWA** on phone, tablet, or desktop and use it at the table.
 
-No Codex App Server account-auth login/refresh/account-read flow, user-driven deck import flow, collection import, scoring engine, Codex evaluation pipeline, pod comparison workflow, game-night session tracking, matchup journal, meta analytics, PWA offline behavior, Docker Compose runtime, or production deployment configuration has shipped yet.
+## Why It's Different
 
-Current stable docs:
-
-- [BUILD.md](/Users/sawyer/github/ideal-magic/BUILD.md) - active build execution manual.
-- [AGENTS.md](/Users/sawyer/github/ideal-magic/AGENTS.md) - repo-local operating rules.
-- [docs/analysis-rubric.md](/Users/sawyer/github/ideal-magic/docs/analysis-rubric.md) - initial score rubric.
-- [docs/provider-integrations.md](/Users/sawyer/github/ideal-magic/docs/provider-integrations.md) - allowed provider integration policy.
-- [docs/security.md](/Users/sawyer/github/ideal-magic/docs/security.md) - auth, secret, privacy, and fan-content boundaries.
-- [docs/deployment.md](/Users/sawyer/github/ideal-magic/docs/deployment.md) - intended self-hosted deployment shape.
-- [docs/product-scope.md](/Users/sawyer/github/ideal-magic/docs/product-scope.md) - consolidated product scope and feature lanes.
-
-Build execution lives in [BUILD.md](/Users/sawyer/github/ideal-magic/BUILD.md). Future agents should treat that file as the active implementation manual until the app is built and these stable docs describe shipped behavior.
-
-## Product Promise
-
-Ideal Magic should help Commander players answer practical questions before a game starts:
-
-- Is this deck likely to fit my table?
-- How fast does it threaten a win or dominant board?
-- Does it have enough interaction?
-- Is the mana, draw, ramp, and redundancy good enough?
-- Why did it receive this score?
-- Which changes would move it closer to the desired power band?
-- Which upgrades do I already own?
-- Which cards are missing across my deck library?
-- Are these four decks likely to create a fair and fun pod?
-- What actually happened the last time these commanders or players met?
-- How is my real playgroup meta changing over time?
-
-The scores must be evidence-backed. A user should be able to open an analysis and see which facts drove the result instead of receiving a mysterious number.
-
-## AI Usage Auth Model
-
-Ideal Magic's v1 AI path is ChatGPT/Codex account auth through OpenAI's documented Codex App Server flow.
-
-Users connect their ChatGPT/Codex account with Codex-managed browser OAuth or device-code login. Ideal Magic then runs AI evaluation through Codex account auth and ChatGPT/Codex rate limits instead of app-owned per-token API billing.
-
-This is not a generic OpenAI API OAuth flow. Ideal Magic must not call the OpenAI API with browser-visible keys, ask for ChatGPT passwords, scrape ChatGPT, hand-roll token refreshes, or claim that ChatGPT billing pays for arbitrary Responses API calls. The supported integration boundary is Codex App Server account auth.
-
-The app should still track model choice, account plan metadata when available, rate-limit state, latency, failures, rubric versions, and all deterministic evidence used by an AI run.
+- **Evidence over vibes.** Open any score and see exactly which cards and patterns produced it. No mystery numbers.
+- **Built for the table.** Mobile-first. Fast. Readable in a noisy game store at 9 PM.
+- **Knows your collection.** Recommendations distinguish what you own from what you'd have to buy.
+- **Remembers your group.** Real game-night history feeds future advice instead of vanishing into a notebook.
+- **Salt as conversation, not judgment.** Salt and social-friction scores help Rule 0 talks happen earlier — they don't shame players for liking what they like.
+- **Source-backed facts.** Card data and Commander legality come from deterministic sources, never model guesses.
+- **Self-hostable and inspectable.** Owned by the person who runs it.
 
 ## Core Scores
 
-Ideal Magic will store scores internally on a 0-100 scale and display them as friendly numeric scores with bands and explanations.
+Every analysis surfaces six scores, each with confidence, evidence, and suggested improvements:
 
-- Power: overall ability to win against prepared Commander tables.
-- Speed: how quickly the deck can present a win attempt or dominant board.
-- Interaction: how well it can answer threats and protect its own plan.
-- Consistency: how reliably it executes its intended game plan.
-- Pod Fit: how well multiple decks match each other for a Commander game.
+| Score | What it measures |
+| --- | --- |
+| **Power** | Ability to win against prepared Commander tables. |
+| **Speed** | How quickly the deck threatens a win or dominant board. |
+| **Interaction** | How well it answers threats and protects its plan. |
+| **Consistency** | How reliably it executes its game plan. |
+| **Salt** | Likelihood of producing frustration at a typical table. |
+| **Social Friction** | How much Rule 0 conversation a deck or pod likely needs. |
 
-Each score should include confidence, evidence, and suggested improvements.
+Pod evaluations also report Pod Fit — whether a set of decks is likely to produce a satisfying game together.
 
-## Stack
+Full rubric: [docs/analysis-rubric.md](docs/analysis-rubric.md).
 
-- Ruby 4.0.3, pinned in `.ruby-version`, `.mise.toml`, and the Docker base image.
-- Rails 8.1.3, pinned in `Gemfile.lock`.
-- PostgreSQL for durable data.
-- Rails authentication as the baseline account system.
-- Hotwire, Turbo, Stimulus, Tailwind CSS v4, and ViewComponent for the UI.
-- Solid Queue for background deck analysis.
-- Solid Cache and Solid Cable are installed with the Rails foundation.
-- Scryfall bulk data for card facts.
-- OpenAI Codex App Server for structured AI evaluation through ChatGPT/Codex account auth.
-- Docker image support is scaffolded; Docker Compose is not implemented yet.
-- Caddy for TLS and reverse proxy at `ideal-magic.com`.
-- systemd for service lifecycle and backup timers on the Ubuntu host.
+## Status
 
-## Planned Features
+Ideal Magic is in active build. The Rails foundation, card corpus pipeline, Commander legality engine, and account system are in place. Deck import, scoring, AI evaluation, pods, sessions, the matchup journal, meta analytics, the PWA shell, and self-hosted deployment are still being built.
 
-- Import by pasted decklist.
-- Import by text export.
-- Import from public Archidekt deck URLs.
-- Import from public Moxfield deck URLs.
-- Import and manage owned collection cards from user-provided exports.
-- Compare every deck against owned and missing cards.
-- Store deck versions and compare changes over time.
-- Evaluate Commander legality, color identity, curve, mana, ramp, draw, tutors, interaction, win conditions, and combos.
-- Run opening-hand and early-turn consistency checks.
-- Generate AI-backed deck reports from deterministic facts.
-- Compare 2 to 4 decks in a pod.
-- Run game-night sessions with player check-in, deck registration, pod seating, and result recording.
-- Keep matchup notes tied to decks, commanders, opponents, pods, and sessions.
-- Review deck, commander, player, pod, win-condition, salt, and social-friction trends over time.
-- Generate collection-aware cuts, upgrades, swaps, budget buys, and meta adjustments.
-- Produce a Rule 0 conversation brief.
-- Share public analysis links with privacy controls.
-- Export analysis to Markdown, text, and JSON.
-- Install as a polished PWA on mobile and desktop.
-- Cache recent deck reports for read-only offline use.
+Build sequencing and current repo truth live in [BUILD.md](BUILD.md).
 
-## UX Direction
+## Documentation
 
-Ideal Magic should feel like a serious table-side tool, not a marketing page.
+- [docs/product-scope.md](docs/product-scope.md) — what Ideal Magic does and where it draws the line.
+- [docs/analysis-rubric.md](docs/analysis-rubric.md) — how scores are computed, banded, and explained.
+- [docs/provider-integrations.md](docs/provider-integrations.md) — which deck and collection sources are supported and why.
+- [docs/security.md](docs/security.md) — auth, secret handling, privacy, and fan-content boundaries.
+- [docs/deployment.md](docs/deployment.md) — the intended self-hosted deployment shape.
+- [BUILD.md](BUILD.md) — active build execution manual.
+- [AGENTS.md](AGENTS.md) — repo-local operating rules for contributors.
 
-The first screen after login should be the working dashboard: import a deck, view recent analyses, open pods, check collection gaps, resume game-night sessions, and see queued work. Mobile layouts should be primary, with desktop taking advantage of space for comparison, evidence panels, collection views, and meta history.
+## For Developers
 
-The interface should favor dense, readable information; fast actions; clear empty states; and score explanations that can be scanned at a table.
+Ideal Magic is a Ruby on Rails monolith. To run it locally:
 
-## Data And Legality
+```sh
+bin/setup
+bin/dev
+```
 
-Card facts should come from Scryfall bulk data and deterministic rules, not model memory. Commander legality and color identity must be computed from source data.
+Quality gates:
 
-Archidekt and Moxfield integrations should start with public deck URLs and exports. Collection intake should start with pasted or uploaded user exports. Authenticated account sync is a future feature only if the provider offers a documented and acceptable auth/API path.
+```sh
+bin/test
+bin/lint
+bin/security
+bin/verify
+```
+
+Use `mise` (or another Ruby version manager that honors `.ruby-version` / `.mise.toml`) to select the pinned Ruby. Stack details, dependencies, and the full build sequence live in [BUILD.md](BUILD.md).
 
 ## Fan Content Notice
 
 Ideal Magic is unofficial fan content. It is not approved, endorsed, or sponsored by Wizards of the Coast.
 
-Portions of Magic: The Gathering materials are property of Wizards of the Coast LLC. Any use of card names, card text, images, or related material must follow Wizards' Fan Content Policy and source-specific data terms.
+Portions of Magic: The Gathering materials are property of Wizards of the Coast LLC. Use of card names, card text, images, and related material follows Wizards' Fan Content Policy and source-specific data terms.
 
-The public app must include the fan-content notice on public legal/footer surfaces before launch.
+## License
 
-## Repo Status
-
-The GitHub repository is public as of 2026-05-03. No license file is present yet, so licensing is pending and reuse terms are not granted until Stephen chooses and commits a license.
-
-## Deployment Target
-
-The intended production shape is a single self-hosted Ubuntu VM:
-
-- Caddy terminates HTTPS for `ideal-magic.com`.
-- Docker Compose runs the Rails web process, worker process, and PostgreSQL.
-- systemd keeps the stack running after reboot.
-- Backups run on a timer and have a documented restore path.
-
-Kamal can be evaluated later, but the default path should stay inspectable through Docker Compose, Caddy, and systemd.
-
-## Development
-
-Use `mise` or another Ruby version manager that can select Ruby 4.0.3. This repo includes `.ruby-version` and `.mise.toml`; with `mise`, run `mise trust` once for this checkout. If your shell does not auto-activate `mise`, prefix commands with `mise exec --`.
-
-Current commands:
-
-```sh
-bin/setup
-bin/dev
-bin/test
-bin/lint
-bin/security
-bin/build
-bin/verify
-```
-
-Useful Rails commands:
-
-```sh
-bin/rails db:prepare
-bin/rails test
-bin/rails assets:precompile
-```
-
-## Project Boundary
-
-Ideal Magic v1 is Commander-first. Collection ownership, deck tuning, pod sessions, matchup notes, and playgroup meta analytics are in scope. Other formats, native apps, Discord bots, collection finance, marketplace features, and full gameplay simulation are future work.
-
-The v1 bar is simple: import decks reliably, analyze them honestly, explain the score, compare pods, track real play, produce collection-aware tuning advice, and run beautifully on Stephen's own server.
+The repository is public. No license file is present yet, so reuse terms are not granted until a license is chosen and committed.

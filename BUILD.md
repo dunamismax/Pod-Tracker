@@ -23,7 +23,7 @@ Future agents working in `ideal-magic` must follow these rules before touching c
 
 `Ideal Magic` is a Ruby on Rails web application for Commander deck and pod evaluation.
 
-It is now the single primary Magic project. The best durable product ideas from Scrybase are consolidated here: deck lab, collection ownership, game-night sessions, pod seating/results, matchup notes, meta analytics, and tuning recommendations from real playgroup history. Do not port Scrybase's old stack or migration plan; rebuild the product ideas inside Ideal Magic's Rails architecture.
+It is Stephen's single primary Magic project. The product surface spans deck lab, collection ownership, game-night sessions, pod seating/results, matchup notes, meta analytics, and tuning recommendations from real playgroup history, all built natively on Ideal Magic's Rails architecture.
 
 The approved product direction:
 
@@ -107,11 +107,9 @@ Reference links:
 - Archidekt public API discussion: https://archidekt.com/forum/thread/16962481
 - Moxfield public organization: https://github.com/moxfield
 
-## Scrybase Consolidation Notes
+## Product Concept Inventory
 
-Scrybase was reviewed on 2026-05-04 before retirement. Ideal Magic replaces it as Stephen's single primary Magic project.
-
-Product concepts to preserve:
+Core product concepts that Ideal Magic must deliver:
 
 - Collection ownership and demand pressure.
 - Deck revisions, diffs, and revision performance.
@@ -124,7 +122,7 @@ Product concepts to preserve:
 - Export surfaces for decks, analysis, collection summaries, and meta reports.
 - Operator status, backup, restore, and smoke-flow discipline.
 
-Implementation rule: preserve these product ideas, not Scrybase's Python, FastAPI, Astro, Elysia, OpenTUI, or rewrite-migration architecture.
+Implementation rule: build these as first-class features of Ideal Magic on the Rails stack defined in this manual.
 
 ## Product Constraints
 
