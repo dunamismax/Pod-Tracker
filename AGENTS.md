@@ -130,7 +130,8 @@ Stephen's standard repo setup is dual-push SSH on `origin`: one fetch URL plus m
 - Before making code changes, run `git pull` from the GitHub remote to get latest upstream. If the GitHub remote is missing, ambiguous, or unavailable, stop and ask before editing.
 - For routine pushes, prefer `git push origin <branch>`; this hits all configured push URLs.
 - After each coding pass, commit completed work, push the current branch, and verify both remotes are current.
-- Attribute committed or shipped work to **Stephen Sawyer / `dunamismax`** only.
+- Attribute committed or shipped work to the **`dunamismax`** GitHub identity only. Use the repo's existing `user.name` / `user.email` (canonical: `dunamismax` / `dunamismax@tutamail.com`). Do **not** override with `-c user.name=...` / `-c user.email=...` and do **not** commit under `stephenvsawyer` or `stephenvsawyer@gmail.com` — that is Stephen's separate private account and must never appear as an author on this repo.
+- If `git config user.email` resolves to anything other than a `dunamismax`-owned address, stop and ask before committing.
 - **Never** include AI, Scry, Claude, ChatGPT, Codex, co-author, "assisted by AI", or similar attribution in commit messages, trailers, release notes, or push summaries.
 
 ---
