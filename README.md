@@ -97,4 +97,9 @@ Portions of Magic: The Gathering materials are property of Wizards of the Coast 
 
 ## License
 
-The repository is public. No license file is present yet, so reuse terms are not granted until a license is chosen and committed.
+Ideal Magic is licensed under the GNU General Public License, version 3. See [LICENSE](LICENSE) for the full text.
+
+```
+GNU GENERAL PUBLIC LICENSE
+Version 3
+```

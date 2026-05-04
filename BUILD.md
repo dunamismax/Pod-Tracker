@@ -74,7 +74,7 @@ A live self-hosted production deployment at `https://ideal-magic.com` was comple
 
 No Codex App Server transport implementation (the JSON-RPC client boundary ships with a fail-closed `NullTransport`), deck import, collection import, scoring engine, Codex evaluation pipeline, provider integration implementation, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, automated PostgreSQL backup/restore, scheduled Scryfall refresh runbook, or admin operator surface exists yet. A Docker Compose runtime is intentionally not present — production runs natively via systemd.
 
-GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
+GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. The repository is licensed under the GNU General Public License v3.0; the verbatim license text lives at `LICENSE` and `README.md` records the choice.
 
 ## Current External Truth To Preserve
 
