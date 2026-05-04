@@ -8,9 +8,9 @@ Ideal Magic will be hosted at `ideal-magic.com` on Stephen's Ubuntu VM behind Ca
 
 ## Current Status
 
-This repository has a verified Rails foundation. The app currently boots with Ruby 4.0.3, Rails 8.1.3, PostgreSQL, Hotwire, Tailwind CSS v4, ViewComponent, Solid Queue/Cache/Cable, Rails authentication, and baseline quality gates.
+This repository has a verified Rails foundation and the first Phase 2 domain model tranche. The app currently boots with Ruby 4.0.3, Rails 8.1.3, PostgreSQL, Hotwire, Tailwind CSS v4, ViewComponent, Solid Queue/Cache/Cable, Rails authentication, baseline quality gates, and schema/model coverage for decks, card corpus records, analysis runs, scorecards, pod evaluations, salt/social-friction evidence, provider links, legality snapshots, and audit events.
 
-No deck import, card corpus, scoring engine, OpenAI evaluation pipeline, pod comparison, PWA offline behavior, Docker Compose runtime, or production deployment configuration has shipped yet.
+No deck import, Scryfall bulk ingestion, card data refresh jobs, Commander legality engine, scoring engine, OpenAI evaluation pipeline, pod comparison workflow, PWA offline behavior, Docker Compose runtime, or production deployment configuration has shipped yet.
 
 Current stable docs:
 

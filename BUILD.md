@@ -1,7 +1,7 @@
 # BUILD.md
 
 Last drafted: 2026-05-03
-Last updated: 2026-05-03
+Last updated: 2026-05-04
 
 ## Agent Operating Rules
 
@@ -36,7 +36,7 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo now contains a verified Rails foundation scaffolded on 2026-05-03.
+The repo now contains a verified Rails foundation scaffolded on 2026-05-03 and the first Phase 2 domain model tranche completed on 2026-05-04.
 
 Shipped foundation:
 
@@ -45,11 +45,13 @@ Shipped foundation:
 - PostgreSQL is configured for development, test, and production.
 - Hotwire, Turbo, Stimulus, Tailwind CSS v4, ViewComponent, Propshaft, Puma, Thruster, Solid Queue, Solid Cache, and Solid Cable are installed.
 - Rails authentication generator output exists for users, sessions, and password reset.
+- Domain models and migrations exist for decks, deck cards, commanders, provider links, card sets, oracle cards, card printings, rulings, legality snapshots, analysis runs, scorecards, pod evaluations, salt/social-friction evidence, and audit events.
+- Lookup and history indexes exist for deck ownership, provider IDs and URLs, normalized card names, Scryfall oracle and printing IDs, analysis history, scorecard ownership, legality snapshots, and audit events.
 - Minitest is the primary test framework.
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
 - `.env.example`, `/up`, `/ready`, and an authenticated dashboard root route exist.
 
-No deck import, card corpus, scoring engine, OpenAI evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison, PWA offline behavior, or production configuration exists yet.
+No deck import, Scryfall bulk ingestion, card data refresh jobs, Commander legality engine, scoring engine, OpenAI evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, PWA offline behavior, or production configuration exists yet.
 
 GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
@@ -284,8 +286,8 @@ ideal-magic/
 
 ### Work Checklist
 
-- [ ] Model users, decks, deck cards, commanders, provider links, card printings, oracle cards, sets, rulings, legality snapshots, analysis runs, scorecards, pod evaluations, salt/social-friction evidence, and audit events.
-- [ ] Add database indexes for deck ownership, card lookup, provider IDs, card names, oracle IDs, and analysis history.
+- [x] Model users, decks, deck cards, commanders, provider links, card printings, oracle cards, sets, rulings, legality snapshots, analysis runs, scorecards, pod evaluations, salt/social-friction evidence, and audit events.
+- [x] Add database indexes for deck ownership, card lookup, provider IDs, card names, oracle IDs, and analysis history.
 - [ ] Build Scryfall bulk-data ingestion with polite user-agent headers and rate-limit discipline.
 - [ ] Store source snapshot metadata for every card corpus refresh.
 - [ ] Normalize card names, faces, color identity, mana value, type lines, oracle text, legalities, and image URIs.
