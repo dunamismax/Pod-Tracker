@@ -26,8 +26,9 @@ This file contains repo-local operating rules for Ideal Magic. It supplements `/
 - Ideal Magic is Commander-first for v1.
 - Public deck URLs, pasted decklists, and user-provided exports are allowed.
 - Private Archidekt or Moxfield account sync requires documented provider support or explicit approval.
-- OpenAI work must use server-side API credentials or encrypted bring-your-own API keys.
-- Do not implement or describe ChatGPT subscription passthrough unless OpenAI publishes an official supported flow.
+- AI work must use OpenAI's documented Codex App Server account-auth surface as the exclusive v1 user-facing model path.
+- Users connect ChatGPT/Codex through Codex-managed browser OAuth or device-code login; Ideal Magic uses the resulting Codex account mode and ChatGPT/Codex rate limits instead of app-owned per-token API billing.
+- Do not implement generic "Sign in with OpenAI" API OAuth, ChatGPT password collection, scraping, browser-visible API keys, or hand-rolled refresh-token calls outside the documented Codex App Server flow.
 - Card facts and Commander legality must come from deterministic source data, primarily Scryfall bulk data and source-backed rules.
 - AI analysis can interpret deterministic facts, but it must not be the rules authority.
 
@@ -36,4 +37,3 @@ This file contains repo-local operating rules for Ideal Magic. It supplements `/
 For docs-only work, run the smallest relevant checks plus `git diff --check`.
 
 For code work after scaffolding, run narrow checks first, then the repo verify entrypoint if present. The planned verify command is `bin/verify`.
-

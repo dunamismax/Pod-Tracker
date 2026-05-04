@@ -1,6 +1,6 @@
 # Security
 
-Ideal Magic will handle accounts, deck history, optional API credentials, and AI usage records. Security work should be implemented as product behavior, not saved for deployment cleanup.
+Ideal Magic will handle accounts, deck history, Codex account-auth metadata, and AI usage records. Security work should be implemented as product behavior, not saved for deployment cleanup.
 
 ## Authentication
 
@@ -14,25 +14,31 @@ V1 should use Rails-native email/password authentication as the baseline. Accoun
 
 Passkeys or external auth providers are future hardening options after the baseline is stable.
 
-## Secrets And API Keys
+## AI Auth And Secrets
 
-OpenAI API keys must never be exposed to browsers.
+OpenAI API keys must never be exposed to browsers. V1 user-facing AI usage should not use app-owned API keys or bring-your-own API keys as the operating model.
 
-Supported v1 modes:
+Supported v1 mode:
 
-- Stephen/app-owned server-side OpenAI API key.
-- Admin-managed server-side API key.
-- Optional encrypted bring-your-own OpenAI API key mode.
+- Codex App Server ChatGPT-managed account auth, started through Codex browser OAuth or device-code login, with Codex handling token refresh.
+
+Allowed implementation boundaries:
+
+- Store only the minimum account metadata needed by Rails, such as auth mode, displayed email, plan type when returned, rate-limit snapshots, and timestamps.
+- Keep Codex credential material isolated per user or per serialized workflow stream.
+- Treat any Codex `auth.json` or equivalent token cache like a password.
+- Let Codex refresh managed ChatGPT sessions; do not call private refresh endpoints directly.
 
 Blocked modes:
 
 - Asking for ChatGPT passwords.
 - Scraping ChatGPT.
 - Browser-visible OpenAI API keys.
-- Claiming a ChatGPT Plus, Pro, Business, Enterprise, Education, or Free subscription pays for Ideal Magic API calls.
-- Unsupported ChatGPT subscription passthrough.
+- Generic OpenAI API OAuth outside the documented Codex App Server account surface.
+- Hand-rolled ChatGPT token refresh or token exchange code outside Codex's documented flow.
+- Claiming ChatGPT billing pays for arbitrary OpenAI API calls.
 
-Encrypted user-provided keys should be decryptable only by server-side code for the minimum time needed to make an API request. Key creation, update, use, and deletion should be audit logged without logging secret values.
+Codex account login, logout, token-cache creation, refresh failure, and deletion should be audit logged without logging credential values.
 
 ## Privacy
 
@@ -52,7 +58,7 @@ Before public launch, add rate limits for:
 - Analysis creation.
 - Public share pages.
 
-Analysis jobs should have user and global quotas so AI spend is bounded.
+Analysis jobs should have user and global quotas so account rate limits and server resources are bounded.
 
 ## Audit Events
 
@@ -61,7 +67,7 @@ Audit events should cover:
 - Authentication changes.
 - Deck imports and refreshes.
 - Analysis creation and failures.
-- API key changes.
+- Codex account link, logout, token-cache, and auth failure events.
 - Admin actions.
 - Share visibility changes.
 
@@ -86,4 +92,3 @@ The planned Rails foundation should include:
 - Bundle audit tooling.
 - Tests for key handling and auth flows.
 - Review of CSRF, CSP, secure cookies, CORS, and security headers before public launch.
-

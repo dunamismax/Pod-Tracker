@@ -2,7 +2,7 @@
 
 Ideal Magic is a Ruby on Rails web app for AI-assisted Magic: The Gathering Commander deck and pod evaluation.
 
-The goal is to build a better, more transparent version of the deck-checking experience: import decks from public Archidekt or Moxfield links, analyze them with deterministic Commander heuristics plus OpenAI-backed evaluation, and return clear scores for power, speed, interaction, consistency, and pod fit.
+The goal is to build a better, more transparent version of the deck-checking experience: import decks from public Archidekt or Moxfield links, analyze them with deterministic Commander heuristics plus Codex-backed OpenAI evaluation, and return clear scores for power, speed, interaction, consistency, and pod fit.
 
 Ideal Magic will be hosted at `ideal-magic.com` on Stephen's Ubuntu VM behind Caddy.
 
@@ -10,7 +10,7 @@ Ideal Magic will be hosted at `ideal-magic.com` on Stephen's Ubuntu VM behind Ca
 
 This repository has a verified Rails foundation and the first Phase 2 domain model tranche. The app currently boots with Ruby 4.0.3, Rails 8.1.3, PostgreSQL, Hotwire, Tailwind CSS v4, ViewComponent, Solid Queue/Cache/Cable, Rails authentication, baseline quality gates, and schema/model coverage for decks, card corpus records, analysis runs, scorecards, pod evaluations, salt/social-friction evidence, provider links, legality snapshots, and audit events.
 
-No deck import, Scryfall bulk ingestion, card data refresh jobs, Commander legality engine, scoring engine, OpenAI evaluation pipeline, pod comparison workflow, PWA offline behavior, Docker Compose runtime, or production deployment configuration has shipped yet.
+No deck import, Scryfall bulk ingestion, card data refresh jobs, Commander legality engine, scoring engine, Codex evaluation pipeline, pod comparison workflow, PWA offline behavior, Docker Compose runtime, or production deployment configuration has shipped yet.
 
 Current stable docs:
 
@@ -37,17 +37,15 @@ Ideal Magic should help Commander players answer practical questions before a ga
 
 The scores must be evidence-backed. A user should be able to open an analysis and see which facts drove the result instead of receiving a mysterious number.
 
-## Important OpenAI Constraint
+## AI Usage Auth Model
 
-The desired "sign in with ChatGPT and use the user's ChatGPT subscription for backend work" flow is not currently a safe product assumption.
+Ideal Magic's v1 AI path is ChatGPT/Codex account auth through OpenAI's documented Codex App Server flow.
 
-OpenAI's API uses API keys, and ChatGPT billing is separate from API billing. Ideal Magic should therefore support these v1 modes:
+Users connect their ChatGPT/Codex account with Codex-managed browser OAuth or device-code login. Ideal Magic then runs AI evaluation through Codex account auth and ChatGPT/Codex rate limits instead of app-owned per-token API billing.
 
-- Stephen/app-owned OpenAI API billing.
-- Optional encrypted bring-your-own OpenAI API key mode.
-- Future official OpenAI OAuth or ChatGPT app integration only if OpenAI publishes a supported flow for it.
+This is not a generic OpenAI API OAuth flow. Ideal Magic must not call the OpenAI API with browser-visible keys, ask for ChatGPT passwords, scrape ChatGPT, hand-roll token refreshes, or claim that ChatGPT billing pays for arbitrary Responses API calls. The supported integration boundary is Codex App Server account auth.
 
-Ideal Magic must not ask users for ChatGPT passwords, scrape ChatGPT, expose API keys to browsers, or imply that a ChatGPT Plus/Pro subscription pays for API calls.
+The app should still track model choice, account plan metadata when available, rate-limit state, latency, failures, rubric versions, and all deterministic evidence used by an AI run.
 
 ## Core Scores
 
@@ -71,7 +69,7 @@ Each score should include confidence, evidence, and suggested improvements.
 - Solid Queue for background deck analysis.
 - Solid Cache and Solid Cable are installed with the Rails foundation.
 - Scryfall bulk data for card facts.
-- OpenAI Responses API for structured AI evaluation.
+- OpenAI Codex App Server for structured AI evaluation through ChatGPT/Codex account auth.
 - Docker image support is scaffolded; Docker Compose is not implemented yet.
 - Caddy for TLS and reverse proxy at `ideal-magic.com`.
 - systemd for service lifecycle and backup timers on the Ubuntu host.

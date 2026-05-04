@@ -21,6 +21,7 @@ The expected process split:
 
 - `web`: Rails app served by Puma.
 - `worker`: Rails background jobs for imports, Scryfall refreshes, and analysis.
+- `codex`: Codex App Server or isolated Codex worker runtime for ChatGPT/Codex account-auth AI evaluation.
 - `db`: PostgreSQL.
 - Optional internal support services only when they earn their complexity.
 
@@ -32,7 +33,7 @@ The production environment should eventually document every required variable. E
 
 - Rails secret key base.
 - Database URL or database credentials.
-- OpenAI API key mode and server-side key when enabled.
+- Codex runtime path, Codex credential storage path, and account-auth isolation settings.
 - App host and mailer URL options.
 - SMTP settings for account emails.
 - Scryfall sync settings.

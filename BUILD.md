@@ -17,7 +17,7 @@ Future agents working in `ideal-magic` must follow these rules before touching c
 - If this file and an older planning note disagree, this file wins.
 - Do not copy DeckCheck's UI, copy, internal scoring, or proprietary behavior. Ideal Magic may compete with and improve on the category, but it must have its own implementation and rubric.
 - Do not use unofficial, undocumented, or scraped deck-provider APIs for private user data. Public deck URLs and user-provided exports are allowed; authenticated provider sync requires a documented provider surface or explicit approval.
-- Do not claim users can sign in with ChatGPT or use their ChatGPT subscription for backend model calls unless OpenAI publishes an official third-party auth and billing flow that supports it.
+- AI usage must follow OpenAI's documented Codex App Server account-auth surface. Do not implement generic OpenAI API OAuth, ChatGPT password collection, scraping, browser-visible API keys, or hand-rolled token refresh outside Codex's documented flow.
 
 ## Build Decision
 
@@ -30,7 +30,7 @@ The approved product direction:
 - PostgreSQL as the durable application database.
 - Hotwire, Turbo, Stimulus, Tailwind CSS, and componentized Rails views for the primary UI.
 - Rails-native background jobs, caching, and realtime features first.
-- OpenAI Responses API for AI evaluation using server-side API credentials or an encrypted bring-your-own-API-key mode.
+- Codex App Server for AI evaluation using Codex-managed ChatGPT browser OAuth or device-code login as the exclusive v1 user-facing model path.
 - PWA-first mobile and desktop experience.
 - Docker Compose, Caddy, and systemd for Stephen's self-hosted Ubuntu deployment at `ideal-magic.com`.
 
@@ -51,7 +51,7 @@ Shipped foundation:
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
 - `.env.example`, `/up`, `/ready`, and an authenticated dashboard root route exist.
 
-No deck import, Scryfall bulk ingestion, card data refresh jobs, Commander legality engine, scoring engine, OpenAI evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, PWA offline behavior, or production configuration exists yet.
+No deck import, Scryfall bulk ingestion, card data refresh jobs, Commander legality engine, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, PWA offline behavior, or production configuration exists yet.
 
 GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
@@ -63,10 +63,12 @@ These references were checked while drafting this plan. Agents must re-check cur
 - RubyGems listed Rails 8.1.3 as the latest Rails gem release. Re-checked before scaffolding on 2026-05-03.
 - Rails 8.0 introduced the default authentication generator, Propshaft by default, Solid Cable, Solid Cache, and Solid Queue.
 - Rails 8.1 release notes list Active Job Continuations, Structured Event Reporting, Local CI, Markdown rendering, command-line credentials fetching, and registry-free Kamal deployment improvements.
-- The OpenAI API authenticates with API keys. API keys must stay server-side and must not be exposed to browsers.
-- OpenAI's ChatGPT billing and API platform billing are separate systems. A ChatGPT Free, Plus, Pro, Business, Enterprise, or Education subscription cannot be assumed to pay for this app's backend API usage.
-- ChatGPT Actions and ChatGPT Apps can authenticate ChatGPT to a third-party app, but that is not the same as a public "Sign in with ChatGPT" web login or a way to spend a user's ChatGPT subscription from Ideal Magic.
-- OpenAI's platform docs recommend the Responses API for new text-generation apps.
+- The OpenAI API still authenticates with API keys. API keys must stay server-side and must not be exposed to browsers.
+- OpenAI's Codex CLI supports `codex login` with ChatGPT OAuth, device-code auth, or an API key.
+- OpenAI's Codex App Server documentation exposes account auth methods for API key, ChatGPT-managed browser login, ChatGPT device-code login, and experimental externally managed ChatGPT tokens.
+- Codex App Server account state can include ChatGPT plan type, and its account surface can read ChatGPT/Codex rate limits.
+- OpenAI documents ChatGPT-managed Codex auth for trusted private automation when users need ChatGPT/Codex rate limits instead of API key usage, while still saying API keys are the right default for most CI/CD jobs.
+- Ideal Magic's v1 AI path is Codex App Server ChatGPT-managed auth. It must not claim generic OpenAI API OAuth support or use ChatGPT tokens for arbitrary Responses API calls outside the documented Codex App Server surface.
 - Scryfall provides public card data and asks clients to stay under 10 requests per second and use bulk data for large workloads.
 - The Commander format requires exactly 100 cards including the commander, singleton rules except allowed exceptions, and commander color identity restrictions.
 - Wizards' Fan Content Policy allows free fan content with required unofficial disclaimers and limits on trademarks, payments, and access restrictions.
@@ -81,8 +83,9 @@ Reference links:
 - Rails 8.1 release notes: https://guides.rubyonrails.org/8_1_release_notes.html
 - Tailwind CSS for Rails: https://tailwindcss.com/docs/installation/framework-guides/ruby-on-rails
 - OpenAI API authentication: https://developers.openai.com/api/reference/overview#authentication
-- OpenAI ChatGPT vs API billing: https://help.openai.com/en/articles/9039756
-- OpenAI latest model guide: https://platform.openai.com/docs/guides/latest-model
+- Codex CLI login: https://developers.openai.com/codex/cli/reference#codex-login
+- Codex App Server auth endpoints: https://developers.openai.com/codex/app-server#auth-endpoints
+- Codex ChatGPT-managed auth in CI/CD: https://developers.openai.com/codex/auth/ci-cd-auth
 - Scryfall API rate guidance: https://scryfall.com/docs/faqs/i-m-having-trouble-accessing-the-scryfall-api-or-i-m-blocked-17
 - Commander rules: https://mtgcommander.net/index.php/rules/
 - Wizards Fan Content Policy: https://company.wizards.com/en/legal/fancontentpolicy
@@ -92,8 +95,11 @@ Reference links:
 ## Product Constraints
 
 - Ideal Magic must work from public deck URLs and text exports before depending on provider account linking.
-- Ideal Magic must not store Archidekt, Moxfield, OpenAI, or other third-party passwords.
-- OpenAI API costs must be explicit. Supported v1 options are app-owned API billing, admin-only API key, or encrypted user-provided API keys. ChatGPT subscription passthrough is blocked unless OpenAI ships an official flow.
+- Ideal Magic must not store Archidekt, Moxfield, ChatGPT, OpenAI, or other third-party passwords.
+- User-facing AI evaluation must use Codex App Server ChatGPT-managed account auth as the exclusive v1 model path.
+- Codex account credential material must be isolated per user or per serialized workflow stream, treated like a password, and never committed, logged, pasted into tickets, or exposed to browsers.
+- Rails should store only the minimum Codex account metadata needed for UX, auditing, and scheduling, such as auth mode, displayed email, plan type when returned, rate-limit snapshots, and timestamps.
+- Do not implement bring-your-own OpenAI API key mode, admin-owned API key mode, or app-owned per-token API billing for v1 unless Stephen explicitly changes the product direction later.
 - WotC-owned names, card text, art, and symbols require fan-content care. Do not place core access behind a paywall without legal review.
 - AI output is advice, not rules authority. Commander legality and card facts must come from deterministic data and source-backed rules, not model guesses.
 - Every score must have evidence, a rubric version, and enough explanation that users can challenge it.
@@ -127,14 +133,16 @@ Reference links:
 
 ### AI And Analysis
 
-- OpenAI Responses API through a small Rails service boundary.
+- Codex App Server through a small Rails service boundary.
+- Codex-managed ChatGPT browser OAuth or device-code login for user account linking.
+- ChatGPT/Codex account plan metadata and rate-limit snapshots when returned by Codex.
 - Structured outputs for scorecards and explanations.
 - Deterministic pre-analysis before model calls.
 - Prompt, rubric, and model versioning in the database.
 - Replayable analysis runs.
 - Evaluation fixtures for known decks across precon, casual, upgraded, high-power, and cEDH-like ranges.
 - Salt and social-friction fixtures for high-friction cards, play patterns, combos, stax, mass land denial, extra turns, theft, chaos, repetitive locks, and mismatch-prone decks.
-- Cost, token, latency, and failure telemetry per analysis run.
+- Model, latency, rate-limit, token-usage-if-reported, and failure telemetry per analysis run.
 
 ### Data Sources
 
@@ -195,10 +203,10 @@ ideal-magic/
 - [x] Phase 0 - Freeze product charter and repo rules.
 - [x] Phase 1 - Scaffold the Rails foundation.
 - [ ] Phase 2 - Build the data model and card corpus pipeline.
-- [ ] Phase 3 - Build authentication, accounts, and AI billing boundaries.
+- [ ] Phase 3 - Build authentication, accounts, and Codex account-auth boundaries.
 - [ ] Phase 4 - Build deck import and provider adapters.
 - [ ] Phase 5 - Build deterministic Commander analysis.
-- [ ] Phase 6 - Build OpenAI evaluation pipeline.
+- [ ] Phase 6 - Build Codex evaluation pipeline.
 - [ ] Phase 7 - Build the deck evaluation UX.
 - [ ] Phase 8 - Build pod evaluation and comparison.
 - [ ] Phase 9 - Build the PWA experience.
@@ -229,7 +237,7 @@ ideal-magic/
 ### Exit Criteria
 
 - [x] A future agent can answer what Ideal Magic is, what v1 must ship, and what is out of scope.
-- [x] A future agent cannot accidentally plan around unsupported ChatGPT subscription passthrough.
+- [x] A future agent cannot accidentally plan around generic OpenAI API OAuth or unsupported ChatGPT token passthrough.
 - [x] The legal and provider boundaries are written before implementation.
 
 ### Verification
@@ -314,12 +322,12 @@ ideal-magic/
 - [ ] Database migration reset from scratch.
 - [ ] Background job smoke test for data refresh.
 
-## Phase 3 - Build Authentication, Accounts, And AI Billing Boundaries
+## Phase 3 - Build Authentication, Accounts, And Codex Account-Auth Boundaries
 
 ### Objectives
 
 - [ ] Let users own deck history and analysis settings.
-- [ ] Make OpenAI usage explicit, secure, and honest.
+- [ ] Make Codex account usage explicit, secure, and honest.
 - [ ] Keep future auth providers replaceable.
 
 ### Work Checklist
@@ -327,28 +335,29 @@ ideal-magic/
 - [ ] Implement email/password auth with secure sessions.
 - [ ] Add email verification and password reset.
 - [ ] Add account settings for display name, timezone, and preferred units.
-- [ ] Add encrypted storage for optional user-provided OpenAI API keys.
-- [ ] Add admin-owned OpenAI API key mode.
-- [ ] Add per-user and global analysis quota controls.
-- [ ] Add visible AI usage estimate before expensive analysis.
-- [ ] Add token/cost/latency tracking per analysis run.
+- [ ] Add Codex App Server account login start, completion, cancel, logout, and account-read flows.
+- [ ] Add Codex browser OAuth and device-code UX without collecting ChatGPT passwords.
+- [ ] Add isolated Codex credential storage per user or serialized workflow stream.
+- [ ] Add per-user and global analysis quota controls backed by app policy and Codex rate-limit state.
+- [ ] Add visible rate-limit and expected runtime guidance before expensive analysis.
+- [ ] Add model, rate-limit, token-usage-if-reported, and latency tracking per analysis run.
 - [ ] Add account deletion and data export flows.
 - [ ] Add provider account link placeholders without requesting third-party passwords.
-- [ ] Add feature flag for future official OpenAI OAuth or ChatGPT app integration if OpenAI supports the desired flow later.
+- [ ] Add token-cache deletion and auth disconnect flows that clear local Codex credentials.
 
 ### Exit Criteria
 
 - [ ] Users can sign up, sign in, reset passwords, and delete their account.
-- [ ] AI billing mode is clear to users and operators.
-- [ ] No browser can see an OpenAI API key.
-- [ ] The app does not imply ChatGPT subscription passthrough is supported.
+- [ ] Codex account-auth mode, plan metadata when available, and rate-limit state are clear to users and operators.
+- [ ] No browser can see OpenAI API keys or Codex access tokens.
+- [ ] The app does not imply generic OpenAI API OAuth or arbitrary Responses API subscription passthrough is supported.
 
 ### Verification
 
 - [ ] Auth system tests.
-- [ ] Encrypted credential tests.
+- [ ] Codex credential isolation and disconnect tests.
 - [ ] Browser tests for signup, login, logout, password reset, and account deletion.
-- [ ] Security review of key handling.
+- [ ] Security review of Codex credential handling.
 
 ## Phase 4 - Build Deck Import And Provider Adapters
 
@@ -429,26 +438,28 @@ ideal-magic/
 - [ ] Benchmark deck score snapshot tests.
 - [ ] Performance test for large batch analysis.
 
-## Phase 6 - Build OpenAI Evaluation Pipeline
+## Phase 6 - Build Codex Evaluation Pipeline
 
 ### Objectives
 
 - [ ] Add AI judgment on top of deterministic facts.
 - [ ] Make the model produce structured, auditable scorecards.
-- [ ] Keep model cost, latency, and variance under control.
+- [ ] Keep model latency, rate-limit usage, and variance under control.
 
 ### Work Checklist
 
-- [ ] Create an OpenAI client service for Responses API calls.
+- [ ] Create a Rails service for Codex App Server JSON-RPC calls.
+- [ ] Create isolated Codex runtime lifecycle management for evaluation jobs.
+- [ ] Read Codex account state and ChatGPT/Codex rate limits before starting expensive evaluations.
 - [ ] Define JSON schema for AI scorecards, including salt score, salt rating, social friction score, friction drivers, and Rule 0 talking points.
 - [ ] Define prompt versions for single-deck analysis.
 - [ ] Define prompt versions for pod analysis.
 - [ ] Pass deterministic feature vectors, decklist summaries, commander identity, combo candidates, salt/social-friction evidence, and rubric text to the model.
 - [ ] Instruct the model to cite only provided facts and mark uncertainty.
-- [ ] Add retries, timeouts, request IDs, and failure states.
+- [ ] Add retries, timeouts, request IDs, auth failure states, and rate-limit failure states.
 - [ ] Add moderation or abuse safeguards for user-provided deck descriptions and prompts.
 - [ ] Add model selection settings with a current default and pinned snapshot option when available.
-- [ ] Add low-cost and high-quality evaluation modes.
+- [ ] Add fast and high-quality evaluation modes when the Codex model catalog supports them.
 - [ ] Add evaluator tests with recorded fixtures or mocked responses.
 - [ ] Add human-review admin tools for score calibration.
 - [ ] Add red-team fixtures for hallucination, illegal decks, joke decks, and malformed imports.
@@ -459,15 +470,15 @@ ideal-magic/
 - [ ] Invalid model output is rejected and retried or surfaced as a failed run.
 - [ ] Deterministic facts remain visible beside AI interpretation.
 - [ ] AI salt/social-friction explanations cite deterministic evidence and do not shame players for deck choices.
-- [ ] Cost and token usage are stored per run.
+- [ ] Model, latency, rate-limit state, and token usage when reported are stored per run.
 
 ### Verification
 
-- [ ] OpenAI client unit tests.
+- [ ] Codex App Server client unit tests.
 - [ ] Schema validation tests.
 - [ ] Prompt fixture tests.
-- [ ] Analysis job integration test with mocked OpenAI.
-- [ ] Optional live smoke test gated by `OPENAI_API_KEY`.
+- [ ] Analysis job integration test with mocked Codex App Server.
+- [ ] Optional live smoke test gated by available Codex account auth.
 
 ## Phase 7 - Build The Deck Evaluation UX
 
