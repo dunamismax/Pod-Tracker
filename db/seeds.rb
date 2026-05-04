@@ -9,3 +9,4 @@
 #   end
 
 CommanderFormat::LegalitySnapshotImporter.new.import!
+CommanderFormat::CardTagImporter.new.import!

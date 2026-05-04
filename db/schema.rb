@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_04_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_04_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -136,6 +136,40 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_170000) do
     t.index ["code"], name: "index_card_sets_on_code", unique: true
     t.index ["scryfall_id"], name: "index_card_sets_on_scryfall_id", unique: true
     t.index ["set_type"], name: "index_card_sets_on_set_type"
+  end
+
+  create_table "card_tag_assignments", force: :cascade do |t|
+    t.string "card_name", null: false
+    t.bigint "card_tag_id", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.string "normalized_card_name", null: false
+    t.text "notes"
+    t.bigint "oracle_card_id"
+    t.string "severity"
+    t.string "source", default: "curated", null: false
+    t.datetime "updated_at", null: false
+    t.decimal "weight", precision: 7, scale: 3
+    t.index ["card_tag_id", "normalized_card_name"], name: "index_card_tag_assignments_on_tag_and_card", unique: true
+    t.index ["card_tag_id"], name: "index_card_tag_assignments_on_card_tag_id"
+    t.index ["normalized_card_name"], name: "index_card_tag_assignments_on_normalized_card_name"
+    t.index ["oracle_card_id", "card_tag_id"], name: "index_card_tag_assignments_on_oracle_card_id_and_card_tag_id"
+    t.index ["oracle_card_id"], name: "index_card_tag_assignments_on_oracle_card_id"
+  end
+
+  create_table "card_tags", force: :cascade do |t|
+    t.string "category", null: false
+    t.datetime "created_at", null: false
+    t.string "default_severity"
+    t.text "description"
+    t.decimal "friction_weight", precision: 7, scale: 3
+    t.string "label", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.decimal "salt_weight", precision: 7, scale: 3
+    t.string "slug", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category"], name: "index_card_tags_on_category"
+    t.index ["slug"], name: "index_card_tags_on_slug", unique: true
   end
 
   create_table "commanders", force: :cascade do |t|
@@ -373,6 +407,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_170000) do
   add_foreign_key "audit_events", "users"
   add_foreign_key "card_printings", "card_sets"
   add_foreign_key "card_printings", "oracle_cards"
+  add_foreign_key "card_tag_assignments", "card_tags"
+  add_foreign_key "card_tag_assignments", "oracle_cards"
   add_foreign_key "commanders", "card_printings"
   add_foreign_key "commanders", "decks"
   add_foreign_key "commanders", "oracle_cards"
