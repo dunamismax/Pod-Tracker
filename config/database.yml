@@ -90,6 +90,7 @@ production:
     database: ideal_magic_production
     username: ideal_magic
     password: <%= ENV["IDEAL_MAGIC_DATABASE_PASSWORD"] %>
+    host: <%= ENV.fetch("IDEAL_MAGIC_DATABASE_HOST", "localhost") %>
   cache:
     <<: *primary_production
     database: ideal_magic_production_cache

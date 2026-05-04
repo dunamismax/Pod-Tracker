@@ -170,6 +170,42 @@ Treat `BUILD.md` as temporary. Once the repo is past initial build, fold still-u
 
 ---
 
+## Production Deployment
+
+`ideal-magic.com` is live and self-hosted on Stephen's Ubuntu VM. Treat it as the canonical production target for v1, not a future deploy.
+
+Production runtime (the v1 deployment shape):
+
+- Native Puma under systemd, not Docker Compose. Other apps on this VM (`dunamismax-web.service`, `sentrypact-web.service`) follow the same pattern; Ideal Magic matches it. The Compose-based plan in `BUILD.md` Phase 13 was deferred — only revisit it if a concrete reason emerges.
+- Caddy at the host edge terminates TLS for `ideal-magic.com` and `www.ideal-magic.com` and reverse-proxies to `127.0.0.1:8083`.
+- PostgreSQL 17 from Ubuntu's package, running on the host. Production databases are `ideal_magic_production`, `ideal_magic_production_cache`, `ideal_magic_production_queue`, `ideal_magic_production_cable`, owned by role `ideal_magic`.
+- Solid Queue runs in-Puma via `SOLID_QUEUE_IN_PUMA=true`. No separate worker process for now.
+- Ruby 4.0.3 and Node 24.13.1 come from `mise` installs under `/home/sawyer/.local/share/mise/installs/`.
+
+Production paths to know:
+
+- App tree: `/home/sawyer/github/ideal-magic`
+- Env file: `/etc/ideal-magic-web/env` (root:sawyer 0640) — holds `SECRET_KEY_BASE`, `IDEAL_MAGIC_DATABASE_PASSWORD`, `IDEAL_MAGIC_DATABASE_HOST`, `RAILS_ENV=production`, `PORT=8083`, etc. Add new production env vars here.
+- systemd unit: `/etc/systemd/system/ideal-magic-web.service`
+- Caddy config: `/etc/caddy/Caddyfile` (the `ideal-magic.com` and `www.ideal-magic.com` blocks)
+- Master key: `/home/sawyer/github/ideal-magic/config/master.key` is gitignored. Back it up out-of-band; without it `config/credentials.yml.enc` is unreadable.
+- Sudoers drop-in: `/etc/sudoers.d/ideal-magic-web` grants `sawyer` passwordless `systemctl restart|reload|status ideal-magic-web.service` and `journalctl -u ideal-magic-web*` so `bin/redeploy` runs without prompts.
+
+Deploy loop:
+
+- After local edits, push, then on the VM (or already on it): `bin/redeploy`. It pulls, bundles (production groups only), runs `db:prepare`, precompiles assets, restarts the unit, and curls `/up` until it returns 200.
+- For an iteration that does not need a code pull (e.g. testing a config tweak), `sudo systemctl restart ideal-magic-web` is the smallest restart.
+- Logs: `sudo journalctl -u ideal-magic-web -f` (passwordless for `sawyer`).
+- Health: `curl -s -o /dev/null -w '%{http_code}\n' https://ideal-magic.com/up`.
+
+Deployment-shape rules:
+
+- Do not commit `config/master.key`, `/etc/ideal-magic-web/env`, or any rotated database password.
+- `config/database.yml` reads the production primary host from `IDEAL_MAGIC_DATABASE_HOST` (default `localhost`). PostgreSQL on this VM uses peer auth on the default socket, so TCP/`localhost` is required for the `ideal_magic` role.
+- Adding a new production-only env var: update `.env.example` (placeholder), update `/etc/ideal-magic-web/env`, restart the service. Do not bake secrets into the unit file.
+- Adding a new background process (e.g. a separate worker if Solid-in-Puma stops fitting): add a sibling systemd unit (`ideal-magic-worker.service`) modeled on `ideal-magic-web.service`, do not introduce Docker Compose just to add one process.
+- Backups, scheduled Scryfall refresh, and restore drills are still pending — `BUILD.md` Phase 13 tracks them.
+
 ## Persistent Instructions
 
 You wake fresh each session. This file is the only persistent local prompt for this repo.
