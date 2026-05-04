@@ -2,6 +2,8 @@ Rails.application.routes.draw do
   resource :session
   resource :registration, only: %i[new create]
   resource :account, only: %i[show edit update]
+  resource :account_deletion, only: %i[new destroy]
+  resource :account_export, only: %i[create]
   resources :passwords, param: :token
 
   get "email_verifications/:token", to: "email_verifications#show", as: :email_verification
