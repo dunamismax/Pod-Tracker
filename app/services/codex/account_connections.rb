@@ -14,6 +14,18 @@ module Codex
     class InvalidAuthMode < Error; end
     class InvalidAttempt < Error; end
 
+    class << self
+      attr_writer :client_factory
+
+      def client_factory
+        @client_factory ||= -> { AppServerClient.new }
+      end
+
+      def for(user, clock: -> { Time.current }, client_label: DEFAULT_CLIENT_LABEL)
+        new(user, client: client_factory.call, clock: clock, client_label: client_label)
+      end
+    end
+
     def initialize(user, client: AppServerClient.new, clock: -> { Time.current }, client_label: DEFAULT_CLIENT_LABEL)
       @user = user
       @client = client

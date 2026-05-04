@@ -4,7 +4,13 @@ Rails.application.routes.draw do
   resource :account, only: %i[show edit update]
   resource :account_deletion, only: %i[new destroy]
   resource :account_export, only: %i[create]
-  resource :account_codex_account, only: %i[destroy]
+  resource :account_codex_account, only: %i[destroy] do
+    post :refresh
+    post :logout
+  end
+  resources :account_codex_logins, only: %i[new create show destroy] do
+    post :poll, on: :member
+  end
   resources :passwords, param: :token
 
   get "email_verifications/:token", to: "email_verifications#show", as: :email_verification
