@@ -140,7 +140,29 @@ Stephen's standard repo setup is dual-push SSH on `origin`: one fetch URL plus m
 
 For docs-only work, run the smallest relevant checks plus `git diff --check`.
 
-For code work after scaffolding, run the narrowest useful command first, then broaden as needed. Follow the repo's documented quality gate — lint, format, type-check, test. The planned single verify entrypoint is `bin/verify`; use it once available.
+For code work, run the narrowest useful command first, then broaden as needed. `bin/verify` (which delegates to `bin/ci`) is the canonical gate — Ruby style, ERB lint, gem and importmap audits, Brakeman, Rails tests, system tests, and seed replant.
+
+### Running Tests On This VM
+
+Two gotchas because the production app and the working tree live on the same machine:
+
+1. **The bundle is pinned to production groups.** `/.bundle/config` carries `BUNDLE_WITHOUT: "development:test"` (set by `bin/redeploy`). Tests need `debug`, `capybara`, `rubocop`, etc., so first run:
+
+   ```sh
+   bundle config unset without
+   bundle install
+   ```
+
+   This is non-destructive: `bin/redeploy` resets the `without` flag itself and only runs `bundle check`, so dev/test gems sit harmlessly in the shared gem path until the next deploy.
+
+2. **The test database has no default role.** `config/database.yml`'s `test:` block omits username/password, so Active Record connects as OS-user `sawyer` and dies with `FATAL: role "sawyer" does not exist`. Export `DATABASE_URL` pointing at the `ideal_magic` role before running anything that touches the DB:
+
+   ```sh
+   export DATABASE_URL="postgres://ideal_magic:$(. /etc/ideal-magic-web/env; echo "$IDEAL_MAGIC_DATABASE_PASSWORD")@localhost/ideal_magic_test"
+   bin/verify
+   ```
+
+   The `ideal_magic_test` database and its `ideal_magic_test_0..N` parallel-worker siblings already exist on the host PostgreSQL cluster.
 
 ---
 
