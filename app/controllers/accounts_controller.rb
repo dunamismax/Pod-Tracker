@@ -5,6 +5,7 @@ class AccountsController < ApplicationController
     @codex_account = @user.codex_account
     @active_codex_login = @user.codex_login_attempts.active.recent_first.first
     @provider_links = @user.provider_links.order(:provider, :handle)
+    @analysis_quota = Codex::QuotaPolicy.for(@user).check
   end
 
   def edit
