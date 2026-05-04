@@ -37,7 +37,46 @@
     </div>
   </dl>
 
-  <div class="flex flex-wrap gap-4 text-sm">
+  <h2 class="font-bold text-2xl mt-10">Codex account</h2>
+
+  <% if @codex_account.present? %>
+    <dl class="my-4 space-y-3 text-sm">
+      <div class="flex justify-between gap-4">
+        <dt class="text-zinc-400">Status</dt>
+        <dd class="font-medium text-zinc-100"><%= @codex_account.status.humanize %></dd>
+      </div>
+      <div class="flex justify-between gap-4">
+        <dt class="text-zinc-400">Auth mode</dt>
+        <dd class="font-medium text-zinc-100"><%= @codex_account.auth_mode.humanize %></dd>
+      </div>
+      <% if @codex_account.displayed_email.present? %>
+        <div class="flex justify-between gap-4">
+          <dt class="text-zinc-400">ChatGPT account</dt>
+          <dd class="font-medium text-zinc-100"><%= @codex_account.displayed_email %></dd>
+        </div>
+      <% end %>
+      <% if @codex_account.plan_type.present? %>
+        <div class="flex justify-between gap-4">
+          <dt class="text-zinc-400">Plan</dt>
+          <dd class="font-medium text-zinc-100"><%= @codex_account.plan_type %></dd>
+        </div>
+      <% end %>
+      <% if @codex_account.last_synced_at.present? %>
+        <div class="flex justify-between gap-4">
+          <dt class="text-zinc-400">Last synced</dt>
+          <dd class="font-medium text-zinc-100"><%= time_ago_in_words(@codex_account.last_synced_at) %> ago</dd>
+        </div>
+      <% end %>
+    </dl>
+    <% if @codex_account.credential_present? %>
+      <%= button_to "Disconnect Codex account", account_codex_account_path, method: :delete, data: { turbo_confirm: "Disconnect this Codex account? Stored credentials will be erased." }, class: "rounded-md px-3.5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-medium cursor-pointer text-sm" %>
+    <% end %>
+  <% else %>
+    <p class="my-4 text-sm text-zinc-400">No Codex account is connected. AI evaluation requires connecting a ChatGPT/Codex account through the documented Codex App Server flow. The connection UI ships in a later tranche.</p>
+  <% end %>
+
+  <h2 class="font-bold text-2xl mt-10">Account actions</h2>
+  <div class="mt-4 flex flex-wrap gap-4 text-sm">
     <%= link_to "Edit account", edit_account_path, class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium" %>
     <%= button_to "Download my data", account_export_path, method: :post, class: "rounded-md px-3.5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-medium cursor-pointer" %>
     <%= button_to "Sign out", session_path, method: :delete, class: "rounded-md px-3.5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-medium cursor-pointer" %>
