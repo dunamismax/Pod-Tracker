@@ -1,0 +1,59 @@
+<% content_for :title, @deck.name %>
+
+<section class="space-y-6">
+  <div class="flex flex-wrap items-baseline justify-between gap-4">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-emerald-300">Commander deck</p>
+      <h1 class="mt-1 text-2xl font-semibold text-white"><%= @deck.name %></h1>
+      <p class="mt-1 text-sm text-zinc-400">
+        <%= @deck.commander_names.join(", ").presence || "No commander recorded" %>
+        <% if @deck.source_type.present? %>
+          · Source: <%= @deck.source_type.humanize %>
+        <% end %>
+        · Imported <%= time_ago_in_words(@deck.last_imported_at || @deck.created_at) %> ago
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <%= link_to "All decks", decks_path, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
+      <%= button_to "Remove deck", deck_path(@deck), method: :delete, form: { data: { turbo_confirm: "Remove this deck?" } }, class: "rounded-md bg-red-700 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-red-600" %>
+    </div>
+  </div>
+
+  <% unparsed_lines = Array(@deck.import_metadata["unparsed_lines"]) %>
+  <% if unparsed_lines.any? %>
+    <div class="rounded-md border border-amber-800 bg-amber-950/40 p-4 text-sm text-amber-200">
+      <p class="font-medium">Some lines could not be parsed and were skipped:</p>
+      <ul class="mt-2 list-disc pl-5 font-mono text-xs">
+        <% unparsed_lines.first(20).each do |line| %>
+          <li><%= line %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <% if @deck.commanders.any? %>
+      <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+        <h2 class="text-lg font-medium text-white">Commander</h2>
+        <ul class="mt-3 space-y-1 text-sm text-zinc-200">
+          <% @deck.commanders.order(:position).each do |commander| %>
+            <li><%= commander.name %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <% DeckCard::BOARDS.each do |board| %>
+      <% cards = @deck.deck_cards.where(board: board).order(:position, :name) %>
+      <% next if cards.empty? %>
+      <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+        <h2 class="text-lg font-medium text-white"><%= board.humanize %> · <%= cards.sum(&:quantity) %> cards</h2>
+        <ul class="mt-3 grid gap-1 text-sm text-zinc-200 sm:grid-cols-2">
+          <% cards.each do |card| %>
+            <li><span class="text-zinc-500"><%= card.quantity %>×</span> <%= card.name %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+  </div>
+</section>

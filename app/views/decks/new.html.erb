@@ -1,0 +1,45 @@
+<% content_for :title, "Import deck" %>
+
+<section class="mx-auto w-full max-w-3xl space-y-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-white">Import a Commander deck</h1>
+    <p class="mt-1 text-sm text-zinc-400">
+      Paste a decklist from any source. Use a <code class="rounded bg-zinc-800 px-1 text-xs">Commander</code> header for your commander, or pick one in the form below. Provider URL imports come later — for now, paste works.
+    </p>
+  </div>
+
+  <%= form_with model: @form, url: decks_path, scope: :deck_import_form, local: true, class: "space-y-5" do |form| %>
+    <% if @form.errors.any? %>
+      <div class="rounded-md border border-red-800 bg-red-950/40 p-3 text-sm text-red-200">
+        <ul class="list-disc pl-5">
+          <% @form.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div>
+      <%= form.label :name, "Deck name (optional)", class: "block text-sm font-medium text-zinc-300" %>
+      <%= form.text_field :name, class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100", placeholder: "Auto-derived from commander if blank" %>
+    </div>
+
+    <div>
+      <%= form.label :commander_hint, "Commander (optional if your decklist has a Commander header)", class: "block text-sm font-medium text-zinc-300" %>
+      <%= form.text_field :commander_hint, class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100", placeholder: "e.g. Atraxa, Praetors' Voice" %>
+    </div>
+
+    <div>
+      <%= form.label :decklist, "Decklist", class: "block text-sm font-medium text-zinc-300" %>
+      <%= form.text_area :decklist, rows: 18, class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100", placeholder: "1 Sol Ring\n1 Arcane Signet\n..." %>
+      <p class="mt-1 text-xs text-zinc-500">
+        Lines like <code>1 Sol Ring</code> or <code>1 Sol Ring (CMM) 410</code>. Headers like <code>Commander</code>, <code>Mainboard</code>, or <code>Sideboard</code> route lines to the right pile.
+      </p>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <%= form.submit "Import deck", class: "rounded-md bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
+      <%= link_to "Cancel", decks_path, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
+    </div>
+  <% end %>
+</section>

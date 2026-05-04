@@ -1,0 +1,39 @@
+<% content_for :title, "Decks" %>
+
+<section class="space-y-6">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-white">Your decks</h1>
+      <p class="mt-1 text-sm text-zinc-400">
+        Pasted Commander decklists you've imported. Provider URL imports land here once those adapters ship.
+      </p>
+    </div>
+    <%= link_to "Import a deck", new_deck_path, class: "rounded-md bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
+  </div>
+
+  <% if @decks.empty? %>
+    <div class="rounded-lg border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center">
+      <p class="text-sm text-zinc-400">No decks yet. Paste a Commander decklist to get started.</p>
+    </div>
+  <% else %>
+    <ul class="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+      <% @decks.each do |deck| %>
+        <li class="px-5 py-4">
+          <div class="flex flex-wrap items-baseline justify-between gap-4">
+            <div>
+              <%= link_to deck.name, deck_path(deck), class: "text-base font-medium text-emerald-300 hover:text-emerald-200" %>
+              <p class="mt-1 text-xs text-zinc-500">
+                <%= deck.commander_names.join(", ").presence || "No commander recorded" %>
+                <% if deck.source_type.present? %>
+                  · Source: <%= deck.source_type.humanize %>
+                <% end %>
+                · Imported <%= time_ago_in_words(deck.last_imported_at || deck.created_at) %> ago
+              </p>
+            </div>
+            <span class="text-xs uppercase tracking-wide text-zinc-500"><%= deck.status %></span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>
