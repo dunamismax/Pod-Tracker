@@ -1,6 +1,11 @@
 Rails.application.routes.draw do
   resource :session
+  resource :registration, only: %i[new create]
+  resource :account, only: %i[show edit update]
   resources :passwords, param: :token
+
+  get "email_verifications/:token", to: "email_verifications#show", as: :email_verification
+  post "email_verifications", to: "email_verifications#create", as: :email_verifications
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.

@@ -1,7 +1,7 @@
 # BUILD.md
 
 Last drafted: 2026-05-03
-Last updated: 2026-05-04 (Commander deck fixtures, legality engine, Scryfall refresh job)
+Last updated: 2026-05-04 (registration, account settings, email verification)
 
 ## Agent Operating Rules
 
@@ -39,7 +39,7 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04, source-controlled representative Commander deck fixtures and a deterministic Commander legality engine completed on 2026-05-04, and a Solid Queue card corpus refresh job completed on 2026-05-04.
+The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04, source-controlled representative Commander deck fixtures and a deterministic Commander legality engine completed on 2026-05-04, a Solid Queue card corpus refresh job completed on 2026-05-04, and the first Phase 3 tranche covering self-service registration, account profile fields, and email verification completed on 2026-05-04.
 
 Shipped foundation:
 
@@ -55,12 +55,13 @@ Shipped foundation:
 - Source-controlled representative Commander deck fixtures live under `db/seeds/commander/deck_fixtures/` for legal mono-green stompy, four-color superfriends, and mono-red goblin tribal builds, plus intentionally illegal banlist, singleton, and color-identity demo decks for regression tests. A pasted-decklist parser and a fixture library service load each fixture into persistable `Deck`, `Commander`, and `DeckCard` records.
 - A deterministic Commander legality engine (`CommanderFormat::LegalityChecker`) evaluates deck size, commander count, banlist membership against the loaded `LegalitySnapshot`, singleton rules with basic-land and card-text exemptions (Relentless Rats, Rat Colony, Shadowborn Apostle, Persistent Petitioners, Dragon's Approach, Slime Against Humanity, Hare Apparent, Templar Knight, Seven Dwarves, Nazgul), commander type-line requirements, and color-identity violations, returning structured issues with severity, code, and JSON-serializable summaries suitable for analysis-run snapshots. Oracle-backed checks degrade gracefully when oracle data is missing.
 - A Solid Queue background job (`Scryfall::CardCorpusRefreshJob`) wraps `Scryfall::BulkImporter` with bounded retries for rate-limit and transport errors, runs on a dedicated `card_corpus` queue, and is wired into `config/recurring.yml` for daily production refreshes.
+- Self-service email/password registration (`RegistrationsController`), an authenticated account settings page (`AccountsController`) for display name, timezone, and preferred units, and a tokenized email verification flow (`EmailVerificationsController`, `UserMailer#verify_email`) are wired up. The `users` table now carries `display_name`, `timezone`, `preferred_units`, `email_verified_at`, and `email_verification_sent_at`, with `User` validating email format and uniqueness, normalizing display name and email, and exposing `User#email_verified?` and `User#attribution_name`.
 - Lookup and history indexes exist for deck ownership, provider IDs and URLs, normalized card names, Scryfall oracle and printing IDs, analysis history, scorecard ownership, legality snapshots, and audit events.
 - Minitest is the primary test framework.
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
 - `.env.example`, `/up`, `/ready`, and an authenticated dashboard root route exist.
 
-No deck import, collection import, card data refresh jobs, full Commander legality engine, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, or production configuration exists yet.
+No Codex App Server account-auth flow, account deletion or data export, deck import, collection import, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, or production configuration exists yet.
 
 GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
@@ -374,10 +375,10 @@ ideal-magic/
 
 ### Work Checklist
 
-- [ ] Implement email/password auth with secure sessions.
-- [ ] Add email verification and password reset.
-- [ ] Add account settings for display name, timezone, and preferred units.
-- [ ] Add user profile fields needed for playgroup sessions, public display names, and private note attribution.
+- [x] Implement email/password auth with secure sessions.
+- [x] Add email verification and password reset.
+- [x] Add account settings for display name, timezone, and preferred units.
+- [x] Add user profile fields needed for playgroup sessions, public display names, and private note attribution.
 - [ ] Add Codex App Server account login start, completion, cancel, logout, and account-read flows.
 - [ ] Add Codex browser OAuth and device-code UX without collecting ChatGPT passwords.
 - [ ] Add isolated Codex credential storage per user or serialized workflow stream.
