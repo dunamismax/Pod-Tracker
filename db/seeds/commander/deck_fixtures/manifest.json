@@ -1,0 +1,66 @@
+{
+  "version": "2026-05-04",
+  "notes": "Representative Commander deck fixtures used for legality, parser, and analysis tests. Each entry references a sibling .txt file containing a pasted-decklist style card list with explicit Commander, Mainboard, and optional Sideboard sections. Color identity, banlist intent, and power band are recorded to make legality and analysis assertions stable.",
+  "decks": [
+    {
+      "slug": "mono_green_omnath_stompy",
+      "name": "Omnath Mono-Green Stompy",
+      "format": "commander",
+      "color_identity": ["G"],
+      "expected_main_card_count": 99,
+      "intent": "Legal mono-green casual ramp/stompy build. Uses no banned cards.",
+      "power_band": "casual",
+      "file": "mono_green_omnath_stompy.txt"
+    },
+    {
+      "slug": "atraxa_superfriends_upgraded",
+      "name": "Atraxa Superfriends Upgraded",
+      "format": "commander",
+      "color_identity": ["W", "U", "B", "G"],
+      "expected_main_card_count": 99,
+      "intent": "Legal four-color superfriends upgraded build. Uses no banned cards.",
+      "power_band": "upgraded",
+      "file": "atraxa_superfriends_upgraded.txt"
+    },
+    {
+      "slug": "krenko_goblin_tribal",
+      "name": "Krenko Goblin Tribal",
+      "format": "commander",
+      "color_identity": ["R"],
+      "expected_main_card_count": 99,
+      "intent": "Legal mono-red goblin tribal aggro build for parser and ownership tests.",
+      "power_band": "casual",
+      "file": "krenko_goblin_tribal.txt"
+    },
+    {
+      "slug": "illegal_banned_card_demo",
+      "name": "Atraxa With Banned Card",
+      "format": "commander",
+      "color_identity": ["W", "U", "B", "G"],
+      "expected_main_card_count": 99,
+      "intent": "Intentionally illegal: includes Mana Crypt (banned in Commander) to exercise banlist regression checks.",
+      "power_band": "test",
+      "file": "illegal_banned_card_demo.txt"
+    },
+    {
+      "slug": "illegal_singleton_violation_demo",
+      "name": "Krenko Singleton Violation",
+      "format": "commander",
+      "color_identity": ["R"],
+      "expected_main_card_count": 99,
+      "intent": "Intentionally illegal: contains 4 copies of Goblin Piledriver (non-basic, non-singleton-exempt) to exercise singleton checks.",
+      "power_band": "test",
+      "file": "illegal_singleton_violation_demo.txt"
+    },
+    {
+      "slug": "illegal_color_identity_demo",
+      "name": "Krenko Off-Color",
+      "format": "commander",
+      "color_identity": ["R"],
+      "expected_main_card_count": 99,
+      "intent": "Intentionally illegal: mono-red commander but mainboard contains Counterspell (blue) to exercise color identity checks.",
+      "power_band": "test",
+      "file": "illegal_color_identity_demo.txt"
+    }
+  ]
+}

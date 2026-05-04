@@ -1,7 +1,7 @@
 # BUILD.md
 
 Last drafted: 2026-05-03
-Last updated: 2026-05-04 (card tag taxonomy and curated overrides)
+Last updated: 2026-05-04 (Commander deck fixtures, legality engine, Scryfall refresh job)
 
 ## Agent Operating Rules
 
@@ -39,7 +39,7 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, and a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04.
+The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04, source-controlled representative Commander deck fixtures and a deterministic Commander legality engine completed on 2026-05-04, and a Solid Queue card corpus refresh job completed on 2026-05-04.
 
 Shipped foundation:
 
@@ -52,6 +52,9 @@ Shipped foundation:
 - Fixture-tested Scryfall bulk-data ingestion exists for the `default_cards` bulk file, including polite `User-Agent` and `Accept` headers, API request throttling, streaming top-level JSON array parsing, normalized single-face and multi-face card facts, and upserts for card sets, oracle cards, and card printings.
 - Source-controlled Commander rules and banlist snapshot storage exists for the current `mtgcommander` Commander legality source, including normalized banned-name lookups, category bans, rules metadata, seed loading, and fixture-tested idempotent import.
 - Source-controlled internal card tag taxonomy and curated overrides exist for role tags (ramp, fast mana, tutor, card draw, protection, removal, stack interaction, board wipe, stax, combo, graveyard use, land, win condition), salt drivers (fast mana, mass land denial, extra turns, chaos, theft, repetitive loop, stax lockpiece, compact combo), and social-friction patterns (combo opacity, long-game pressure, disclosure required, interaction asymmetry), with tag/assignment models, normalized card-name lookup, oracle-card backfill on save, idempotent JSON-driven importer, and seed loading wired into `bin/rails db:seed`.
+- Source-controlled representative Commander deck fixtures live under `db/seeds/commander/deck_fixtures/` for legal mono-green stompy, four-color superfriends, and mono-red goblin tribal builds, plus intentionally illegal banlist, singleton, and color-identity demo decks for regression tests. A pasted-decklist parser and a fixture library service load each fixture into persistable `Deck`, `Commander`, and `DeckCard` records.
+- A deterministic Commander legality engine (`CommanderFormat::LegalityChecker`) evaluates deck size, commander count, banlist membership against the loaded `LegalitySnapshot`, singleton rules with basic-land and card-text exemptions (Relentless Rats, Rat Colony, Shadowborn Apostle, Persistent Petitioners, Dragon's Approach, Slime Against Humanity, Hare Apparent, Templar Knight, Seven Dwarves, Nazgul), commander type-line requirements, and color-identity violations, returning structured issues with severity, code, and JSON-serializable summaries suitable for analysis-run snapshots. Oracle-backed checks degrade gracefully when oracle data is missing.
+- A Solid Queue background job (`Scryfall::CardCorpusRefreshJob`) wraps `Scryfall::BulkImporter` with bounded retries for rate-limit and transport errors, runs on a dedicated `card_corpus` queue, and is wired into `config/recurring.yml` for daily production refreshes.
 - Lookup and history indexes exist for deck ownership, provider IDs and URLs, normalized card names, Scryfall oracle and printing IDs, analysis history, scorecard ownership, legality snapshots, and audit events.
 - Minitest is the primary test framework.
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
@@ -238,7 +241,7 @@ ideal-magic/
 
 - [x] Phase 0 - Freeze product charter and repo rules.
 - [x] Phase 1 - Scaffold the Rails foundation.
-- [ ] Phase 2 - Build the data model and card corpus pipeline.
+- [x] Phase 2 - Build the data model and card corpus pipeline.
 - [ ] Phase 3 - Build authentication, accounts, and Codex account-auth boundaries.
 - [ ] Phase 4 - Build deck import and provider adapters.
 - [ ] Phase 5 - Build deterministic Commander analysis.
@@ -341,25 +344,25 @@ ideal-magic/
 - [x] Add internal card tags for ramp, fast mana, tutors, draw, protection, removal, stack interaction, board wipes, stax, combos, graveyard use, lands, win conditions, salt drivers, and social-friction patterns.
 - [x] Add curated salt taxonomy and override data for cards and play patterns that deterministic card facts cannot classify reliably.
 - [x] Add curated override files or admin screens for tags the card corpus cannot infer reliably.
-- [ ] Add import fixtures for representative Commander decks.
-- [ ] Add data refresh jobs through Solid Queue.
+- [x] Add import fixtures for representative Commander decks.
+- [x] Add data refresh jobs through Solid Queue.
 
 ### Exit Criteria
 
-- [ ] The app can answer card facts without calling OpenAI.
-- [ ] Card data refreshes are repeatable and auditable.
-- [ ] Commander legality checks have deterministic source data.
-- [ ] Salt and social-friction tags are source-controlled, reviewable, and separated from raw Scryfall card facts.
+- [x] The app can answer card facts without calling OpenAI.
+- [x] Card data refreshes are repeatable and auditable.
+- [x] Commander legality checks have deterministic source data.
+- [x] Salt and social-friction tags are source-controlled, reviewable, and separated from raw Scryfall card facts.
 
 ### Verification
 
 - [x] Card corpus unit tests.
 - [x] Scryfall ingestion tests against fixture payloads.
 - [x] Commander rules and banlist snapshot storage tests.
-- [ ] Commander legality tests.
+- [x] Commander legality tests.
 - [x] Salt taxonomy and override tests.
-- [ ] Database migration reset from scratch.
-- [ ] Background job smoke test for data refresh.
+- [x] Database migration reset from scratch.
+- [x] Background job smoke test for data refresh.
 
 ## Phase 3 - Build Authentication, Accounts, And Codex Account-Auth Boundaries
 
