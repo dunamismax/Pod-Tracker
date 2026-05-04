@@ -10,7 +10,7 @@ This is a single-developer build of a Commander companion app, not a corporate r
 
 - **Ship vertical slices that move the user-visible product forward.** Each pass should deliver a concrete capability someone can demo at a kitchen table, not horizontal plumbing.
 - **Skip ahead when it pays.** Pick the slice that delivers the most user-visible value next, regardless of order. The slice list below is roughly value-ordered, not gospel.
-- **4–8 related checkboxes per pass minimum.** Bigger is fine when boxes share infrastructure. One-box passes are okay only when the work is genuinely isolated; flag the reason in the commit.
+- **2–4 related checkboxes per pass minimum.** Bigger is fine when boxes share infrastructure. One-box passes are okay only when the work is genuinely isolated; flag the reason in the commit.
 - **Trim ceremony.** When a slice ships, check only the boxes that shipped, append one line to "Recent slices," and update "What's live now" only if a user-visible capability changed. Do not write a paragraph per pass.
 - **The verify gate is `bin/verify`.** Run it once before each commit, not per checkbox.
 - **A box is `[x]` only if it shipped, was tested, and is in `main`.** `[~]` means partial. `[ ]` means open. Never check a box for aspirational work.

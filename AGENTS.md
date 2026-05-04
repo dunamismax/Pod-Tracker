@@ -174,7 +174,7 @@ Three gotchas because the production app and the working tree live on the same m
 `BUILD.md` is the active implementation manual, organized as user-visible vertical slices. Read it first; it has its own operating rules at the top. Highlights:
 
 - Ship vertical slices that move user-visible product forward, not horizontal plumbing. Skip ahead between slices when value is higher elsewhere.
-- 4–8 related checkboxes per pass minimum. One-box passes need a reason in the commit.
+- 2–4 related checkboxes per pass minimum. One-box passes need a reason in the commit.
 - Check boxes only for shipped, tested, in-`main` work. Trim ceremony — one line in "Recent slices," update "What's live now" only when user-visible capability changes.
 - Update `README.md` when current product or setup truth changes. Keep future execution detail in `BUILD.md`.
 - Slices and boxes are editable. Delete or rewrite work that turns out wrong-shaped, premature, or redundant.
