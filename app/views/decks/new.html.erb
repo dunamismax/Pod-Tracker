@@ -4,7 +4,7 @@
   <div>
     <h1 class="text-2xl font-semibold text-white">Import a Commander deck</h1>
     <p class="mt-1 text-sm text-zinc-400">
-      Paste a decklist or upload a plain-text decklist file. Use a <code class="rounded bg-zinc-800 px-1 text-xs">Commander</code> header for your commander, or pick one in the form below. Provider URL imports come later — for now, paste or upload works.
+      Paste a public Archidekt deck URL, upload a plain-text decklist file, or paste a decklist. Use a <code class="rounded bg-zinc-800 px-1 text-xs">Commander</code> header for your commander, or pick one in the form below. Archidekt URL takes precedence, then upload, then paste.
     </p>
   </div>
 
@@ -27,6 +27,14 @@
     <div>
       <%= form.label :commander_hint, "Commander (optional if your decklist has a Commander header)", class: "block text-sm font-medium text-zinc-300" %>
       <%= form.text_field :commander_hint, class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100", placeholder: "e.g. Atraxa, Praetors' Voice" %>
+    </div>
+
+    <div>
+      <%= form.label :archidekt_url, "Archidekt deck URL (optional)", class: "block text-sm font-medium text-zinc-300" %>
+      <%= form.url_field :archidekt_url, class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100", placeholder: "https://archidekt.com/decks/12345" %>
+      <p class="mt-1 text-xs text-zinc-500">
+        Public Archidekt decks only. If a URL is provided it overrides any file upload or pasted text.
+      </p>
     </div>
 
     <div>

@@ -24,7 +24,14 @@ class DecksController < ApplicationController
     end
 
     result =
-      if @form.upload_provided?
+      if @form.archidekt_url_provided?
+        Decks::Importer.import_archidekt_url(
+          user: current_user,
+          url: @form.normalized_archidekt_url,
+          name: @form.name,
+          commander_hint: @form.commander_hint
+        )
+      elsif @form.upload_provided?
         Decks::Importer.import_text_file(
           user: current_user,
           file: @form.decklist_file,
@@ -66,7 +73,7 @@ class DecksController < ApplicationController
     end
 
     def import_params
-      params.require(:deck_import_form).permit(:decklist, :name, :commander_hint, :decklist_file)
+      params.require(:deck_import_form).permit(:decklist, :name, :commander_hint, :decklist_file, :archidekt_url)
     end
 
     def record_audit(name, deck:, parsed:)

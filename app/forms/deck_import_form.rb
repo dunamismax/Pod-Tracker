@@ -8,8 +8,9 @@ class DeckImportForm
   attribute :decklist, :string
   attribute :commander_hint, :string
   attribute :decklist_file
+  attribute :archidekt_url, :string
 
-  validate :decklist_or_file_present
+  validate :decklist_file_or_url_present
   validate :decklist_size_within_limit
   validate :decklist_has_content_lines
   validate :uploaded_file_size_within_limit
@@ -30,10 +31,18 @@ class DeckImportForm
     decklist.present?
   end
 
+  def archidekt_url_provided?
+    archidekt_url.to_s.strip.present?
+  end
+
+  def normalized_archidekt_url
+    archidekt_url.to_s.strip
+  end
+
   private
 
-  def decklist_or_file_present
-    return if pasted_text_provided? || upload_provided?
+  def decklist_file_or_url_present
+    return if pasted_text_provided? || upload_provided? || archidekt_url_provided?
 
     errors.add(:decklist, "is required")
   end

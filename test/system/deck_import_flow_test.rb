@@ -34,6 +34,44 @@ class DeckImportFlowTest < ApplicationSystemTestCase
     assert_text(/required/i)
   end
 
+  test "user imports a deck from an Archidekt URL" do
+    user = users(:one)
+    sign_in_through_ui(user)
+
+    json = {
+      "id" => 12345,
+      "name" => "URL Atraxa",
+      "categories" => [
+        { "name" => "Commander", "includedInDeck" => true, "isPremier" => true }
+      ],
+      "cards" => [
+        { "quantity" => 1, "categories" => [ "Commander" ],
+          "card" => { "oracleCard" => { "name" => "Atraxa, Praetors' Voice" } } },
+        { "quantity" => 1, "categories" => [],
+          "card" => { "oracleCard" => { "name" => "Sol Ring" } } },
+        { "quantity" => 1, "categories" => [],
+          "card" => { "oracleCard" => { "name" => "Arcane Signet" } } }
+      ]
+    }
+
+    previous = Decks::Adapters::Archidekt.client_factory
+    stub_class = Class.new do
+      define_method(:fetch_deck) { |_id| json }
+    end
+    Decks::Adapters::Archidekt.client_factory = -> { stub_class.new }
+
+    visit new_deck_path
+    fill_in "Archidekt deck URL (optional)", with: "https://archidekt.com/decks/12345/atraxa"
+    click_button "Import deck"
+
+    assert_text "Deck imported."
+    assert_text "URL Atraxa"
+    assert_text "Atraxa, Praetors' Voice"
+    assert_text "Sol Ring"
+  ensure
+    Decks::Adapters::Archidekt.client_factory = previous if previous
+  end
+
   test "user uploads a text file decklist" do
     user = users(:one)
     sign_in_through_ui(user)

@@ -83,6 +83,40 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
     assert_equal "atraxa.txt", deck.import_metadata.dig("source_metadata", "filename")
   end
 
+  test "imports a deck from an Archidekt URL using the configured client factory" do
+    sign_in_as(@user)
+
+    with_archidekt_stub_client(archidekt_sample_json) do
+      assert_difference -> { @user.decks.count } => 1,
+                        -> { AuditEvent.where(event_name: "deck.imported").count } => 1 do
+        post decks_path, params: {
+          deck_import_form: { archidekt_url: "https://archidekt.com/decks/12345/atraxa", name: "URL Atraxa" }
+        }
+      end
+    end
+
+    deck = @user.decks.order(:id).last
+    assert_redirected_to deck_path(deck)
+    assert_equal "archidekt_url", deck.source_type
+    assert_equal "URL Atraxa", deck.name
+    assert_equal "https://archidekt.com/decks/12345", deck.import_metadata["source_url"]
+  end
+
+  test "rejects a non-Archidekt URL" do
+    sign_in_as(@user)
+
+    with_archidekt_stub_client(archidekt_sample_json) do
+      assert_no_difference -> { Deck.count } do
+        post decks_path, params: {
+          deck_import_form: { archidekt_url: "https://moxfield.com/decks/abc" }
+        }
+      end
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "li", /Archidekt/
+  end
+
   test "rejects an uploaded file with an unsupported extension" do
     sign_in_as(@user)
 
@@ -140,6 +174,35 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+    def archidekt_sample_json
+      {
+        "id" => 12345,
+        "name" => "Atraxa URL Sample",
+        "categories" => [
+          { "name" => "Commander", "includedInDeck" => true, "isPremier" => true }
+        ],
+        "cards" => [
+          { "quantity" => 1, "categories" => [ "Commander" ],
+            "card" => { "oracleCard" => { "name" => "Atraxa, Praetors' Voice" } } },
+          { "quantity" => 1, "categories" => [],
+            "card" => { "oracleCard" => { "name" => "Sol Ring" } } },
+          { "quantity" => 1, "categories" => [],
+            "card" => { "oracleCard" => { "name" => "Arcane Signet" } } }
+        ]
+      }
+    end
+
+    def with_archidekt_stub_client(json)
+      previous = Decks::Adapters::Archidekt.client_factory
+      stub_class = Class.new do
+        define_method(:fetch_deck) { |_id| json }
+      end
+      Decks::Adapters::Archidekt.client_factory = -> { stub_class.new }
+      yield
+    ensure
+      Decks::Adapters::Archidekt.client_factory = previous
+    end
 
     def fixture_text_file(name, content, content_type: "text/plain")
       tempfile = Tempfile.new([ "deck", File.extname(name) ])

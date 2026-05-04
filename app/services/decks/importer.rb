@@ -26,6 +26,16 @@ module Decks
       )
     end
 
+    def self.import_archidekt_url(user:, url:, name: nil, commander_hint: nil, adapter: Adapters::Archidekt.new)
+      new.import(
+        user: user,
+        adapter: adapter,
+        payload: url,
+        name: name,
+        commander_hint: commander_hint
+      )
+    end
+
     def import(user:, adapter:, payload:, name: nil, commander_hint: nil)
       parsed = adapter.parse(payload)
       parsed_with_hint = apply_commander_hint(parsed, commander_hint)
@@ -40,7 +50,9 @@ module Decks
         deck.save!
       end
       Result.new(deck: deck, parsed: parsed_with_hint, error_messages: [])
-    rescue Adapters::TextFile::InvalidFile => e
+    rescue Adapters::TextFile::InvalidFile,
+           Adapters::Archidekt::InvalidUrl,
+           Adapters::Archidekt::FetchFailed => e
       Result.new(deck: nil, parsed: nil, error_messages: [ e.message ])
     rescue ActiveRecord::RecordInvalid => e
       Result.new(deck: nil, parsed: parsed, error_messages: Array(e.record&.errors&.full_messages || [ e.message ]))
@@ -131,6 +143,9 @@ module Decks
     def derive_name(parsed, supplied_name)
       cleaned = supplied_name.to_s.strip
       return cleaned if cleaned.present?
+
+      parsed_name = parsed.name.to_s.strip
+      return parsed_name if parsed_name.present?
 
       commander_label = parsed.commanders.map { |c| c[:name] }.compact.first
       return commander_label if commander_label.present?

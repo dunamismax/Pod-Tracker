@@ -105,7 +105,73 @@ module Decks
       assert_includes result.error_messages.join(" "), "Unsupported file extension"
     end
 
+    test "imports an Archidekt deck URL with a fake client" do
+      adapter = Adapters::Archidekt.new(client: stub_archidekt_client)
+
+      result = Importer.import_archidekt_url(
+        user: @user,
+        url: "https://archidekt.com/decks/12345/atraxa-stuff",
+        adapter: adapter
+      )
+
+      assert result.success?, result.error_messages.inspect
+      assert_equal "archidekt_url", result.deck.source_type
+      assert_equal "Atraxa Sample", result.deck.name
+      assert_equal [ "Atraxa, Praetors' Voice" ], result.deck.commander_names
+      assert_equal "https://archidekt.com/decks/12345", result.deck.import_metadata["source_url"]
+      assert_equal "12345", result.deck.import_metadata.dig("source_metadata", "archidekt_deck_id")
+      assert_equal 2, result.deck.deck_cards.where(board: "main").sum(:quantity)
+    end
+
+    test "import_archidekt_url surfaces invalid URLs" do
+      adapter = Adapters::Archidekt.new(client: stub_archidekt_client)
+      result = Importer.import_archidekt_url(
+        user: @user,
+        url: "https://moxfield.com/decks/abc",
+        adapter: adapter
+      )
+      refute result.success?
+      assert_nil result.deck
+      assert_includes result.error_messages.join(" "), "Archidekt"
+    end
+
+    test "import_archidekt_url surfaces fetch failures" do
+      client = Class.new do
+        def fetch_deck(_id) = raise Decks::ArchidektClient::NotFoundError, "missing"
+      end.new
+      adapter = Adapters::Archidekt.new(client: client)
+      result = Importer.import_archidekt_url(
+        user: @user,
+        url: "https://archidekt.com/decks/12345",
+        adapter: adapter
+      )
+      refute result.success?
+      assert_includes result.error_messages.join(" ").downcase, "not found"
+    end
+
     private
+
+    def stub_archidekt_client
+      json = {
+        "id" => 12345,
+        "name" => "Atraxa Sample",
+        "categories" => [
+          { "name" => "Commander", "includedInDeck" => true, "isPremier" => true }
+        ],
+        "cards" => [
+          { "quantity" => 1, "categories" => [ "Commander" ],
+            "card" => { "oracleCard" => { "name" => "Atraxa, Praetors' Voice" } } },
+          { "quantity" => 1, "categories" => [],
+            "card" => { "oracleCard" => { "name" => "Sol Ring" } } },
+          { "quantity" => 1, "categories" => [],
+            "card" => { "oracleCard" => { "name" => "Arcane Signet" } } }
+        ]
+      }
+      Class.new do
+        define_method(:fetch_deck) { |_id| json }
+      end.new
+    end
+
 
     def uploaded_file(content, filename:, content_type: "text/plain")
       tempfile = Tempfile.new([ "deck", File.extname(filename) ])
