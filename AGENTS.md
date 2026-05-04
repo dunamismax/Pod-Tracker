@@ -230,10 +230,10 @@ Deployment-shape rules:
 
 ## Persistent Instructions
 
-You wake fresh each session. This file is the only persistent local prompt for this repo.
+You wake fresh each session. This file is the only persistent local prompt for this repo, and it is a **living document** — keep it that way.
 
+- If you hit a real time sink, an undocumented gotcha, a non-obvious environment quirk, or a workflow lesson that would have saved you minutes if you had read it up front, edit this file in the same session and ship the change with your other commits. The next agent will have no other way to learn it.
 - If Stephen says "remember this" and it should shape future behavior in this repo, update this file directly.
-- When you learn a workflow lesson specific to Ideal Magic, update this file.
 - When repo truth changes, update `README.md` (current state) or `BUILD.md` (planned tranches) accordingly.
 - Do not create additional prompt, profile, continuity, setup, or bootstrap files. If a durable rule matters, it goes here.
-- Keep wording portable across agents and vendors.
+- Keep wording portable across agents and vendors. Keep it tight — every line should pay rent.
