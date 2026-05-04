@@ -1,6 +1,6 @@
 # Product Scope
 
-Ideal Magic is Stephen's primary Magic: The Gathering product. It should absorb the best durable ideas from the retired Scrybase direction while staying on the Rails architecture already chosen for Ideal Magic.
+Ideal Magic is Stephen's primary Magic: The Gathering product, built on Rails and designed to be the operating surface for Commander play.
 
 The product should become a Commander operating surface, not only a deck checker. The center is still transparent deck and pod evaluation, but the long-term advantage comes from connecting decks, owned cards, game-night history, matchup notes, and real playgroup meta evidence.
 
@@ -77,6 +77,6 @@ Expected durable concepts:
 - Public links should be opt-in, revocable, and scoped to the specific deck, analysis, pod, or session.
 - The app should be fast enough to use at a Commander table on a phone.
 
-## Replacement Direction
+## Build Direction
 
-Ideal Magic replaces Scrybase as the single primary Magic project. Do not port Scrybase's Python, FastAPI, Astro, Elysia, OpenTUI, or migration architecture. Preserve the product lessons and rebuild them in Rails using Ideal Magic's current stack and build phases.
+Ideal Magic is the single primary Magic project. Every feature in this scope document must be implemented natively on Ideal Magic's Rails stack as defined in `BUILD.md`, not adapted from any other architecture.
