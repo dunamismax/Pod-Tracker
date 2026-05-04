@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_04_081657) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_04_143000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -60,6 +60,34 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_081657) do
     t.index ["event_name", "occurred_at"], name: "index_audit_events_on_event_name_and_occurred_at"
     t.index ["user_id", "occurred_at"], name: "index_audit_events_on_user_id_and_occurred_at"
     t.index ["user_id"], name: "index_audit_events_on_user_id"
+  end
+
+  create_table "card_corpus_refreshes", force: :cascade do |t|
+    t.string "bulk_type", null: false
+    t.integer "card_printing_count", default: 0, null: false
+    t.integer "card_set_count", default: 0, null: false
+    t.datetime "completed_at"
+    t.bigint "content_length"
+    t.string "content_type"
+    t.datetime "created_at", null: false
+    t.string "error_code"
+    t.text "error_message"
+    t.string "etag"
+    t.datetime "failed_at"
+    t.datetime "fetched_at", null: false
+    t.string "last_modified"
+    t.integer "object_count", default: 0, null: false
+    t.integer "oracle_card_count", default: 0, null: false
+    t.jsonb "raw_payload", default: {}, null: false
+    t.datetime "scryfall_updated_at"
+    t.string "source", default: "scryfall", null: false
+    t.string "source_uri", null: false
+    t.datetime "started_at"
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["scryfall_updated_at"], name: "index_card_corpus_refreshes_on_scryfall_updated_at"
+    t.index ["source", "bulk_type", "scryfall_updated_at"], name: "idx_card_corpus_refresh_source_snapshot"
+    t.index ["source", "bulk_type", "status"], name: "index_card_corpus_refreshes_on_source_and_bulk_type_and_status"
   end
 
   create_table "card_printings", force: :cascade do |t|
