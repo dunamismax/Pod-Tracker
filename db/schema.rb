@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_04_220000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_04_230000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -443,6 +443,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_220000) do
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
+  create_table "user_provider_links", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "handle", null: false
+    t.string "label"
+    t.string "normalized_handle", null: false
+    t.text "notes"
+    t.string "profile_url", null: false
+    t.string "provider", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["provider"], name: "index_user_provider_links_on_provider"
+    t.index ["user_id", "provider", "normalized_handle"], name: "idx_user_provider_links_on_user_provider_handle", unique: true
+    t.index ["user_id"], name: "index_user_provider_links_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "display_name"
@@ -482,4 +497,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_220000) do
   add_foreign_key "salt_social_friction_evidences", "oracle_cards"
   add_foreign_key "scorecards", "analysis_runs"
   add_foreign_key "sessions", "users"
+  add_foreign_key "user_provider_links", "users"
 end

@@ -11,6 +11,7 @@ Rails.application.routes.draw do
   resources :account_codex_logins, only: %i[new create show destroy] do
     post :poll, on: :member
   end
+  resources :account_provider_links, only: %i[new create destroy]
   resources :passwords, param: :token
 
   get "email_verifications/:token", to: "email_verifications#show", as: :email_verification
