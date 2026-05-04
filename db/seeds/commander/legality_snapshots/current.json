@@ -1,0 +1,104 @@
+{
+  "source": "mtgcommander",
+  "format": "commander",
+  "effective_on": "2024-09-23",
+  "fetched_at": "2026-05-04T00:00:00Z",
+  "source_checked_on": "2026-05-04",
+  "source_url": "https://mtgcommander.net/index.php/banned-list/",
+  "rules_url": "https://mtgcommander.net/index.php/rules/",
+  "banned_names": [
+    "Ancestral Recall",
+    "Balance",
+    "Biorhythm",
+    "Black Lotus",
+    "Channel",
+    "Chaos Orb",
+    "Dockside Extortionist",
+    "Emrakul, the Aeon's Torn",
+    "Erayo, Soratami Ascendant",
+    "Falling Star",
+    "Fastbond",
+    "Flash",
+    "Golos, Tireless Pilgrim",
+    "Griselbrand",
+    "Hullbreacher",
+    "Iona, Shield of Emeria",
+    "Jeweled Lotus",
+    "Karakas",
+    "Leovold, Emissary of Trest",
+    "Library of Alexandria",
+    "Limited Resources",
+    "Lutri, the Spellchaser",
+    "Mana Crypt",
+    "Mox Emerald",
+    "Mox Jet",
+    "Mox Pearl",
+    "Mox Ruby",
+    "Mox Sapphire",
+    "Nadu, Winged Wisdom",
+    "Paradox Engine",
+    "Primeval Titan",
+    "Prophet of Kruphix",
+    "Recurring Nightmare",
+    "Rofellos, Llanowar Emissary",
+    "Shahrazad",
+    "Sundering Titan",
+    "Sylvan Primordial",
+    "Time Vault",
+    "Time Walk",
+    "Tinker",
+    "Tolarian Academy",
+    "Trade Secrets",
+    "Upheaval",
+    "Yawgmoth's Bargain"
+  ],
+  "restricted_names": [],
+  "category_bans": [
+    {
+      "key": "ante",
+      "label": "Cards that refer to the ante mechanic",
+      "source_url": "https://gatherer.wizards.com/Pages/Search/Default.aspx?action=advanced&text=+[ante]"
+    },
+    {
+      "key": "removed_from_constructed",
+      "label": "Cards Wizards removed from constructed formats",
+      "source_url": "https://magic.wizards.com/en/banned-restricted-list"
+    },
+    {
+      "key": "conspiracy_type",
+      "label": "Cards with the Conspiracy card type",
+      "source_url": "https://gatherer.wizards.com/Pages/Search/Default.aspx?action=advanced&type=+[Conspiracy]"
+    }
+  ],
+  "rules_snapshot": {
+    "card_pool": {
+      "regulation_sized_public_wotc_cards": true,
+      "legal_as_of_set_prerelease": true,
+      "excluded_card_frames_or_stamps": [
+        "silver border",
+        "gold border",
+        "acorn security stamp"
+      ]
+    },
+    "deck_construction": {
+      "commander_must_be_legendary_creature": true,
+      "deck_size_including_commander": 100,
+      "singleton_except_basic_lands_or_card_text": true,
+      "color_identity_restriction": true,
+      "companion_must_follow_color_identity_and_singleton": true
+    },
+    "play": {
+      "starting_life_total": 40,
+      "commanders_start_in_command_zone": true,
+      "command_tax_generic_mana": 2,
+      "command_zone_replacement_effect": true,
+      "commander_damage_loss_threshold": 21,
+      "outside_game_cards_do_not_function": true
+    },
+    "source_urls": {
+      "rules": "https://mtgcommander.net/index.php/rules/",
+      "banned_list": "https://mtgcommander.net/index.php/banned-list/"
+    }
+  },
+  "notes": "Source-controlled Commander legality seed snapshot. Re-check the official Commander rules and banned-list pages before updating this file."
+}

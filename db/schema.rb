@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_04_143000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_04_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -204,6 +204,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_143000) do
 
   create_table "legality_snapshots", force: :cascade do |t|
     t.string "banned_names", default: [], null: false, array: true
+    t.string "banned_normalized_names", default: [], null: false, array: true
+    t.jsonb "category_bans", default: [], null: false
     t.datetime "created_at", null: false
     t.date "effective_on", null: false
     t.datetime "fetched_at", null: false
@@ -211,11 +213,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_143000) do
     t.text "notes"
     t.jsonb "raw_payload", default: {}, null: false
     t.string "restricted_names", default: [], null: false, array: true
+    t.string "restricted_normalized_names", default: [], null: false, array: true
+    t.jsonb "rules_snapshot", default: {}, null: false
     t.string "source", null: false
+    t.date "source_checked_on"
     t.string "source_url"
     t.datetime "updated_at", null: false
     t.index ["banned_names"], name: "index_legality_snapshots_on_banned_names", using: :gin
+    t.index ["banned_normalized_names"], name: "index_legality_snapshots_on_banned_normalized_names", using: :gin
+    t.index ["category_bans"], name: "index_legality_snapshots_on_category_bans", using: :gin
     t.index ["restricted_names"], name: "index_legality_snapshots_on_restricted_names", using: :gin
+    t.index ["restricted_normalized_names"], name: "index_legality_snapshots_on_restricted_normalized_names", using: :gin
     t.index ["source", "format", "effective_on"], name: "index_legality_snapshots_on_source_and_format_and_effective_on", unique: true
   end
 

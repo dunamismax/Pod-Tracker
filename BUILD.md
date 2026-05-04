@@ -36,7 +36,7 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, and the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04.
+The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, and source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04.
 
 Shipped foundation:
 
@@ -47,12 +47,13 @@ Shipped foundation:
 - Rails authentication generator output exists for users, sessions, and password reset.
 - Domain models and migrations exist for decks, deck cards, commanders, provider links, card sets, oracle cards, card printings, rulings, legality snapshots, analysis runs, scorecards, pod evaluations, salt/social-friction evidence, audit events, and card corpus refresh metadata.
 - Fixture-tested Scryfall bulk-data ingestion exists for the `default_cards` bulk file, including polite `User-Agent` and `Accept` headers, API request throttling, streaming top-level JSON array parsing, normalized single-face and multi-face card facts, and upserts for card sets, oracle cards, and card printings.
+- Source-controlled Commander rules and banlist snapshot storage exists for the current `mtgcommander` Commander legality source, including normalized banned-name lookups, category bans, rules metadata, seed loading, and fixture-tested idempotent import.
 - Lookup and history indexes exist for deck ownership, provider IDs and URLs, normalized card names, Scryfall oracle and printing IDs, analysis history, scorecard ownership, legality snapshots, and audit events.
 - Minitest is the primary test framework.
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
 - `.env.example`, `/up`, `/ready`, and an authenticated dashboard root route exist.
 
-No deck import, card data refresh jobs, Commander legality engine, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, PWA offline behavior, or production configuration exists yet.
+No deck import, card data refresh jobs, full Commander legality engine, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, PWA offline behavior, or production configuration exists yet.
 
 GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
@@ -72,6 +73,7 @@ These references were checked while drafting this plan. Agents must re-check cur
 - Ideal Magic's v1 AI path is Codex App Server ChatGPT-managed auth. It must not claim generic OpenAI API OAuth support or use ChatGPT tokens for arbitrary Responses API calls outside the documented Codex App Server surface.
 - Scryfall provides public card data and asks clients to stay under 10 requests per second and use bulk data for large workloads.
 - The Commander format requires exactly 100 cards including the commander, singleton rules except allowed exceptions, and commander color identity restrictions.
+- The official Commander banned list checked on 2026-05-04 contains 44 explicitly banned card names plus category bans for ante cards, cards Wizards removed from constructed formats, and Conspiracy-type cards. The latest visible official update affecting this snapshot was the 2024-09-23 quarterly update.
 - Wizards' Fan Content Policy allows free fan content with required unofficial disclaimers and limits on trademarks, payments, and access restrictions.
 - Archidekt has visible public API behavior for public decks but sparse documentation. Treat it as an adapter that may break.
 - Moxfield has public deck pages and a public GitHub organization, but no clearly documented official public API was found. Treat direct API integration as unstable until proven.
@@ -89,6 +91,8 @@ Reference links:
 - Codex ChatGPT-managed auth in CI/CD: https://developers.openai.com/codex/auth/ci-cd-auth
 - Scryfall API rate guidance: https://scryfall.com/docs/faqs/i-m-having-trouble-accessing-the-scryfall-api-or-i-m-blocked-17
 - Commander rules: https://mtgcommander.net/index.php/rules/
+- Commander banned list: https://mtgcommander.net/index.php/banned-list/
+- Commander September 2024 quarterly update: https://mtgcommander.net/index.php/2024/09/23/september-2024-quarterly-update/
 - Wizards Fan Content Policy: https://company.wizards.com/en/legal/fancontentpolicy
 - Archidekt public API discussion: https://archidekt.com/forum/thread/16962481
 - Moxfield public organization: https://github.com/moxfield
@@ -300,7 +304,7 @@ ideal-magic/
 - [x] Build Scryfall bulk-data ingestion with polite user-agent headers and rate-limit discipline.
 - [x] Store source snapshot metadata for every card corpus refresh.
 - [x] Normalize card names, faces, color identity, mana value, type lines, oracle text, legalities, and image URIs.
-- [ ] Add Commander banlist and rules snapshot storage.
+- [x] Add Commander banlist and rules snapshot storage.
 - [ ] Add internal card tags for ramp, fast mana, tutors, draw, protection, removal, stack interaction, board wipes, stax, combos, graveyard use, lands, win conditions, salt drivers, and social-friction patterns.
 - [ ] Add curated salt taxonomy and override data for cards and play patterns that deterministic card facts cannot classify reliably.
 - [ ] Add curated override files or admin screens for tags the card corpus cannot infer reliably.
@@ -318,6 +322,7 @@ ideal-magic/
 
 - [x] Card corpus unit tests.
 - [x] Scryfall ingestion tests against fixture payloads.
+- [x] Commander rules and banlist snapshot storage tests.
 - [ ] Commander legality tests.
 - [ ] Salt taxonomy and override tests.
 - [ ] Database migration reset from scratch.
