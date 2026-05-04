@@ -2,6 +2,7 @@ class AccountsController < ApplicationController
   before_action :load_user
 
   def show
+    @codex_account = @user.codex_account
   end
 
   def edit

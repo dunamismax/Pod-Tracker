@@ -65,5 +65,38 @@ module Accounts
 
       assert_match(/^ideal-magic-account-.+-20260504T123000Z\.json$/, filename)
     end
+
+    test "includes codex_account metadata without leaking credentials" do
+      @user.codex_account&.destroy
+      @user.create_codex_account!(
+        auth_mode: "chatgpt_browser",
+        status: "connected",
+        displayed_email: "one-codex@example.com",
+        plan_type: "ChatGPT Plus",
+        encrypted_credential_payload: "secret-token",
+        credential_metadata: { token_kind: "chatgpt_session" },
+        rate_limit_snapshot: { primary_used_percent: 5 }
+      )
+
+      payload = Exporter.new(@user).to_h
+      codex = payload[:codex_account]
+
+      assert_equal "chatgpt_browser", codex[:auth_mode]
+      assert_equal "connected", codex[:status]
+      assert_equal "one-codex@example.com", codex[:displayed_email]
+      assert_equal "ChatGPT Plus", codex[:plan_type]
+      assert_equal({ "primary_used_percent" => 5 }, codex[:rate_limit_snapshot])
+      assert codex[:credential_present]
+      assert_equal [ "token_kind" ], codex[:credential_metadata_keys]
+
+      json = Exporter.new(@user).to_json
+      refute_includes json, "secret-token"
+    end
+
+    test "codex_account is nil when no codex account is linked" do
+      @user.codex_account&.destroy
+      payload = Exporter.new(@user).to_h
+      assert_nil payload[:codex_account]
+    end
   end
 end

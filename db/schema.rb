@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_04_200000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_04_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -170,6 +170,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_200000) do
     t.datetime "updated_at", null: false
     t.index ["category"], name: "index_card_tags_on_category"
     t.index ["slug"], name: "index_card_tags_on_slug", unique: true
+  end
+
+  create_table "codex_accounts", force: :cascade do |t|
+    t.string "auth_mode", null: false
+    t.datetime "connected_at"
+    t.datetime "created_at", null: false
+    t.jsonb "credential_metadata", default: {}, null: false
+    t.datetime "credentials_expire_at"
+    t.datetime "disconnected_at"
+    t.string "displayed_email"
+    t.text "encrypted_credential_payload"
+    t.string "last_error_code"
+    t.text "last_error_message"
+    t.datetime "last_failed_at"
+    t.datetime "last_synced_at"
+    t.string "plan_type"
+    t.jsonb "rate_limit_snapshot", default: {}, null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["auth_mode"], name: "index_codex_accounts_on_auth_mode"
+    t.index ["status"], name: "index_codex_accounts_on_status"
+    t.index ["user_id"], name: "index_codex_accounts_on_user_id", unique: true
   end
 
   create_table "commanders", force: :cascade do |t|
@@ -414,6 +437,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_200000) do
   add_foreign_key "card_printings", "oracle_cards"
   add_foreign_key "card_tag_assignments", "card_tags"
   add_foreign_key "card_tag_assignments", "oracle_cards"
+  add_foreign_key "codex_accounts", "users"
   add_foreign_key "commanders", "card_printings"
   add_foreign_key "commanders", "decks"
   add_foreign_key "commanders", "oracle_cards"

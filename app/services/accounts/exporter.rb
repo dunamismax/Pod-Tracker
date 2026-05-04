@@ -12,6 +12,7 @@ module Accounts
         schema_version: SCHEMA_VERSION,
         generated_at: @generated_at.utc.iso8601,
         account: account_payload,
+        codex_account: codex_account_payload,
         decks: decks_payload,
         analysis_runs: analysis_runs_payload,
         pod_evaluations: pod_evaluations_payload,
@@ -42,6 +43,12 @@ module Accounts
           created_at: iso(@user.created_at),
           updated_at: iso(@user.updated_at)
         }
+      end
+
+      def codex_account_payload
+        codex_account = @user.codex_account
+        return nil unless codex_account
+        codex_account.export_payload
       end
 
       def decks_payload

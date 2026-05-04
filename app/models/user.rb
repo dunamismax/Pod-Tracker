@@ -8,6 +8,7 @@ class User < ApplicationRecord
   has_many :analysis_runs, dependent: :nullify
   has_many :pod_evaluations, dependent: :destroy
   has_many :audit_events, dependent: :nullify
+  has_one :codex_account, dependent: :destroy
 
   generates_token_for :email_verification, expires_in: 1.day do
     email_address
