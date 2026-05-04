@@ -10,3 +10,5 @@
 
 CommanderFormat::LegalitySnapshotImporter.new.import!
 CommanderFormat::CardTagImporter.new.import!
+
+load Rails.root.join("db/seeds/users.rb")

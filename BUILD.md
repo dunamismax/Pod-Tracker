@@ -203,7 +203,7 @@ Implementation rule: build these as first-class features of Ideal Magic on the R
 
 ### Deployment
 
-- Ubuntu server VM (currently shared with `dunamismax-web` and `sentrypact-web`).
+- Ubuntu server VM (currently shared with `dunamismax-web`).
 - `ideal-magic.com` behind Caddy-managed TLS at the host edge.
 - Native Puma under a per-app systemd unit (`ideal-magic-web.service`) listening on `127.0.0.1:8083`. Docker Compose was deferred from the original plan; revisit only if a concrete reason emerges.
 - Host-installed PostgreSQL accepting TCP on `localhost`. The `ideal_magic` role owns the four production databases (primary, cache, queue, cable).

@@ -201,7 +201,7 @@ Treat `BUILD.md` as temporary. Once the repo is past initial build, fold still-u
 
 Production runtime (the v1 deployment shape):
 
-- Native Puma under systemd, not Docker Compose. Other apps on this VM (`dunamismax-web.service`, `sentrypact-web.service`) follow the same pattern; Ideal Magic matches it. The Compose-based plan in `BUILD.md` Phase 13 was deferred — only revisit it if a concrete reason emerges.
+- Native Puma under systemd, not Docker Compose. The other Rails app on this VM (`dunamismax-web.service`) follows the same pattern; Ideal Magic matches it. The Compose-based plan in `BUILD.md` Phase 13 was deferred — only revisit it if a concrete reason emerges.
 - Caddy at the host edge terminates TLS for `ideal-magic.com` and `www.ideal-magic.com` and reverse-proxies to `127.0.0.1:8083`.
 - PostgreSQL 17 from Ubuntu's package, running on the host. Production databases are `ideal_magic_production`, `ideal_magic_production_cache`, `ideal_magic_production_queue`, `ideal_magic_production_cable`, owned by role `ideal_magic`.
 - Solid Queue runs in-Puma via `SOLID_QUEUE_IN_PUMA=true`. No separate worker process for now.
@@ -230,6 +230,24 @@ Deployment-shape rules:
 - Adding a new production-only env var: update `.env.example` (placeholder), update `/etc/ideal-magic-web/env`, restart the service. Do not bake secrets into the unit file.
 - Adding a new background process (e.g. a separate worker if Solid-in-Puma stops fitting): add a sibling systemd unit (`ideal-magic-worker.service`) modeled on `ideal-magic-web.service`, do not introduce Docker Compose just to add one process.
 - Backups, scheduled Scryfall refresh, and restore drills are still pending — `BUILD.md` Phase 13 tracks them.
+
+## Seeded Accounts
+
+`bin/rails db:seed` ensures two baked-in users exist:
+
+- **Admin (Stephen):** `stephenvsawyer@gmail.com`. Password is read from `IDEAL_MAGIC_ADMIN_PASSWORD`. The seed never bakes a default — it skips creating the admin if the env var is unset and the user does not already exist. The env var lives in `/etc/ideal-magic-web/env` in production. Do not commit it.
+- **Demo:** `demo@demo.com` / `demo1234` (override with `IDEAL_MAGIC_DEMO_PASSWORD`). Credentials are intentionally public so anyone can drive the live demo.
+
+Both accounts are created with `email_verified_at` set so they bypass the verification gate. Re-running the seed updates passwords if the env var changed but does not destroy decks or audit history.
+
+To wipe the demo account back to factory defaults (decks, analyses, codex links, provider links, audit events), run on the VM:
+
+```sh
+bin/rails demo:reset    # destructive
+bin/rails demo:status   # read-only count of what reset would remove
+```
+
+`demo:reset` writes a `demo.reset` audit event so the action is traceable.
 
 ## Persistent Instructions
 
