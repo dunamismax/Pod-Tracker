@@ -4,14 +4,6 @@
 
 This file contains repo-local operating rules for Ideal Magic. It supplements `/Users/sawyer/github/SOUL.md` and `/Users/sawyer/github/AGENTS.md`; those workspace files still define Scry identity and general workflow.
 
-## Read Order
-
-1. `/Users/sawyer/github/SOUL.md`
-2. `/Users/sawyer/github/AGENTS.md`
-3. `README.md`
-4. `BUILD.md`
-5. Task-relevant files under `docs/` or the Rails app once scaffolded
-
 ## Current Build Manual
 
 `BUILD.md` is the active implementation manual until the Rails app is built and stable docs describe shipped behavior. Keep it honest:
