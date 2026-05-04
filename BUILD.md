@@ -1,7 +1,7 @@
 # BUILD.md
 
 Last drafted: 2026-05-03
-Last updated: 2026-05-04 (provider account link placeholders)
+Last updated: 2026-05-04 (live self-hosted deployment at ideal-magic.com)
 
 ## Agent Operating Rules
 
@@ -35,7 +35,7 @@ The approved product direction:
 - Rails-native background jobs, caching, and realtime features first.
 - Codex App Server for AI evaluation using Codex-managed ChatGPT browser OAuth or device-code login as the exclusive v1 user-facing model path.
 - PWA-first mobile and desktop experience.
-- Docker Compose, Caddy, and systemd for Stephen's self-hosted Ubuntu deployment at `ideal-magic.com`.
+- Native systemd-managed Puma behind Caddy on Stephen's self-hosted Ubuntu VM at `ideal-magic.com`. Docker Compose was the original Phase 13 plan but was deferred in favor of the same systemd+Puma+host-PostgreSQL pattern already used by the other Rails apps on this VM.
 
 ## Current Repo Truth
 
@@ -66,7 +66,9 @@ Shipped foundation:
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
 - `.env.example`, `/up`, `/ready`, and an authenticated dashboard root route exist.
 
-No Codex App Server transport implementation (the JSON-RPC client boundary ships with a fail-closed `NullTransport`), deck import, collection import, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, or production configuration exists yet.
+A live self-hosted production deployment at `https://ideal-magic.com` was completed on 2026-05-04. The site is fronted by Caddy with Let's Encrypt TLS, reverse-proxied to a Puma cluster (`127.0.0.1:8083`, 2 workers, 5 threads) managed by `ideal-magic-web.service`, backed by a host-installed PostgreSQL 17 cluster owning the `ideal_magic_production`, `ideal_magic_production_cache`, `ideal_magic_production_queue`, and `ideal_magic_production_cable` databases under role `ideal_magic`. Solid Queue runs in-Puma via `SOLID_QUEUE_IN_PUMA=true`; no separate worker process exists yet. `config/database.yml` reads the production primary host from `IDEAL_MAGIC_DATABASE_HOST` (default `localhost`) so the role connects via TCP rather than the peer-auth Unix socket. Production secrets live in `/etc/ideal-magic-web/env` (root:sawyer 0640) referenced by the unit's `EnvironmentFile`. A `bin/redeploy` script provides a single-command iteration loop (pull → bundle → `db:prepare` → assets:precompile → restart unit → poll `/up`); `/etc/sudoers.d/ideal-magic-web` grants `sawyer` passwordless `systemctl restart|reload|status` and `journalctl` for that unit only. Operational paths and the full deploy flow live in `docs/deployment.md`.
+
+No Codex App Server transport implementation (the JSON-RPC client boundary ships with a fail-closed `NullTransport`), deck import, collection import, scoring engine, Codex evaluation pipeline, provider integration implementation, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, automated PostgreSQL backup/restore, scheduled Scryfall refresh runbook, or admin operator surface exists yet. A Docker Compose runtime is intentionally not present — production runs natively via systemd.
 
 GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
@@ -197,12 +199,13 @@ Implementation rule: build these as first-class features of Ideal Magic on the R
 
 ### Deployment
 
-- Ubuntu server VM.
-- `ideal-magic.com` behind Caddy-managed TLS.
-- Docker Compose for local and self-hosted production.
-- systemd unit for the Compose app.
-- systemd timers or cron-compatible scripts for backups, Scryfall sync, and health checks.
-- PostgreSQL volume backups with restore drills.
+- Ubuntu server VM (currently shared with `dunamismax-web` and `sentrypact-web`).
+- `ideal-magic.com` behind Caddy-managed TLS at the host edge.
+- Native Puma under a per-app systemd unit (`ideal-magic-web.service`) listening on `127.0.0.1:8083`. Docker Compose was deferred from the original plan; revisit only if a concrete reason emerges.
+- Host-installed PostgreSQL accepting TCP on `localhost`. The `ideal_magic` role owns the four production databases (primary, cache, queue, cable).
+- Solid Queue runs in-Puma. Promote to a sibling systemd unit (`ideal-magic-worker.service`) if jobs outgrow that.
+- systemd timers or cron-compatible scripts for backups, Scryfall sync, and health checks (still pending).
+- PostgreSQL `pg_dump` backups with restore drills (still pending).
 - No hard dependency on external PaaS.
 
 ## Target Repo Shape
@@ -256,7 +259,7 @@ ideal-magic/
 - [ ] Phase 10 - Build matchup journal and meta analytics.
 - [ ] Phase 11 - Build the PWA experience.
 - [ ] Phase 12 - Harden security, observability, and admin operations.
-- [ ] Phase 13 - Ship self-hosted deployment.
+- [~] Phase 13 - Ship self-hosted deployment. (Live at `https://ideal-magic.com`. Backups, restore drills, `/ready`, and operator status command still pending.)
 - [ ] Phase 14 - Run beta, calibrate scoring, and prepare v1.
 
 ## Phase 0 - Freeze Product Charter And Repo Rules
@@ -787,43 +790,48 @@ ideal-magic/
 
 ## Phase 13 - Ship Self-Hosted Deployment
 
+The original plan was Docker Compose. The shipped runtime is native Puma under systemd, host-installed PostgreSQL, and Caddy at the edge — matching the existing pattern of the other Rails apps on Stephen's VM (`dunamismax-web.service`, `sentrypact-web.service`). The Docker-flavored boxes below have been rewritten against the actual runtime.
+
 ### Objectives
 
-- [ ] Make `ideal-magic.com` deployable on Stephen's Ubuntu VM.
-- [ ] Keep deployment boring, inspectable, and recoverable.
-- [ ] Use Caddy as the public TLS edge.
+- [x] Make `ideal-magic.com` deployable on Stephen's Ubuntu VM.
+- [x] Keep deployment boring, inspectable, and recoverable.
+- [x] Use Caddy as the public TLS edge.
 
 ### Work Checklist
 
-- [ ] Add production Dockerfile for Rails.
-- [ ] Add `docker-compose.yml` for app, worker, database, and optional internal Caddy.
-- [ ] Add `compose.production.yml` or documented production overrides.
-- [ ] Add Caddyfile for `ideal-magic.com`.
-- [ ] Add systemd unit for Compose lifecycle.
-- [ ] Add systemd timer for backups.
-- [ ] Add environment variable contract for production.
-- [ ] Add secret setup instructions using Rails credentials or environment secrets.
-- [ ] Add database migration command for deploys.
-- [ ] Add health check endpoint and Caddy upstream checks.
-- [ ] Add operator status and backup commands for production troubleshooting.
-- [ ] Add rollback and restore docs.
-- [ ] Add first deploy runbook.
+- [x] Pick the production runtime shape (native systemd + host PostgreSQL, not Docker Compose; matches sibling apps on the VM).
+- [x] Provision the host PostgreSQL cluster, role `ideal_magic`, and the four production databases (primary, cache, queue, cable).
+- [x] Add Caddyfile entry for `ideal-magic.com` and `www.ideal-magic.com` with the standard security headers and reverse-proxy to `127.0.0.1:8083`.
+- [x] Add `/etc/systemd/system/ideal-magic-web.service` for the Puma cluster (mise-pinned PATH, `EnvironmentFile=/etc/ideal-magic-web/env`, hardened `ProtectSystem=full` with explicit `ReadWritePaths` for `storage/`, `tmp/`, `log/`, `public/`).
+- [x] Add `/etc/ideal-magic-web/env` with the production environment contract (`RAILS_ENV`, `SECRET_KEY_BASE`, `IDEAL_MAGIC_DATABASE_PASSWORD`, `IDEAL_MAGIC_DATABASE_HOST`, `PORT`, `RAILS_FORCE_SSL`, `RAILS_SERVE_STATIC_FILES`, `WEB_CONCURRENCY`, `RAILS_MAX_THREADS`, `SOLID_QUEUE_IN_PUMA`, `APP_HOST`).
+- [x] Generate `config/master.key` and `config/credentials.yml.enc` for production. Store the master key off-host.
+- [x] Wire `config/database.yml` production primary host from `IDEAL_MAGIC_DATABASE_HOST` (default `localhost`) so the role connects via TCP, not the peer-auth Unix socket.
+- [x] Add `bin/redeploy` for the single-command iteration loop (pull → bundle → `db:prepare` → assets:precompile → restart unit → poll `/up`).
+- [x] Add `/etc/sudoers.d/ideal-magic-web` with a narrow `NOPASSWD` entry so `bin/redeploy` is non-interactive for the `sawyer` user (limited to restart/reload/status of the one unit and `journalctl` on it).
+- [x] Confirm `/up` health check is reachable through Caddy and used by `bin/redeploy`.
+- [x] Document the live deployment shape and runbook in `docs/deployment.md`.
+- [ ] Add a `pg_dump`-based backup script covering all four production databases plus Active Storage, with a systemd timer.
+- [ ] Add a documented restore script and run a restore drill into a fresh database cluster before public traffic.
+- [ ] Add a `/ready` readiness endpoint that verifies database connectivity (`/up` only proves the process is up).
+- [ ] Add an operator status command (`bin/status` or similar) showing app version, migration status, queue health, card corpus freshness, and last successful backup.
+- [ ] Add a rollback procedure (rolling back the working tree + replaying backups) to `docs/deployment.md`.
+- [ ] Add a sibling `ideal-magic-worker.service` if Solid-in-Puma stops fitting.
 
 ### Exit Criteria
 
-- [ ] A fresh Ubuntu VM can run Ideal Magic from documented steps.
-- [ ] Caddy terminates HTTPS for `ideal-magic.com`.
-- [ ] App, worker, and database restart cleanly after reboot.
-- [ ] Backups survive container replacement.
+- [x] A fresh Ubuntu VM can run Ideal Magic from documented steps (see the "First-deploy bootstrap" section in `docs/deployment.md`).
+- [x] Caddy terminates HTTPS for `ideal-magic.com`.
+- [x] App and database restart cleanly after reboot (`ideal-magic-web.service` is enabled; PostgreSQL ships with its own enabled unit).
+- [ ] Backups survive a destroyed VM and have been exercised by a restore drill.
 
 ### Verification
 
-- [ ] `docker compose build`
-- [ ] `docker compose up -d`
-- [ ] `docker compose exec web bin/rails db:migrate`
-- [ ] `curl -fsS https://ideal-magic.com/up`
-- [ ] Reboot smoke test on staging or production VM.
-- [ ] Restore test into a fresh volume.
+- [x] `systemctl status ideal-magic-web.service` reports active running.
+- [x] `curl -fsS https://ideal-magic.com/up` returns 200.
+- [x] `bin/redeploy` completes and the live `/up` returns 200.
+- [ ] Reboot smoke test on the production VM.
+- [ ] Restore test into a fresh PostgreSQL cluster.
 
 ## Phase 14 - Run Beta, Calibrate Scoring, And Prepare V1
 

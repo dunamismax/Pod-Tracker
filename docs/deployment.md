@@ -1,80 +1,132 @@
 # Deployment
 
-Ideal Magic's target deployment is a single self-hosted Ubuntu VM serving `ideal-magic.com` behind Caddy-managed TLS.
+`ideal-magic.com` is live and self-hosted on Stephen's Ubuntu VM. This document is the operational runbook for the running deployment, not a future plan.
 
-This document describes the intended production shape. It is not a runbook yet because the Docker Compose, Caddy, systemd, backup, and production deploy files have not been implemented.
+## Architecture
 
-## Target Architecture
+```
+internet → Caddy (host) → 127.0.0.1:8083 (Puma in ideal-magic-web.service) → Rails 8.1 → PostgreSQL 17
+```
 
-- Ubuntu VM.
-- Caddy as the public TLS reverse proxy for `ideal-magic.com`.
-- Docker Compose for the Rails web process, worker process, PostgreSQL, and supporting services.
-- Puma for Rails web serving.
-- Solid Queue for background analysis and refresh jobs.
-- PostgreSQL volume backups with documented restore.
-- systemd units for service lifecycle.
-- systemd timers or equivalent cron-compatible jobs for backups, Scryfall sync, and health checks.
+- One Ubuntu VM. The same VM also runs `dunamismax-web.service` (port 8082) and `sentrypact-web.service` (port 8081); Ideal Magic uses the same systemd+Puma+Caddy pattern with `8083`.
+- Caddy is the public TLS edge for `ideal-magic.com` and `www.ideal-magic.com` (a redirect to apex). TLS certs are ACME via Let's Encrypt.
+- Puma is started directly by systemd; no Docker, no Compose, no Kamal in v1. Solid Queue runs in-Puma (`SOLID_QUEUE_IN_PUMA=true`). Add a sibling unit later if jobs outgrow that.
+- PostgreSQL is the host package (`apt install postgresql`), accepting TCP on `localhost`. The `ideal_magic` role owns four databases: `ideal_magic_production` (primary), and `_cache`, `_queue`, `_cable`.
+- Ruby 4.0.3 and Node 24.13.1 come from `mise` installs under `/home/sawyer/.local/share/mise/installs/`. The systemd unit pins those paths explicitly so it does not depend on shell setup.
 
-## Runtime Processes
+## Runtime processes
 
-The expected process split:
+| Process | Where | Notes |
+| --- | --- | --- |
+| `web` | `ideal-magic-web.service` (Puma cluster, 2 workers, 5 threads) | Listens on `127.0.0.1:8083`. |
+| `jobs` | Solid Queue inside Puma | Runs the `card_corpus` queue and any other registered queues. |
+| `db` | `postgresql.service` | Host package, default cluster on `localhost:5432`. |
+| `tls/edge` | `caddy.service` | Reverse-proxies the apex hostname; redirects `www`. |
 
-- `web`: Rails app served by Puma.
-- `worker`: Rails background jobs for deck imports, collection imports, Scryfall refreshes, analysis, exports, backups, and meta recomputation.
-- `codex`: Codex App Server or isolated Codex worker runtime for ChatGPT/Codex account-auth AI evaluation.
-- `db`: PostgreSQL.
-- Optional internal support services only when they earn their complexity.
+`codex` (the Codex App Server runtime) is not deployed yet. When it is, it should be added as another systemd unit on the same VM, not folded into the web unit.
 
-Caddy should normally live at the host edge and proxy to the app container.
+## Paths
 
-## Environment Contract
+| Thing | Path |
+| --- | --- |
+| App tree | `/home/sawyer/github/ideal-magic` |
+| Env file | `/etc/ideal-magic-web/env` (root:sawyer 0640) |
+| systemd unit | `/etc/systemd/system/ideal-magic-web.service` |
+| Caddy config | `/etc/caddy/Caddyfile` (block: `ideal-magic.com`) |
+| Sudoers drop-in | `/etc/sudoers.d/ideal-magic-web` |
+| Master key | `/home/sawyer/github/ideal-magic/config/master.key` (gitignored) |
+| Logs | `sudo journalctl -u ideal-magic-web` |
 
-The production environment should eventually document every required variable. Expected categories:
+## Environment contract
 
-- Rails secret key base.
-- Database URL or database credentials.
-- Codex runtime path, Codex credential storage path, and account-auth isolation settings.
-- App host and mailer URL options.
-- SMTP settings for account emails.
-- Scryfall sync settings.
-- Rate-limit and quota settings.
+Production env vars live in `/etc/ideal-magic-web/env` and are loaded by the systemd unit. The required and recommended variables today:
 
-Secrets must not be committed. `.env.example` should contain names and safe placeholder values only.
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `RAILS_ENV` | yes | Always `production` in this file. |
+| `SECRET_KEY_BASE` | yes | 64-byte hex generated with `bin/rails secret`. |
+| `IDEAL_MAGIC_DATABASE_PASSWORD` | yes | Password for the `ideal_magic` PostgreSQL role. |
+| `IDEAL_MAGIC_DATABASE_HOST` | yes | Defaults to `localhost`. PG on the VM uses peer auth on the default socket, so TCP is required for the role. |
+| `PORT` | yes | `8083`. Must match the Caddy upstream and the `ExecStart` flag. |
+| `RAILS_SERVE_STATIC_FILES` | yes | `1`. Rails serves precompiled assets directly; Caddy is just the proxy. |
+| `RAILS_FORCE_SSL` | yes | `true`. The Rails app is fronted by Caddy TLS. |
+| `RAILS_LOG_LEVEL` | recommended | `info` in production. |
+| `WEB_CONCURRENCY` | recommended | Puma worker count. Currently `2`. |
+| `RAILS_MAX_THREADS` | recommended | Puma threads per worker. Currently `5`. Keep `database.yml` `max_connections` ≥ this. |
+| `SOLID_QUEUE_IN_PUMA` | recommended | `true` until jobs need a separate process. |
+| `APP_HOST` | yes | `ideal-magic.com`. Used for mailer URLs and similar. |
+| `CODEX_HOME` / `CODEX_APP_SERVER_COMMAND` | future | Set when the Codex evaluation pipeline ships (Phase 6). |
 
-## Deploy Flow
+Never commit `/etc/ideal-magic-web/env`, `config/master.key`, or rotated database passwords. Update `.env.example` with placeholder names when a new variable is added so local development stays in sync.
 
-The intended deploy flow:
+## Deploy flow
 
-1. Pull the current branch on the VM.
-2. Build or pull Docker images.
-3. Run database migrations.
-4. Restart the web and worker services.
-5. Check health endpoint.
-6. Check logs for boot or migration errors.
+The single command on the VM is:
 
-The actual commands should be written after the Docker runtime exists.
+```sh
+bin/redeploy
+```
 
-## Backups And Restore
+Which performs, in order:
 
-Backups should include PostgreSQL data and any Active Storage files that become durable product data.
+1. `git pull --ff-only`.
+2. `bundle install` (production groups only; the script sets `BUNDLE_WITHOUT='development:test'`).
+3. `bin/rails db:prepare` (creates/migrates primary, cache, queue, cable databases).
+4. `bin/rails assets:precompile`.
+5. `sudo systemctl restart ideal-magic-web.service` (passwordless via the sudoers drop-in).
+6. Polls `https://ideal-magic.com/up` until it returns `200`, otherwise prints the last 40 lines of journal and exits non-zero.
 
-Continuity-critical data includes auth sessions, Codex account metadata, deck and analysis share tokens, pod/session share tokens, collection imports, matchup notes, audit events, and uploaded import/export files.
+Restart-only iteration (no pull, no asset rebuild):
 
-Before public launch, the repo needs:
+```sh
+sudo systemctl restart ideal-magic-web
+```
 
-- Backup script.
-- Restore script or documented restore command.
-- systemd timer for scheduled backups.
-- Retention policy.
-- Restore drill into a fresh volume.
+Tail the live process:
+
+```sh
+sudo journalctl -u ideal-magic-web -f
+```
+
+## First-deploy bootstrap
+
+The current production environment was bootstrapped roughly as follows; capture this as a runbook for spinning up a fresh VM:
+
+1. Install system packages: `apt install postgresql postgresql-contrib libpq-dev caddy`. Install Ruby and Node via `mise` matching `.ruby-version` and `.mise.toml`.
+2. Create the PostgreSQL role and four databases (`ideal_magic_production{,_cache,_queue,_cable}`) owned by `ideal_magic`. Generate a strong password and store it only in `/etc/ideal-magic-web/env`.
+3. Clone the repo to `/home/sawyer/github/ideal-magic`.
+4. Generate `config/master.key` and `config/credentials.yml.enc` with `EDITOR=true RAILS_ENV=production bundle exec rails credentials:edit`. Keep an out-of-band backup of `master.key`.
+5. Write `/etc/ideal-magic-web/env` with the variables listed above.
+6. Install `/etc/systemd/system/ideal-magic-web.service` (model on `dunamismax-web.service`), `daemon-reload`, then `systemctl enable --now ideal-magic-web`.
+7. Append the `ideal-magic.com` and `www.ideal-magic.com` blocks to `/etc/caddy/Caddyfile`, validate with `caddy validate`, then `systemctl reload caddy`. Caddy will obtain TLS certificates on the first request.
+8. Install `/etc/sudoers.d/ideal-magic-web` with `visudo -c -f` validation so `bin/redeploy` is non-interactive.
+9. Verify: `curl -fsS https://ideal-magic.com/up`.
+
+## Backups and restore
+
+Not yet implemented. Tracked in `BUILD.md` Phase 13. What is needed before public traffic:
+
+- `pg_dump` of all four production databases on a systemd timer.
+- Active Storage blob backup once user uploads exist as durable product data.
+- A restore script exercised against a fresh database cluster.
+- Off-host copy of `config/master.key` and `/etc/ideal-magic-web/env`.
 
 Backups are not complete until restore has been tested.
 
-## Health Checks
+## Health checks
 
-The app exposes health and readiness endpoints:
+- `/up` — process up. Used by `bin/redeploy`.
+- `/ready` — database connectivity (planned; see Phase 13).
 
-- `/up` for process boot.
-- `/ready` for database connectivity.
+`/up` is silenced in the Rails log via `config.silence_healthcheck_path = "/up"`, so frequent probes do not pollute production logs.
 
-Caddy and deployment scripts should use these endpoints once implemented.
+## Adding a new production process
+
+When the worker eventually needs to leave Puma (or the Codex App Server runtime ships):
+
+1. Copy `/etc/systemd/system/ideal-magic-web.service` to a sibling unit (`ideal-magic-worker.service`, `ideal-magic-codex.service`).
+2. Replace `ExecStart` with the appropriate command (e.g. `bundle exec bin/jobs`).
+3. Reuse `/etc/ideal-magic-web/env` via `EnvironmentFile=` so secrets stay in one place.
+4. Add a matching `NOPASSWD` entry to `/etc/sudoers.d/ideal-magic-web` and extend `bin/redeploy` to restart the new unit alongside the web one.
+
+Resist the urge to bring in Docker Compose just to add one process.

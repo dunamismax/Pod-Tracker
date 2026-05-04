@@ -4,7 +4,7 @@ The serious Commander companion: import a deck, get an honest read on it, build 
 
 Ideal Magic is a web app for Magic: The Gathering Commander players who want more than a power level guess. It scores decks from real evidence, compares pods before the cards hit the table, and remembers what happened the last time these commanders met.
 
-Live at [ideal-magic.com](https://ideal-magic.com) (when deployed).
+Live at [ideal-magic.com](https://ideal-magic.com).
 
 ## What Ideal Magic Does
 
@@ -47,9 +47,9 @@ Full rubric: [docs/analysis-rubric.md](docs/analysis-rubric.md).
 
 ## Status
 
-Ideal Magic is in active build. The Rails foundation, card corpus pipeline, Commander legality engine, and account system are in place. Deck import, scoring, AI evaluation, pods, sessions, the matchup journal, meta analytics, the PWA shell, and self-hosted deployment are still being built.
+Ideal Magic is in active build and runs live at [ideal-magic.com](https://ideal-magic.com) so the product can be iterated against the real domain. The Rails foundation, card corpus pipeline, Commander legality engine, account system, and the self-hosted deployment shape are in place. Deck import, scoring, AI evaluation, pods, sessions, the matchup journal, meta analytics, and the PWA shell are still being built.
 
-Build sequencing and current repo truth live in [BUILD.md](BUILD.md).
+Build sequencing and current repo truth live in [BUILD.md](BUILD.md). Operational runbook for the live deployment lives in [docs/deployment.md](docs/deployment.md).
 
 ## Documentation
 
@@ -78,6 +78,14 @@ bin/lint
 bin/security
 bin/verify
 ```
+
+To redeploy the live site after pulling or pushing changes (run on the production VM as the `sawyer` user):
+
+```sh
+bin/redeploy
+```
+
+`bin/redeploy` pulls, bundles, runs `db:prepare`, precompiles assets, restarts the systemd unit, and then health-checks `https://ideal-magic.com/up`. See [docs/deployment.md](docs/deployment.md) for the full deployment shape.
 
 Use `mise` (or another Ruby version manager that honors `.ruby-version` / `.mise.toml`) to select the pinned Ruby. Stack details, dependencies, and the full build sequence live in [BUILD.md](BUILD.md).
 
