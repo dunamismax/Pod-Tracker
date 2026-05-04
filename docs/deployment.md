@@ -104,7 +104,7 @@ The current production environment was bootstrapped roughly as follows; capture 
 
 ## Backups and restore
 
-Not yet implemented. Tracked in `BUILD.md` Phase 13. What is needed before public traffic:
+Not yet implemented. Tracked in `BUILD.md` Slice 8. What is needed before public traffic:
 
 - `pg_dump` of all four production databases on a systemd timer.
 - Active Storage blob backup once user uploads exist as durable product data.
@@ -116,7 +116,7 @@ Backups are not complete until restore has been tested.
 ## Health checks
 
 - `/up` — process up. Used by `bin/redeploy`.
-- `/ready` — database connectivity (planned; see Phase 13).
+- `/ready` — database connectivity (planned; see `BUILD.md` Slice 8).
 
 `/up` is silenced in the Rails log via `config.silence_healthcheck_path = "/up"`, so frequent probes do not pollute production logs.
 

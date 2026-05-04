@@ -171,14 +171,15 @@ Three gotchas because the production app and the working tree live on the same m
 
 ## Current Build Manual
 
-`BUILD.md` is the active implementation manual until the Rails app is built and stable docs describe shipped behavior. Keep it honest:
+`BUILD.md` is the active implementation manual, organized as user-visible vertical slices. Read it first; it has its own operating rules at the top. Highlights:
 
-- Check boxes only for completed and verified repo truth.
-- Update `README.md` when current product or setup truth changes.
-- Keep future execution detail in `BUILD.md`, not `README.md`.
-- Do not mark planned behavior as shipped.
+- Ship vertical slices that move user-visible product forward, not horizontal plumbing. Skip ahead between slices when value is higher elsewhere.
+- 4–8 related checkboxes per pass minimum. One-box passes need a reason in the commit.
+- Check boxes only for shipped, tested, in-`main` work. Trim ceremony — one line in "Recent slices," update "What's live now" only when user-visible capability changes.
+- Update `README.md` when current product or setup truth changes. Keep future execution detail in `BUILD.md`.
+- Slices and boxes are editable. Delete or rewrite work that turns out wrong-shaped, premature, or redundant.
 
-Treat `BUILD.md` as temporary. Once the repo is past initial build, fold still-useful current-state guidance into stable project docs and remove the temporary manual unless Stephen asks to keep it.
+Once the slice list is drained, fold still-useful current-state guidance into stable project docs and retire `BUILD.md` unless Stephen asks to keep it.
 
 ---
 
@@ -201,7 +202,7 @@ Treat `BUILD.md` as temporary. Once the repo is past initial build, fold still-u
 
 Production runtime (the v1 deployment shape):
 
-- Native Puma under systemd, not Docker Compose. The other Rails app on this VM (`dunamismax-web.service`) follows the same pattern; Ideal Magic matches it. The Compose-based plan in `BUILD.md` Phase 13 was deferred — only revisit it if a concrete reason emerges.
+- Native Puma under systemd, not Docker Compose. The other Rails app on this VM (`dunamismax-web.service`) follows the same pattern; Ideal Magic matches it. The Compose-based plan was deferred during the rewrite — only revisit it if a concrete reason emerges.
 - Caddy at the host edge terminates TLS for `ideal-magic.com` and `www.ideal-magic.com` and reverse-proxies to `127.0.0.1:8083`.
 - PostgreSQL 17 from Ubuntu's package, running on the host. Production databases are `ideal_magic_production`, `ideal_magic_production_cache`, `ideal_magic_production_queue`, `ideal_magic_production_cable`, owned by role `ideal_magic`.
 - Solid Queue runs in-Puma via `SOLID_QUEUE_IN_PUMA=true`. No separate worker process for now.
@@ -229,7 +230,7 @@ Deployment-shape rules:
 - `config/database.yml` reads the production primary host from `IDEAL_MAGIC_DATABASE_HOST` (default `localhost`). PostgreSQL on this VM uses peer auth on the default socket, so TCP/`localhost` is required for the `ideal_magic` role.
 - Adding a new production-only env var: update `.env.example` (placeholder), update `/etc/ideal-magic-web/env`, restart the service. Do not bake secrets into the unit file.
 - Adding a new background process (e.g. a separate worker if Solid-in-Puma stops fitting): add a sibling systemd unit (`ideal-magic-worker.service`) modeled on `ideal-magic-web.service`, do not introduce Docker Compose just to add one process.
-- Backups, scheduled Scryfall refresh, and restore drills are still pending — `BUILD.md` Phase 13 tracks them.
+- Backups, scheduled Scryfall refresh runbook, and restore drills are still pending — `BUILD.md` Slice 8 tracks them.
 
 ## Seeded Accounts
 
