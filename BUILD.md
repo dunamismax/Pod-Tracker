@@ -1,7 +1,7 @@
 # BUILD.md
 
 Last drafted: 2026-05-03
-Last updated: 2026-05-04 (analysis quota policy and rate-limit guidance)
+Last updated: 2026-05-04 (Phase 3 system-flow verification and credential review)
 
 ## Agent Operating Rules
 
@@ -39,7 +39,7 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04, source-controlled representative Commander deck fixtures and a deterministic Commander legality engine completed on 2026-05-04, a Solid Queue card corpus refresh job completed on 2026-05-04, the first Phase 3 tranche covering self-service registration, account profile fields, and email verification completed on 2026-05-04, an account deletion and JSON data export tranche completed on 2026-05-04, a Codex account encrypted credential storage and disconnect tranche completed on 2026-05-04, a Codex App Server account-auth service layer covering login start, polling, cancel, logout, and auth-status read flows completed on 2026-05-04, a Codex browser/device-code login UX with refresh-status and remote sign-out controls completed on 2026-05-04, a per-user provider account link placeholder tranche for Archidekt and Moxfield public profile URLs (no third-party password collection) completed on 2026-05-04, and a per-user/global analysis quota policy plus visible Codex rate-limit and expected-runtime guidance (with `codex_rate_limit_snapshot` and `latency_ms` telemetry columns and lifecycle helpers on `AnalysisRun`) completed on 2026-05-04.
+The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04, source-controlled representative Commander deck fixtures and a deterministic Commander legality engine completed on 2026-05-04, a Solid Queue card corpus refresh job completed on 2026-05-04, the first Phase 3 tranche covering self-service registration, account profile fields, and email verification completed on 2026-05-04, an account deletion and JSON data export tranche completed on 2026-05-04, a Codex account encrypted credential storage and disconnect tranche completed on 2026-05-04, a Codex App Server account-auth service layer covering login start, polling, cancel, logout, and auth-status read flows completed on 2026-05-04, a Codex browser/device-code login UX with refresh-status and remote sign-out controls completed on 2026-05-04, a per-user provider account link placeholder tranche for Archidekt and Moxfield public profile URLs (no third-party password collection) completed on 2026-05-04, a per-user/global analysis quota policy plus visible Codex rate-limit and expected-runtime guidance (with `codex_rate_limit_snapshot` and `latency_ms` telemetry columns and lifecycle helpers on `AnalysisRun`) completed on 2026-05-04, and Rack::Test-backed system coverage for signup, login, logout, password reset, account deletion, and Codex credential non-disclosure on account pages completed on 2026-05-04.
 
 Shipped foundation:
 
@@ -62,6 +62,7 @@ Shipped foundation:
 - Codex browser/device-code login UX ships through `AccountCodexLoginsController` with `new`, `create`, `show`, `poll`, and `destroy` actions plus the `account_codex_logins` and `poll_account_codex_login` routes. The new flow lets a user pick browser sign-in or device-code sign-in, displays the resulting one-time login URL or short user code without ever collecting a ChatGPT password, polls the App Server for completion through a manual "Check sign-in status" button, and cancels in-flight attempts both locally and at the App Server. `AccountCodexAccountsController` gained `refresh` and `logout` actions wired to `Codex::AccountConnections#refresh_status` and `#logout`, and the account settings page now exposes "Connect Codex account", "Refresh status", "Sign out of Codex", and "Disconnect locally" controls plus a "Continue sign-in" link when an attempt is still active. Login start, completion, and cancellation each emit `codex.login_started`, `codex.login_completed`, and `codex.login_cancelled` audit events, and remote sign-out emits a `codex.logged_out` event.
 - A per-user and global analysis quota policy (`Codex::QuotaPolicy`) combines configurable daily caps (defaults: 25 AI runs per user per 24h, 500 site-wide per 24h, ~25 second expected runtime) with the most recent Codex App Server rate-limit snapshot from `CodexAccount#rate_limit_snapshot`. The policy returns an `allowed?` decision plus structured reasons (`:user_quota_exhausted`, `:global_quota_exhausted`, `:codex_account_disconnected`, `:codex_rate_limit_blocked`, `:codex_credentials_expired`) and renders a human-readable Codex rate-limit summary classified as `:ok`, `:tight`, `:critical`, `:blocked`, or `:unknown`. The account settings page now shows the user's daily AI analysis budget, site-wide budget, expected runtime per analysis, Codex rate-limit summary, and a green/amber readiness banner before the user can start an expensive evaluation. Configuration knobs (`IDEAL_MAGIC_ANALYSIS_PER_USER_PER_DAY`, `IDEAL_MAGIC_ANALYSIS_GLOBAL_PER_DAY`, `IDEAL_MAGIC_ANALYSIS_EXPECTED_RUNTIME_SECONDS`) live in `config/initializers/analysis_quota.rb`. `AnalysisRun` gained `codex_rate_limit_snapshot` (jsonb) and `latency_ms` (integer) columns and `mark_started!`, `mark_succeeded!`, and `mark_failed!` helpers that record latency and rate-limit telemetry per run.
 - Per-user encrypted Codex account credential storage (`CodexAccount`) is wired in. The `codex_accounts` table belongs to a user (uniquely), tracks `auth_mode` (chatgpt_browser or chatgpt_device_code), `status`, displayed ChatGPT email, plan type, rate-limit snapshots, credential metadata, error state, and connection timestamps, and stores the credential payload in an Active Record encrypted column with non-deterministic encryption. A `CodexAccount#disconnect!` helper, the `AccountCodexAccountsController#destroy` action (`DELETE /account_codex_account`), and a "Disconnect Codex account" button on the account settings page clear the encrypted credential, reset rate-limit/metadata snapshots, stamp `disconnected_at`, and record a `codex.disconnected` audit event. `Accounts::Exporter` now emits a `codex_account` payload with auth mode, status, displayed email, plan type, rate-limit snapshot, credential metadata key names, and timestamps, and never includes the encrypted credential body. Active Record encryption keys live in encrypted credentials; the test environment turns on `encrypt_fixtures` so encrypted columns survive fixture loads.
+- Rack::Test-backed system tests cover rendered-page signup, sign-in, sign-out, password reset, account deletion, and Codex account display behavior. The Codex display flow verifies that account status, displayed email, and plan type are visible while credential payloads and credential metadata values are not rendered to the page.
 - Lookup and history indexes exist for deck ownership, provider IDs and URLs, normalized card names, Scryfall oracle and printing IDs, analysis history, scorecard ownership, legality snapshots, and audit events.
 - Minitest is the primary test framework.
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
@@ -399,17 +400,17 @@ ideal-magic/
 
 ### Exit Criteria
 
-- [ ] Users can sign up, sign in, reset passwords, and delete their account.
-- [ ] Codex account-auth mode, plan metadata when available, and rate-limit state are clear to users and operators.
-- [ ] No browser can see OpenAI API keys or Codex access tokens.
-- [ ] The app does not imply generic OpenAI API OAuth or arbitrary Responses API subscription passthrough is supported.
+- [x] Users can sign up, sign in, reset passwords, and delete their account.
+- [x] Codex account-auth mode, plan metadata when available, and rate-limit state are clear to users and operators.
+- [x] No browser can see OpenAI API keys or Codex access tokens.
+- [x] The app does not imply generic OpenAI API OAuth or arbitrary Responses API subscription passthrough is supported.
 
 ### Verification
 
-- [ ] Auth system tests.
-- [ ] Codex credential isolation and disconnect tests.
-- [ ] Browser tests for signup, login, logout, password reset, and account deletion.
-- [ ] Security review of Codex credential handling.
+- [x] Auth system tests.
+- [x] Codex credential isolation and disconnect tests.
+- [ ] Browser tests for signup, login, logout, password reset, and account deletion. (Rack::Test-backed Rails system coverage is now present; a real browser-driver pass remains pending.)
+- [x] Security review of Codex credential handling.
 
 ## Phase 4 - Build Deck Import And Provider Adapters
 
