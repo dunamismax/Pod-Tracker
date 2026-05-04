@@ -1,6 +1,6 @@
 # Security
 
-Ideal Magic will handle accounts, deck history, Codex account-auth metadata, and AI usage records. Security work should be implemented as product behavior, not saved for deployment cleanup.
+Ideal Magic will handle accounts, deck history, collection ownership, playgroup sessions, matchup notes, Codex account-auth metadata, and AI usage records. Security work should be implemented as product behavior, not saved for deployment cleanup.
 
 ## Authentication
 
@@ -42,11 +42,13 @@ Codex account login, logout, token-cache creation, refresh failure, and deletion
 
 ## Privacy
 
-Users should control whether deck analyses are private, shared by link, or public. Defaults should favor privacy until the sharing model is implemented and visible.
+Users should control whether deck analyses, decks, pods, sessions, and public summaries are private, shared by link, or public. Defaults should favor privacy until the sharing model is implemented and visible.
 
 Do not store provider passwords or private provider session cookies. Do not exfiltrate private deck data to providers or AI services beyond the explicit analysis workflow.
 
 AI requests should include only the information needed for evaluation. Deterministic card facts and summarized deck features are preferred over raw unrelated user data.
+
+Collection inventory, matchup notes, player names, and session history are private user or playgroup data. Include them in AI requests only when the user explicitly runs a workflow that needs that context, and summarize them to the minimum useful evidence.
 
 ## Abuse Controls
 
@@ -66,7 +68,10 @@ Audit events should cover:
 
 - Authentication changes.
 - Deck imports and refreshes.
+- Collection imports and unresolved-card review.
 - Analysis creation and failures.
+- Pod/session creation, sharing, and result recording.
+- Matchup note create, update, delete, and share-affecting actions.
 - Codex account link, logout, token-cache, and auth failure events.
 - Admin actions.
 - Share visibility changes.

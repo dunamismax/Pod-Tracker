@@ -4,7 +4,7 @@ class LegalitySnapshotTest < ActiveSupport::TestCase
   test "normalizes ban lookups from stored card names" do
     snapshot = LegalitySnapshot.create!(
       source: "mtgcommander",
-      effective_on: Date.new(2024, 9, 23),
+      effective_on: Date.new(2024, 9, 24),
       banned_names: [ " Mana Crypt ", "Nadu, Winged Wisdom", "Nadu, Winged Wisdom" ],
       category_bans: [ { "label" => "Cards that refer to ante" } ],
       rules_snapshot: { "play" => { "starting_life_total" => 40 } }
@@ -27,7 +27,7 @@ class LegalitySnapshotTest < ActiveSupport::TestCase
     )
     newer = LegalitySnapshot.create!(
       source: "mtgcommander",
-      effective_on: Date.new(2024, 9, 23),
+      effective_on: Date.new(2025, 1, 1),
       banned_names: [ "Dockside Extortionist" ]
     )
 

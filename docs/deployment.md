@@ -20,7 +20,7 @@ This document describes the intended production shape. It is not a runbook yet b
 The expected process split:
 
 - `web`: Rails app served by Puma.
-- `worker`: Rails background jobs for imports, Scryfall refreshes, and analysis.
+- `worker`: Rails background jobs for deck imports, collection imports, Scryfall refreshes, analysis, exports, backups, and meta recomputation.
 - `codex`: Codex App Server or isolated Codex worker runtime for ChatGPT/Codex account-auth AI evaluation.
 - `db`: PostgreSQL.
 - Optional internal support services only when they earn their complexity.
@@ -57,6 +57,8 @@ The actual commands should be written after the Docker runtime exists.
 ## Backups And Restore
 
 Backups should include PostgreSQL data and any Active Storage files that become durable product data.
+
+Continuity-critical data includes auth sessions, Codex account metadata, deck and analysis share tokens, pod/session share tokens, collection imports, matchup notes, audit events, and uploaded import/export files.
 
 Before public launch, the repo needs:
 

@@ -29,6 +29,8 @@ Every scorecard must include:
 
 The model must cite only facts supplied by the app. If a decklist is incomplete, malformed, missing card facts, or potentially stale, the score confidence should drop instead of inventing certainty.
 
+When collection, session, and matchup data exist, scorecards may cite those facts separately from raw deck construction. The UI must make that distinction clear: a deck's inherent analysis, a user's owned-card opportunities, and a playgroup's actual history are different evidence classes.
+
 ## Power
 
 Power measures the deck's ability to win against prepared Commander tables.
@@ -97,6 +99,7 @@ Primary inputs:
 - Dead-card risk.
 - Mulligan and opening-hand heuristics.
 - Internal tension between card packages.
+- Opening-hand simulation, land-drop rates, curve-hit rates, and commander-cast timing where feasible.
 
 Consistency should penalize decks that contain powerful cards but cannot reliably cast or find them.
 
@@ -117,9 +120,37 @@ Primary inputs:
 
 Pod fit should produce a practical brief, not just a number. The brief should explain likely mismatch patterns and suggest swaps or expectations.
 
+## Collection-Aware Tuning
+
+Collection-aware tuning is not a score by itself. It is a recommendation layer that uses the user's owned cards and deck library demand to make advice more actionable.
+
+Primary inputs:
+
+- Owned versus missing cards in the analyzed deck.
+- Cards needed by multiple decks.
+- Owned cards that fit the deck color identity and role needs.
+- Missing role coverage such as ramp, draw, interaction, wipes, protection, and win conditions.
+- Optional price snapshots when available, clearly marked as stale-prone context.
+
+Collection-aware recommendations should distinguish "you already own this", "this fills a structural need", "this answers your recorded meta", and "this is merely a possible buy." The app must not imply a purchase is required to make a deck valid or fun.
+
+## Real Meta Evidence
+
+Recorded playgroup history can improve tuning but must not overwrite deterministic deck facts.
+
+Primary inputs:
+
+- Deck win rate, games played, draws, average turns, and last played.
+- Commander appearances, wins, average score band, and matchup notes.
+- Pod balance history and mismatch outcomes.
+- Win-condition breakdowns.
+- Recurring salt, stax, combo, speed, or interaction complaints recorded in notes or post-game reviews.
+- Revision performance before and after deck changes.
+
+Meta evidence should include sample size and recency. A single game should create prompts and questions, not confident conclusions.
+
 ## Rubric Versioning
 
 The initial rubric version is `2026-05-03.phase0`.
 
 Future rubric changes must be versioned. Existing analysis runs should keep their original rubric version so old scorecards remain auditable.
-

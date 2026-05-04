@@ -8,6 +8,7 @@ Ideal Magic imports Commander decks from public and user-provided sources. Provi
 - Uploaded or pasted text exports.
 - Public Archidekt deck URLs.
 - Public Moxfield deck URLs.
+- Pasted or uploaded user-provided collection exports.
 
 These sources are allowed because they do not require storing third-party passwords or bypassing private account boundaries.
 
@@ -35,6 +36,21 @@ Each provider adapter should expose clear methods for:
 
 Provider adapters must not write analysis results directly. Their job ends at normalized deck intake and source metadata.
 
+## Collection Import Policy
+
+Collection import should start with user-provided exports rather than private account sync. The first implementation should support simple pasted lists and uploaded text or CSV-like exports, then add provider-specific collection formats only when they are documented or user-exported.
+
+Collection imports should store:
+
+- Source label.
+- Original filename or paste label when provided.
+- Import timestamp.
+- Parsed card count.
+- Unresolved names.
+- Parser version.
+
+Collection imports may create unresolved-card review items. They must not silently invent card identities when names are ambiguous.
+
 ## Public URL Policy
 
 Public deck URL imports should:
@@ -61,9 +77,10 @@ Imported decks must store:
 
 The UI should show where a deck came from and whether it may be stale.
 
+Public session and pod links should follow the same attribution and privacy posture: opt-in, tokenized, revocable, and scoped to the specific shared surface.
+
 ## Scryfall
 
 Scryfall bulk data is the primary source for card facts. Ideal Magic should use bulk downloads for card corpus refreshes and avoid per-card API calls for normal analysis workloads.
 
 Scryfall usage must include polite request behavior and should stay below Scryfall's published rate guidance.
-

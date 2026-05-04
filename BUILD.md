@@ -23,11 +23,14 @@ Future agents working in `ideal-magic` must follow these rules before touching c
 
 `Ideal Magic` is a Ruby on Rails web application for Commander deck and pod evaluation.
 
+It is now the single primary Magic project. The best durable product ideas from Scrybase are consolidated here: deck lab, collection ownership, game-night sessions, pod seating/results, matchup notes, meta analytics, and tuning recommendations from real playgroup history. Do not port Scrybase's old stack or migration plan; rebuild the product ideas inside Ideal Magic's Rails architecture.
+
 The approved product direction:
 
 - Ruby and Rails latest stable at scaffold time.
 - Rails monolith first, not a separate SPA and API unless the product earns that split later.
 - PostgreSQL as the durable application database.
+- Ideal Magic owns decks, collection, pods, sessions, matchup journal, meta analytics, and analysis as one product surface.
 - Hotwire, Turbo, Stimulus, Tailwind CSS, and componentized Rails views for the primary UI.
 - Rails-native background jobs, caching, and realtime features first.
 - Codex App Server for AI evaluation using Codex-managed ChatGPT browser OAuth or device-code login as the exclusive v1 user-facing model path.
@@ -53,7 +56,7 @@ Shipped foundation:
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
 - `.env.example`, `/up`, `/ready`, and an authenticated dashboard root route exist.
 
-No deck import, card data refresh jobs, full Commander legality engine, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, PWA offline behavior, or production configuration exists yet.
+No deck import, collection import, card data refresh jobs, full Commander legality engine, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, or production configuration exists yet.
 
 GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
@@ -97,9 +100,29 @@ Reference links:
 - Archidekt public API discussion: https://archidekt.com/forum/thread/16962481
 - Moxfield public organization: https://github.com/moxfield
 
+## Scrybase Consolidation Notes
+
+Scrybase was reviewed on 2026-05-04 before retirement. Ideal Magic replaces it as Stephen's single primary Magic project.
+
+Product concepts to preserve:
+
+- Collection ownership and demand pressure.
+- Deck revisions, diffs, and revision performance.
+- Combo, cut, upgrade, and owned-card intelligence.
+- Goldfish consistency simulation for opening hands, land drops, curve hits, commander timing, and card access.
+- Game-night sessions with player check-in, deck registration, pod seating, and result recording.
+- Matchup notes tied to decks, commanders, opponents, pods, and sessions.
+- Meta trends for decks, commanders, players, pods, win conditions, salt, and social friction.
+- Public deck and session share links with opt-in revocation.
+- Export surfaces for decks, analysis, collection summaries, and meta reports.
+- Operator status, backup, restore, and smoke-flow discipline.
+
+Implementation rule: preserve these product ideas, not Scrybase's Python, FastAPI, Astro, Elysia, OpenTUI, or rewrite-migration architecture.
+
 ## Product Constraints
 
 - Ideal Magic must work from public deck URLs and text exports before depending on provider account linking.
+- Collection features must start from user-provided exports and manual entry before depending on provider account linking.
 - Ideal Magic must not store Archidekt, Moxfield, ChatGPT, OpenAI, or other third-party passwords.
 - User-facing AI evaluation must use Codex App Server ChatGPT-managed account auth as the exclusive v1 model path.
 - Codex account credential material must be isolated per user or per serialized workflow stream, treated like a password, and never committed, logged, pasted into tickets, or exposed to browsers.
@@ -108,6 +131,8 @@ Reference links:
 - WotC-owned names, card text, art, and symbols require fan-content care. Do not place core access behind a paywall without legal review.
 - AI output is advice, not rules authority. Commander legality and card facts must come from deterministic data and source-backed rules, not model guesses.
 - Every score must have evidence, a rubric version, and enough explanation that users can challenge it.
+- Collection-aware recommendations must distinguish owned-card opportunities, missing-card gaps, budget context, and optional purchases. Do not turn collection tooling into a marketplace or finance product.
+- Game-night history, player records, matchup notes, and private playgroup context are private by default and must be opt-in for sharing or AI evaluation.
 - Salt score, salt rating, and overall social friction are first-class v1 scoring outputs. They must be evidence-backed, versioned with the rubric, and presented as conversation aids rather than moral judgments about a player or deck.
 - The UX must be fast on a phone at a table, not merely pretty on a desktop monitor.
 
@@ -147,6 +172,8 @@ Reference links:
 - Replayable analysis runs.
 - Evaluation fixtures for known decks across precon, casual, upgraded, high-power, and cEDH-like ranges.
 - Salt and social-friction fixtures for high-friction cards, play patterns, combos, stax, mass land denial, extra turns, theft, chaos, repetitive locks, and mismatch-prone decks.
+- Collection-aware recommendations from owned cards, missing cards, demand pressure, and role gaps.
+- Real-meta recommendations from sessions, results, matchup notes, win conditions, and deck revision history.
 - Model, latency, rate-limit, token-usage-if-reported, and failure telemetry per analysis run.
 
 ### Data Sources
@@ -156,6 +183,8 @@ Reference links:
 - Public Archidekt deck URLs.
 - Public Moxfield deck URLs.
 - User-pasted decklists and exported text files.
+- User-provided collection exports and manual collection entries.
+- Recorded game-night sessions, pod results, matchup notes, and deck revisions.
 - Future optional sources: Manabox exports, MTGGoldfish exports, EDHREC-derived tags if licensing and API access allow.
 
 ### Deployment
@@ -188,6 +217,7 @@ ideal-magic/
     analysis-rubric.md
     deployment.md
     provider-integrations.md
+    product-scope.md
     security.md
   infra/
     caddy/
@@ -213,11 +243,13 @@ ideal-magic/
 - [ ] Phase 5 - Build deterministic Commander analysis.
 - [ ] Phase 6 - Build Codex evaluation pipeline.
 - [ ] Phase 7 - Build the deck evaluation UX.
-- [ ] Phase 8 - Build pod evaluation and comparison.
-- [ ] Phase 9 - Build the PWA experience.
-- [ ] Phase 10 - Harden security, observability, and admin operations.
-- [ ] Phase 11 - Ship self-hosted deployment.
-- [ ] Phase 12 - Run beta, calibrate scoring, and prepare v1.
+- [ ] Phase 8 - Build collection and ownership intelligence.
+- [ ] Phase 9 - Build pod evaluation, sessions, and game-night results.
+- [ ] Phase 10 - Build matchup journal and meta analytics.
+- [ ] Phase 11 - Build the PWA experience.
+- [ ] Phase 12 - Harden security, observability, and admin operations.
+- [ ] Phase 13 - Ship self-hosted deployment.
+- [ ] Phase 14 - Run beta, calibrate scoring, and prepare v1.
 
 ## Phase 0 - Freeze Product Charter And Repo Rules
 
@@ -341,6 +373,7 @@ ideal-magic/
 - [ ] Implement email/password auth with secure sessions.
 - [ ] Add email verification and password reset.
 - [ ] Add account settings for display name, timezone, and preferred units.
+- [ ] Add user profile fields needed for playgroup sessions, public display names, and private note attribution.
 - [ ] Add Codex App Server account login start, completion, cancel, logout, and account-read flows.
 - [ ] Add Codex browser OAuth and device-code UX without collecting ChatGPT passwords.
 - [ ] Add isolated Codex credential storage per user or serialized workflow stream.
@@ -348,6 +381,7 @@ ideal-magic/
 - [ ] Add visible rate-limit and expected runtime guidance before expensive analysis.
 - [ ] Add model, rate-limit, token-usage-if-reported, and latency tracking per analysis run.
 - [ ] Add account deletion and data export flows.
+- [ ] Ensure account export includes decks, analyses, collection records, sessions created by the user, matchup notes, and audit metadata that belongs to the account.
 - [ ] Add provider account link placeholders without requesting third-party passwords.
 - [ ] Add token-cache deletion and auth disconnect flows that clear local Codex credentials.
 
@@ -383,9 +417,11 @@ ideal-magic/
 - [ ] Add provider profile URL discovery only if it can be done politely and without private auth.
 - [ ] Add provider refresh jobs with backoff, cache, and clear error states.
 - [ ] Add deck version history and diffing.
+- [ ] Store deck revision snapshots whenever imports, edits, or manual card changes alter a deck.
 - [ ] Add duplicate card, missing card, unknown card, and commander detection workflows.
 - [ ] Add manual deck edit fallback for failed imports.
 - [ ] Add source attribution on every imported deck.
+- [ ] Add deck export formats for plain text, CSV, and JSON before provider import work is considered complete.
 - [ ] Add provider adapter fixtures from real public deck examples.
 
 ### Exit Criteria
@@ -417,6 +453,7 @@ ideal-magic/
 - [ ] Validate deck size, commander presence, singleton rules, color identity, and legality.
 - [ ] Compute mana curve, color requirements, land count, source count, ramp count, draw count, tutor count, interaction count, wipe count, protection count, graveyard dependence, and win condition markers.
 - [ ] Detect known combos through a curated combo graph.
+- [ ] Compute role/category balance and cut candidates from tags, mana value, duplicate effects, off-plan cards, and recorded dead-draw notes when available.
 - [ ] Detect fast mana and high-power staples through tag rules.
 - [ ] Compute deterministic salt score from salt-tagged cards, high-friction mechanics, denial density, combo compactness, repetitive locks, extra-turn loops, theft/control effects, chaos effects, mass land denial, and expected recovery burden on opponents.
 - [ ] Compute salt rating bands from salt score with stable labels that are clear without being inflammatory.
@@ -426,6 +463,7 @@ ideal-magic/
 - [ ] Estimate interaction from count, type mix, mana efficiency, and coverage.
 - [ ] Estimate power from deterministic feature bands before AI adjustment.
 - [ ] Add simulation jobs for opening hand and early-turn probability checks where feasible.
+- [ ] Store goldfish simulation outputs for average lands in opener, mulligan rate, land-drop rates, curve-hit rates, commander-cast timing, and card-access rates.
 - [ ] Store feature vectors with every analysis run.
 - [ ] Create benchmark decks for precon, upgraded precon, casual, optimized, high-power, and cEDH-like ranges.
 
@@ -458,9 +496,11 @@ ideal-magic/
 - [ ] Create isolated Codex runtime lifecycle management for evaluation jobs.
 - [ ] Read Codex account state and ChatGPT/Codex rate limits before starting expensive evaluations.
 - [ ] Define JSON schema for AI scorecards, including salt score, salt rating, social friction score, friction drivers, and Rule 0 talking points.
+- [ ] Define JSON schema extensions for collection-aware recommendations, real-meta evidence, post-game review prompts, and matchup memory summaries once those phases exist.
 - [ ] Define prompt versions for single-deck analysis.
 - [ ] Define prompt versions for pod analysis.
 - [ ] Pass deterministic feature vectors, decklist summaries, commander identity, combo candidates, salt/social-friction evidence, and rubric text to the model.
+- [ ] Pass owned-card gaps, session history, matchup notes, and meta summaries only for workflows where the user explicitly requests that context.
 - [ ] Instruct the model to cite only provided facts and mark uncertainty.
 - [ ] Add retries, timeouts, request IDs, auth failure states, and rate-limit failure states.
 - [ ] Add moderation or abuse safeguards for user-provided deck descriptions and prompts.
@@ -497,15 +537,18 @@ ideal-magic/
 ### Work Checklist
 
 - [ ] Build dashboard with recent decks, analyses, imports, and queued jobs.
+- [ ] Add dashboard modules for collection gaps, demand pressure, open sessions, recent results, and matchup reminders once those domains exist.
 - [ ] Build deck detail page with commander, colors, source, card list, tags, curve, and import history.
 - [ ] Build analysis run page with power, speed, interaction, consistency, salt score, salt rating, and overall social friction scores.
 - [ ] Show confidence, evidence, and improvement priorities for each score.
 - [ ] Show salt and social-friction evidence with neutral language, card/play-pattern drivers, and practical table-disclosure guidance.
 - [ ] Add "what changed since last analysis" diffs.
 - [ ] Add recommendation sections for mana, draw, ramp, interaction, win conditions, salt reduction, and social fit.
+- [ ] Add recommendation sections for owned upgrades, missing high-demand cards, budget context, and real-meta adjustments once collection and session evidence exist.
 - [ ] Add user feedback controls for score agreement and notes.
 - [ ] Add shareable public analysis links with privacy controls.
 - [ ] Add export to Markdown, text, and JSON.
+- [ ] Add deck export to text, CSV, and JSON from deck detail.
 - [ ] Add loading, queued, running, failed, stale, and complete states.
 - [ ] Add mobile bottom navigation and desktop sidebar navigation.
 - [ ] Add responsive card list controls for search, tags, categories, and role filters.
@@ -525,42 +568,136 @@ ideal-magic/
 - [ ] Playwright or Rails system screenshots for mobile and desktop.
 - [ ] Accessibility checks for keyboard navigation, labels, contrast, and reduced motion.
 
-## Phase 8 - Build Pod Evaluation And Comparison
+## Phase 8 - Build Collection And Ownership Intelligence
+
+### Objectives
+
+- [ ] Let users build and tune from cards they actually own.
+- [ ] Make missing cards, duplicate demand, and owned upgrades visible across the deck library.
+- [ ] Keep collection tooling useful without becoming a finance or marketplace product.
+
+### Work Checklist
+
+- [ ] Model collection cards, collection imports, collection unresolved entries, wishlist items, and deck ownership snapshots.
+- [ ] Add indexes for user collection lookup, normalized card names, ownership gaps, and demand pressure.
+- [ ] Add pasted collection import.
+- [ ] Add uploaded text and CSV-like collection import.
+- [ ] Add manual collection add, edit, remove, and quantity adjustment flows.
+- [ ] Add unresolved-card review for ambiguous or unknown collection entries.
+- [ ] Compute owned versus missing cards for every deck.
+- [ ] Compute demand pressure for cards needed across multiple decks.
+- [ ] Add collection-aware upgrade suggestions from owned cards that fit a deck's color identity, tags, and role gaps.
+- [ ] Add optional budget and price context only when sourced from stored Scryfall price snapshots and clearly marked as stale-prone.
+- [ ] Add wishlist and acquisition planning without marketplace, trading, or checkout flows.
+- [ ] Add collection import history, parser version, source label, and import rollback or correction workflow.
+- [ ] Add exports for collection summary, deck gaps, and demand pressure.
+
+### Exit Criteria
+
+- [ ] A user can import and maintain a collection.
+- [ ] A user can open any deck and see owned, missing, and shortfall counts.
+- [ ] A user can see which missing cards matter across multiple decks.
+- [ ] Recommendations distinguish owned-card opportunities from possible purchases.
+- [ ] Collection data remains private unless explicitly exported or shared.
+
+### Verification
+
+- [ ] Collection model and parser tests.
+- [ ] Collection import fixture tests.
+- [ ] Ownership and demand-pressure service tests.
+- [ ] Collection-aware recommendation tests.
+- [ ] Browser tests for import, manual edits, deck gaps, and exports.
+
+## Phase 9 - Build Pod Evaluation, Sessions, And Game-Night Results
 
 ### Objectives
 
 - [ ] Help players compare decks before a Commander game.
+- [ ] Support real game-night setup: sessions, players, check-in, deck registration, pod seating, and result recording.
 - [ ] Detect mismatch, speed gaps, interaction imbalance, and likely play-pattern issues.
 - [ ] Produce a useful Rule 0 conversation brief.
 
 ### Work Checklist
 
 - [ ] Model pods, pod slots, pod decks, pod analysis runs, and shared pod links.
+- [ ] Model sessions, players, session players, session decks, pod seats, pod results, and shared session links.
 - [ ] Let users create a pod from 2 to 4 decks for v1.
 - [ ] Support guest deck submission by public link or paste.
+- [ ] Let users create a game-night session with date, location, notes, and status.
+- [ ] Add player check-in and deck registration workflows.
+- [ ] Add pod preview and seating from checked-in player/deck pairs.
+- [ ] Add result recording with winner, draw state, turns, win condition, and notes.
+- [ ] Preserve deck revision and analysis snapshot used for each pod seat.
 - [ ] Compute score spread, average, outliers, and matchup warnings.
 - [ ] Compute pod-level salt spread, average social friction, friction outliers, and mismatch warnings.
 - [ ] Detect likely archenemy decks, pubstomp risks, durdle risks, and interaction gaps.
+- [ ] Compute pod seating quality from score spread, social-friction spread, color/archetype repetition, and prior matchup history.
 - [ ] Generate a Rule 0 brief with power band, speed expectations, combo/stax notes, salt/social-friction notes, and suggested swaps.
 - [ ] Show pod balance visually without hiding details.
 - [ ] Add printable and shareable pod summary.
+- [ ] Add public session summary links with opt-in sharing and revocation.
 - [ ] Add "find closer decks from my library" recommendations.
 
 ### Exit Criteria
 
 - [ ] A pod can be created, analyzed, shared, and revised.
+- [ ] A game-night session can be created, checked in, seated, scored, and reviewed.
 - [ ] Mismatch warnings are specific and evidence-backed.
 - [ ] Pod salt/social-friction warnings identify likely table experience issues without overstating certainty.
 - [ ] Pod analysis helps players choose decks, not just assign numbers.
+- [ ] Session history creates durable inputs for meta analytics and post-game tuning.
 
 ### Verification
 
 - [ ] Pod model and service tests.
+- [ ] Session, player, check-in, seating, and result model/service tests.
 - [ ] Pod UI system tests.
+- [ ] Session workflow browser tests from create through result recording.
 - [ ] Pod salt/social-friction fixture tests across low-salt, mixed-salt, and high-friction pods.
 - [ ] Benchmark pod fixture tests across balanced and mismatched pods.
+- [ ] Public session share tests.
 
-## Phase 9 - Build The PWA Experience
+## Phase 10 - Build Matchup Journal And Meta Analytics
+
+### Objectives
+
+- [ ] Preserve human matchup context that decklists and scores cannot capture.
+- [ ] Turn recorded sessions into useful deck, commander, player, pod, and win-condition trends.
+- [ ] Use real playgroup history to improve recommendations without overstating small samples.
+
+### Work Checklist
+
+- [ ] Model matchup notes, matchup tags, note links to decks, commanders, players, pods, and sessions.
+- [ ] Add matchup note create, edit, delete, search, and tag filters.
+- [ ] Add pre-game context surfaces for prior notes tied to a commander, opponent, deck, or pod.
+- [ ] Add post-game review prompts for wins, losses, draws, short games, stalls, overperformers, dead draws, and missing cards.
+- [ ] Compute deck stats: games, wins, draws, average turns, last played, win rate, and confidence by sample size.
+- [ ] Compute commander meta: appearances, wins, win rate, average score band, salt/social-friction history, and recent trend.
+- [ ] Compute player and pod history without turning the app into a public ranking or shaming surface.
+- [ ] Compute win-condition breakdowns and recurring loss patterns.
+- [ ] Compute revision performance by connecting results to deck revisions.
+- [ ] Compute salt and social-friction trends from recorded results, notes, and deterministic evidence.
+- [ ] Add "what changed since this deck last won/lost" views.
+- [ ] Add meta-aware recommendations that cite sample size and recency.
+- [ ] Add admin/operator recompute jobs for derived meta tables.
+
+### Exit Criteria
+
+- [ ] Users can record and retrieve useful matchup notes.
+- [ ] Decks show performance and revision history from real games.
+- [ ] Meta dashboards summarize trends without pretending thin data is certain.
+- [ ] Recommendations can cite real playgroup evidence separately from deck-construction facts.
+
+### Verification
+
+- [ ] Matchup note model, service, and search tests.
+- [ ] Meta analytics service tests.
+- [ ] Revision performance tests.
+- [ ] Post-game prompt tests.
+- [ ] Browser tests for journal, meta dashboard, and deck performance views.
+- [ ] Privacy tests for private notes and share boundaries.
+
+## Phase 11 - Build The PWA Experience
 
 ### Objectives
 
@@ -574,6 +711,7 @@ ideal-magic/
 - [ ] Add service worker with app-shell caching.
 - [ ] Add offline fallback pages.
 - [ ] Cache recent decks and recent analysis summaries for read-only offline access.
+- [ ] Cache recent collection gaps, open session summaries, pod briefs, and matchup notes for read-only offline access when privacy settings allow.
 - [ ] Add background refresh for stale imported decks where supported.
 - [ ] Add install prompts that respect browser behavior and user choice.
 - [ ] Add iOS home-screen metadata and icon coverage.
@@ -588,6 +726,7 @@ ideal-magic/
 - [ ] The app is installable from supported mobile and desktop browsers.
 - [ ] Recent deck evaluations can be opened offline.
 - [ ] Offline states never pretend fresh AI analysis can run without network.
+- [ ] Offline states never pretend imports, sync, sharing changes, or new result recording have reached the server.
 - [ ] PWA updates do not trap users on stale assets.
 
 ### Verification
@@ -598,7 +737,7 @@ ideal-magic/
 - [ ] Service worker cache update test.
 - [ ] No-overlap responsive screenshots.
 
-## Phase 10 - Harden Security, Observability, And Admin Operations
+## Phase 12 - Harden Security, Observability, And Admin Operations
 
 ### Objectives
 
@@ -611,13 +750,16 @@ ideal-magic/
 - [ ] Add rate limiting for auth, imports, analysis creation, and public share pages.
 - [ ] Add CSRF, secure cookie, CORS, CSP, and security header review.
 - [ ] Add audit events for auth, import, analysis, provider refresh, key changes, and admin actions.
-- [ ] Add admin dashboard for users, jobs, imports, analysis failures, provider health, and AI spend.
+- [ ] Add audit events for collection imports, session sharing, result recording, matchup note changes, and meta recomputes.
+- [ ] Add admin dashboard for users, jobs, imports, collection import failures, analysis failures, provider health, public shares, and AI spend.
 - [ ] Add structured logs with request IDs.
+- [ ] Add operator status page or command showing app version, database status, job queues, card corpus freshness, analysis counts, collection counts, session counts, share counts, and backup recency.
 - [ ] Add error reporting route or local log workflow.
 - [ ] Add OpenTelemetry-compatible instrumentation if it earns the complexity.
 - [ ] Add database backup and restore scripts.
 - [ ] Add abuse controls for public imports and share links.
 - [ ] Add privacy controls for deck visibility and analysis sharing.
+- [ ] Add privacy controls for collection visibility, matchup notes, player names, session summaries, and pod result shares.
 - [ ] Add Terms, Privacy, and Fan Content disclaimer pages.
 
 ### Exit Criteria
@@ -635,7 +777,7 @@ ideal-magic/
 - [ ] Backup and restore drill.
 - [ ] Manual admin workflow smoke test.
 
-## Phase 11 - Ship Self-Hosted Deployment
+## Phase 13 - Ship Self-Hosted Deployment
 
 ### Objectives
 
@@ -655,6 +797,7 @@ ideal-magic/
 - [ ] Add secret setup instructions using Rails credentials or environment secrets.
 - [ ] Add database migration command for deploys.
 - [ ] Add health check endpoint and Caddy upstream checks.
+- [ ] Add operator status and backup commands for production troubleshooting.
 - [ ] Add rollback and restore docs.
 - [ ] Add first deploy runbook.
 
@@ -674,7 +817,7 @@ ideal-magic/
 - [ ] Reboot smoke test on staging or production VM.
 - [ ] Restore test into a fresh volume.
 
-## Phase 12 - Run Beta, Calibrate Scoring, And Prepare V1
+## Phase 14 - Run Beta, Calibrate Scoring, And Prepare V1
 
 ### Objectives
 
@@ -687,10 +830,14 @@ ideal-magic/
 - [ ] Recruit beta users with different Commander metas.
 - [ ] Collect score disagreement feedback.
 - [ ] Collect salt score, salt rating, and social-friction disagreement feedback.
+- [ ] Collect collection-aware recommendation feedback from users with real inventories.
+- [ ] Collect pod-session and matchup-journal feedback from real game nights.
 - [ ] Create calibration decks for each power band.
 - [ ] Create calibration decks for each salt rating and social-friction band.
+- [ ] Create calibration pods and sessions for balanced, mismatched, salty, high-friction, and long-game tables.
 - [ ] Tune deterministic scoring weights.
 - [ ] Tune salt/social-friction weights separately from raw power so salty casual decks and clean high-power decks can be represented accurately.
+- [ ] Tune meta-aware recommendation thresholds by sample size and recency.
 - [ ] Tune AI prompt and rubric versions.
 - [ ] Add changelog for scoring rubric changes.
 - [ ] Define v1 launch feature set and freeze scope.
@@ -775,7 +922,7 @@ When salt score, salt rating, or social friction work begins, update `docs/analy
 - [ ] Charging for WotC IP-backed fan content without legal review.
 - [ ] Replacing Scryfall as the card data source.
 - [ ] Building a Discord bot before the web app is useful.
-- [ ] Building trading, collection finance, or marketplace features.
+- [ ] Building trading, collection finance, checkout, pricing speculation, or marketplace features.
 - [ ] Supporting every MTG format before Commander is excellent.
 
 ## Future Feature Backlog
@@ -783,10 +930,9 @@ When salt score, salt rating, or social friction work begins, update `docs/analy
 - [ ] ChatGPT app or GPT Action that can analyze a deck from inside ChatGPT.
 - [ ] Browser share target for deck URLs.
 - [ ] Deck improvement simulator with budget and salt constraints.
-- [ ] Meta profiles for specific playgroups.
-- [ ] Collection-aware upgrade recommendations.
+- [ ] Advanced multi-playgroup profiles with explicit member permissions.
 - [ ] Commander recommendation engine from user preferences.
-- [ ] Local group night mode with QR code deck submission.
+- [ ] Event-scale QR code deck submission and tournament-style seating.
 - [ ] Public deck gallery and analysis leaderboard.
 - [ ] Optional Discord bot for pod checks.
 - [ ] Optional email summaries for deck changes and stale imports.
