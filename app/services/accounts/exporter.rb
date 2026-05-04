@@ -13,6 +13,7 @@ module Accounts
         generated_at: @generated_at.utc.iso8601,
         account: account_payload,
         codex_account: codex_account_payload,
+        provider_links: provider_links_payload,
         decks: decks_payload,
         analysis_runs: analysis_runs_payload,
         pod_evaluations: pod_evaluations_payload,
@@ -49,6 +50,10 @@ module Accounts
         codex_account = @user.codex_account
         return nil unless codex_account
         codex_account.export_payload
+      end
+
+      def provider_links_payload
+        @user.provider_links.order(:provider, :handle).map(&:export_payload)
       end
 
       def decks_payload

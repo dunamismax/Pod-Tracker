@@ -87,6 +87,32 @@
     <%= link_to "Connect Codex account", new_account_codex_login_path, class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium" %>
   <% end %>
 
+  <h2 class="font-bold text-2xl mt-10">Provider account links</h2>
+  <p class="my-3 text-sm text-zinc-400">
+    Public deck-host profile links you have recorded. Ideal Magic does not collect provider passwords; deck import still relies on public deck URLs and pasted lists.
+  </p>
+
+  <% if @provider_links.any? %>
+    <ul class="my-4 divide-y divide-zinc-800 text-sm">
+      <% @provider_links.each do |link| %>
+        <li class="py-3 flex items-start justify-between gap-4">
+          <div>
+            <p class="font-medium text-zinc-100"><%= link.provider_label %> · <%= link.handle %></p>
+            <p class="text-zinc-400 break-all"><%= link.profile_url %></p>
+            <% if link.label.present? %>
+              <p class="text-zinc-500 text-xs mt-1"><%= link.label %></p>
+            <% end %>
+          </div>
+          <%= button_to "Remove", account_provider_link_path(link), method: :delete, data: { turbo_confirm: "Remove this provider link?" }, class: "shrink-0 rounded-md px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white font-medium cursor-pointer" %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <p class="my-4 text-sm text-zinc-500">No provider account links recorded yet.</p>
+  <% end %>
+
+  <%= link_to "Add provider link", new_account_provider_link_path, class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm" %>
+
   <h2 class="font-bold text-2xl mt-10">Account actions</h2>
   <div class="mt-4 flex flex-wrap gap-4 text-sm">
     <%= link_to "Edit account", edit_account_path, class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium" %>

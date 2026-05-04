@@ -98,5 +98,32 @@ module Accounts
       payload = Exporter.new(@user).to_h
       assert_nil payload[:codex_account]
     end
+
+    test "includes user provider links ordered by provider and handle" do
+      @user.provider_links.create!(
+        provider: "moxfield",
+        handle: "PlayerOne",
+        profile_url: "https://moxfield.com/users/PlayerOne",
+        label: "Main"
+      )
+      @user.provider_links.create!(
+        provider: "archidekt",
+        handle: "thedude",
+        profile_url: "https://archidekt.com/u/thedude"
+      )
+
+      payload = Exporter.new(@user).to_h
+      links = payload[:provider_links]
+
+      assert_equal 2, links.size
+      assert_equal "archidekt", links.first[:provider]
+      assert_equal "moxfield", links.last[:provider]
+      assert_equal "Main", links.last[:label]
+    end
+
+    test "provider_links payload is empty when none are linked" do
+      payload = Exporter.new(@user).to_h
+      assert_equal [], payload[:provider_links]
+    end
   end
 end
