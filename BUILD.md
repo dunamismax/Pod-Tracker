@@ -1,7 +1,7 @@
 # BUILD.md
 
 Last drafted: 2026-05-03
-Last updated: 2026-05-04 (Codex account credential storage and disconnect)
+Last updated: 2026-05-04 (Codex App Server account-auth service layer)
 
 ## Agent Operating Rules
 
@@ -39,7 +39,7 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04, source-controlled representative Commander deck fixtures and a deterministic Commander legality engine completed on 2026-05-04, a Solid Queue card corpus refresh job completed on 2026-05-04, the first Phase 3 tranche covering self-service registration, account profile fields, and email verification completed on 2026-05-04, an account deletion and JSON data export tranche completed on 2026-05-04, and a Codex account encrypted credential storage and disconnect tranche completed on 2026-05-04.
+The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04, source-controlled representative Commander deck fixtures and a deterministic Commander legality engine completed on 2026-05-04, a Solid Queue card corpus refresh job completed on 2026-05-04, the first Phase 3 tranche covering self-service registration, account profile fields, and email verification completed on 2026-05-04, an account deletion and JSON data export tranche completed on 2026-05-04, a Codex account encrypted credential storage and disconnect tranche completed on 2026-05-04, and a Codex App Server account-auth service layer covering login start, polling, cancel, logout, and auth-status read flows completed on 2026-05-04.
 
 Shipped foundation:
 
@@ -57,13 +57,14 @@ Shipped foundation:
 - A Solid Queue background job (`Scryfall::CardCorpusRefreshJob`) wraps `Scryfall::BulkImporter` with bounded retries for rate-limit and transport errors, runs on a dedicated `card_corpus` queue, and is wired into `config/recurring.yml` for daily production refreshes.
 - Self-service email/password registration (`RegistrationsController`), an authenticated account settings page (`AccountsController`) for display name, timezone, and preferred units, and a tokenized email verification flow (`EmailVerificationsController`, `UserMailer#verify_email`) are wired up. The `users` table now carries `display_name`, `timezone`, `preferred_units`, `email_verified_at`, and `email_verification_sent_at`, with `User` validating email format and uniqueness, normalizing display name and email, and exposing `User#email_verified?` and `User#attribution_name`.
 - Account deletion (`AccountDeletionsController`) requires password re-confirmation, terminates the session, destroys the user with cascading delete of decks, deck cards, commanders, provider links, pod evaluations, and analysis runs, and records an `account.deleted` audit event whose `user_id` is nullified after the user is removed. Account export (`AccountExportsController`, `Accounts::Exporter`) returns a downloadable JSON file with the account profile, decks, deck cards, commanders, provider links, analysis runs and scorecards, pod evaluations, and audit events, and records an `account.exported` audit event. Both flows are linked from the account settings page.
+- The Codex App Server account-auth service layer is wired in. `Codex::AppServerClient` exposes `start_chatgpt_browser_login`, `start_chatgpt_device_login`, `poll_chatgpt_login`, `cancel_chatgpt_login`, `logout_chatgpt`, and `get_auth_status` over a pluggable JSON-RPC transport (default `NullTransport` raises so dev cannot accidentally call OpenAI). `Codex::AccountConnections` orchestrates start, poll, cancel, logout, and refresh-status flows for a user, persisting in-flight state in `CodexLoginAttempt` and writing completed credentials, displayed email, plan type, rate-limit snapshot, and credential expiration into `CodexAccount`. `CodexLoginAttempt` tracks `auth_mode` (chatgpt_browser or chatgpt_device_code), `status` (pending, awaiting_user, completed, cancelled, failed, expired), opaque App Server handle, browser login URL, device-code verification URI and user code, expiration, last poll timestamp, and structured failure metadata, with active-attempt cancel-on-restart and best-effort remote cancel when the App Server is unreachable. Controller and UI plumbing for the new flows ship in the next tranche; the existing `AccountCodexAccountsController#destroy` disconnect button still works.
 - Per-user encrypted Codex account credential storage (`CodexAccount`) is wired in. The `codex_accounts` table belongs to a user (uniquely), tracks `auth_mode` (chatgpt_browser or chatgpt_device_code), `status`, displayed ChatGPT email, plan type, rate-limit snapshots, credential metadata, error state, and connection timestamps, and stores the credential payload in an Active Record encrypted column with non-deterministic encryption. A `CodexAccount#disconnect!` helper, the `AccountCodexAccountsController#destroy` action (`DELETE /account_codex_account`), and a "Disconnect Codex account" button on the account settings page clear the encrypted credential, reset rate-limit/metadata snapshots, stamp `disconnected_at`, and record a `codex.disconnected` audit event. `Accounts::Exporter` now emits a `codex_account` payload with auth mode, status, displayed email, plan type, rate-limit snapshot, credential metadata key names, and timestamps, and never includes the encrypted credential body. Active Record encryption keys live in encrypted credentials; the test environment turns on `encrypt_fixtures` so encrypted columns survive fixture loads.
 - Lookup and history indexes exist for deck ownership, provider IDs and URLs, normalized card names, Scryfall oracle and printing IDs, analysis history, scorecard ownership, legality snapshots, and audit events.
 - Minitest is the primary test framework.
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
 - `.env.example`, `/up`, `/ready`, and an authenticated dashboard root route exist.
 
-No Codex App Server account-auth flow, deck import, collection import, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, or production configuration exists yet.
+No Codex App Server transport implementation (the JSON-RPC client boundary ships with a fail-closed `NullTransport`), Codex account-auth UI, deck import, collection import, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, or production configuration exists yet.
 
 GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
@@ -379,7 +380,7 @@ ideal-magic/
 - [x] Add email verification and password reset.
 - [x] Add account settings for display name, timezone, and preferred units.
 - [x] Add user profile fields needed for playgroup sessions, public display names, and private note attribution.
-- [ ] Add Codex App Server account login start, completion, cancel, logout, and account-read flows.
+- [x] Add Codex App Server account login start, completion, cancel, logout, and account-read flows.
 - [ ] Add Codex browser OAuth and device-code UX without collecting ChatGPT passwords.
 - [x] Add isolated Codex credential storage per user or serialized workflow stream.
 - [ ] Add per-user and global analysis quota controls backed by app policy and Codex rate-limit state.

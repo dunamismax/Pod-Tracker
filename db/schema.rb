@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_04_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_04_220000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -193,6 +193,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_210000) do
     t.index ["auth_mode"], name: "index_codex_accounts_on_auth_mode"
     t.index ["status"], name: "index_codex_accounts_on_status"
     t.index ["user_id"], name: "index_codex_accounts_on_user_id", unique: true
+  end
+
+  create_table "codex_login_attempts", force: :cascade do |t|
+    t.string "auth_mode", null: false
+    t.datetime "awaiting_user_at"
+    t.datetime "cancelled_at"
+    t.datetime "completed_at"
+    t.datetime "created_at", null: false
+    t.datetime "expires_at"
+    t.string "external_handle"
+    t.datetime "failed_at"
+    t.string "failure_code"
+    t.text "failure_message"
+    t.datetime "last_polled_at"
+    t.string "login_url"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "started_at", null: false
+    t.string "status", default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.string "user_code"
+    t.bigint "user_id", null: false
+    t.string "verification_uri"
+    t.index ["external_handle"], name: "index_codex_login_attempts_on_external_handle", unique: true, where: "(external_handle IS NOT NULL)"
+    t.index ["status"], name: "index_codex_login_attempts_on_status"
+    t.index ["user_id", "created_at"], name: "index_codex_login_attempts_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_codex_login_attempts_on_user_id"
   end
 
   create_table "commanders", force: :cascade do |t|
@@ -438,6 +464,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_210000) do
   add_foreign_key "card_tag_assignments", "card_tags"
   add_foreign_key "card_tag_assignments", "oracle_cards"
   add_foreign_key "codex_accounts", "users"
+  add_foreign_key "codex_login_attempts", "users"
   add_foreign_key "commanders", "card_printings"
   add_foreign_key "commanders", "decks"
   add_foreign_key "commanders", "oracle_cards"
