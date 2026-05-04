@@ -7,16 +7,36 @@ class DeckImportForm
   attribute :name, :string
   attribute :decklist, :string
   attribute :commander_hint, :string
+  attribute :decklist_file
 
-  validates :decklist, presence: { message: "is required" }
+  validate :decklist_or_file_present
   validate :decklist_size_within_limit
   validate :decklist_has_content_lines
+  validate :uploaded_file_size_within_limit
 
   def to_partial_path
     "decks/import_form"
   end
 
+  def upload_provided?
+    file = decklist_file
+    return false if file.blank?
+    return file.size.to_i.positive? if file.respond_to?(:size)
+
+    true
+  end
+
+  def pasted_text_provided?
+    decklist.present?
+  end
+
   private
+
+  def decklist_or_file_present
+    return if pasted_text_provided? || upload_provided?
+
+    errors.add(:decklist, "is required")
+  end
 
   def decklist_size_within_limit
     return if decklist.blank?
@@ -35,5 +55,13 @@ class DeckImportForm
     return if content_lines.any?
 
     errors.add(:decklist, "must contain at least one card line")
+  end
+
+  def uploaded_file_size_within_limit
+    return unless upload_provided?
+    return unless decklist_file.respond_to?(:size)
+    return if decklist_file.size.to_i <= MAX_DECKLIST_BYTES
+
+    errors.add(:decklist_file, "is too large (limit #{MAX_DECKLIST_BYTES / 1024} KB)")
   end
 end

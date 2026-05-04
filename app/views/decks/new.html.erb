@@ -4,11 +4,11 @@
   <div>
     <h1 class="text-2xl font-semibold text-white">Import a Commander deck</h1>
     <p class="mt-1 text-sm text-zinc-400">
-      Paste a decklist from any source. Use a <code class="rounded bg-zinc-800 px-1 text-xs">Commander</code> header for your commander, or pick one in the form below. Provider URL imports come later — for now, paste works.
+      Paste a decklist or upload a plain-text decklist file. Use a <code class="rounded bg-zinc-800 px-1 text-xs">Commander</code> header for your commander, or pick one in the form below. Provider URL imports come later — for now, paste or upload works.
     </p>
   </div>
 
-  <%= form_with model: @form, url: decks_path, scope: :deck_import_form, local: true, class: "space-y-5" do |form| %>
+  <%= form_with model: @form, url: decks_path, scope: :deck_import_form, local: true, multipart: true, class: "space-y-5" do |form| %>
     <% if @form.errors.any? %>
       <div class="rounded-md border border-red-800 bg-red-950/40 p-3 text-sm text-red-200">
         <ul class="list-disc pl-5">
@@ -30,7 +30,15 @@
     </div>
 
     <div>
-      <%= form.label :decklist, "Decklist", class: "block text-sm font-medium text-zinc-300" %>
+      <%= form.label :decklist_file, "Upload a decklist file (optional)", class: "block text-sm font-medium text-zinc-300" %>
+      <%= form.file_field :decklist_file, accept: ".txt,.text,.dec,.deck,.cod,.md,.markdown,.csv,text/plain", class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 file:mr-3 file:rounded file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-sm file:text-white file:hover:bg-zinc-700" %>
+      <p class="mt-1 text-xs text-zinc-500">
+        Plain text only, up to <%= DeckImportForm::MAX_DECKLIST_BYTES / 1024 %> KB. If you upload a file, it overrides any pasted text below.
+      </p>
+    </div>
+
+    <div>
+      <%= form.label :decklist, "Or paste a decklist", class: "block text-sm font-medium text-zinc-300" %>
       <%= form.text_area :decklist, rows: 18, class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm text-zinc-100", placeholder: "1 Sol Ring\n1 Arcane Signet\n..." %>
       <p class="mt-1 text-xs text-zinc-500">
         Lines like <code>1 Sol Ring</code> or <code>1 Sol Ring (CMM) 410</code>. Headers like <code>Commander</code>, <code>Mainboard</code>, or <code>Sideboard</code> route lines to the right pile.

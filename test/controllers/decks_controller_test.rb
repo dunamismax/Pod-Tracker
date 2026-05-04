@@ -64,6 +64,40 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
     assert_select "li", /required/i
   end
 
+  test "imports an uploaded text file" do
+    sign_in_as(@user)
+
+    upload = fixture_text_file("atraxa.txt", DECKLIST)
+
+    assert_difference -> { @user.decks.count } => 1,
+                      -> { AuditEvent.where(event_name: "deck.imported").count } => 1 do
+      post decks_path, params: {
+        deck_import_form: { decklist_file: upload, name: "Uploaded Atraxa" }
+      }
+    end
+
+    deck = @user.decks.order(:id).last
+    assert_redirected_to deck_path(deck)
+    assert_equal "Uploaded Atraxa", deck.name
+    assert_equal "text_file", deck.source_type
+    assert_equal "atraxa.txt", deck.import_metadata.dig("source_metadata", "filename")
+  end
+
+  test "rejects an uploaded file with an unsupported extension" do
+    sign_in_as(@user)
+
+    upload = fixture_text_file("deck.exe", DECKLIST, content_type: "application/octet-stream")
+
+    assert_no_difference -> { Deck.count } do
+      post decks_path, params: {
+        deck_import_form: { decklist_file: upload }
+      }
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "li", /Unsupported file extension/i
+  end
+
   test "rejects a decklist that has no commander" do
     sign_in_as(@user)
 
@@ -106,6 +140,14 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+    def fixture_text_file(name, content, content_type: "text/plain")
+      tempfile = Tempfile.new([ "deck", File.extname(name) ])
+      tempfile.binmode
+      tempfile.write(content)
+      tempfile.rewind
+      Rack::Test::UploadedFile.new(tempfile.path, content_type, original_filename: name)
+    end
 
     def create_deck_for(user, unparsed: [])
       deck = user.decks.create!(

@@ -84,5 +84,39 @@ module Decks
       assert result.success?, result.error_messages.inspect
       assert_includes result.deck.import_metadata["unparsed_lines"], "not a card line"
     end
+
+    test "imports an uploaded text file" do
+      file = uploaded_file(DECKLIST_WITH_HEADER, filename: "atraxa.txt", content_type: "text/plain")
+      result = Importer.import_text_file(user: @user, file: file)
+
+      assert result.success?, result.error_messages.inspect
+      assert_equal "text_file", result.deck.source_type
+      assert_equal "atraxa.txt", result.deck.import_metadata.dig("source_metadata", "filename")
+      assert_equal [ "Atraxa, Praetors' Voice" ], result.deck.commander_names
+      assert_equal 3, result.deck.deck_cards.where(board: "main").sum(:quantity)
+    end
+
+    test "import_text_file surfaces invalid file errors" do
+      file = uploaded_file("not a decklist", filename: "deck.exe", content_type: "application/octet-stream")
+      result = Importer.import_text_file(user: @user, file: file)
+
+      refute result.success?
+      assert_nil result.deck
+      assert_includes result.error_messages.join(" "), "Unsupported file extension"
+    end
+
+    private
+
+    def uploaded_file(content, filename:, content_type: "text/plain")
+      tempfile = Tempfile.new([ "deck", File.extname(filename) ])
+      tempfile.binmode
+      tempfile.write(content)
+      tempfile.rewind
+      ActionDispatch::Http::UploadedFile.new(
+        tempfile: tempfile,
+        filename: filename,
+        type: content_type
+      )
+    end
   end
 end

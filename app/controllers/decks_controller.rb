@@ -23,12 +23,22 @@ class DecksController < ApplicationController
       return
     end
 
-    result = Decks::Importer.import_pasted_text(
-      user: current_user,
-      payload: @form.decklist,
-      name: @form.name,
-      commander_hint: @form.commander_hint
-    )
+    result =
+      if @form.upload_provided?
+        Decks::Importer.import_text_file(
+          user: current_user,
+          file: @form.decklist_file,
+          name: @form.name,
+          commander_hint: @form.commander_hint
+        )
+      else
+        Decks::Importer.import_pasted_text(
+          user: current_user,
+          payload: @form.decklist,
+          name: @form.name,
+          commander_hint: @form.commander_hint
+        )
+      end
 
     if result.success?
       record_audit("deck.imported", deck: result.deck, parsed: result.parsed)
@@ -56,7 +66,7 @@ class DecksController < ApplicationController
     end
 
     def import_params
-      params.require(:deck_import_form).permit(:decklist, :name, :commander_hint)
+      params.require(:deck_import_form).permit(:decklist, :name, :commander_hint, :decklist_file)
     end
 
     def record_audit(name, deck:, parsed:)

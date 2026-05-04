@@ -16,6 +16,16 @@ module Decks
       )
     end
 
+    def self.import_text_file(user:, file:, name: nil, commander_hint: nil)
+      new.import(
+        user: user,
+        adapter: Adapters::TextFile.new,
+        payload: file,
+        name: name,
+        commander_hint: commander_hint
+      )
+    end
+
     def import(user:, adapter:, payload:, name: nil, commander_hint: nil)
       parsed = adapter.parse(payload)
       parsed_with_hint = apply_commander_hint(parsed, commander_hint)
@@ -30,6 +40,8 @@ module Decks
         deck.save!
       end
       Result.new(deck: deck, parsed: parsed_with_hint, error_messages: [])
+    rescue Adapters::TextFile::InvalidFile => e
+      Result.new(deck: nil, parsed: nil, error_messages: [ e.message ])
     rescue ActiveRecord::RecordInvalid => e
       Result.new(deck: nil, parsed: parsed, error_messages: Array(e.record&.errors&.full_messages || [ e.message ]))
     end
