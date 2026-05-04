@@ -1,7 +1,7 @@
 # BUILD.md
 
 Last drafted: 2026-05-03
-Last updated: 2026-05-04 (registration, account settings, email verification)
+Last updated: 2026-05-04 (account deletion and data export flows)
 
 ## Agent Operating Rules
 
@@ -39,7 +39,7 @@ The approved product direction:
 
 ## Current Repo Truth
 
-The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04, source-controlled representative Commander deck fixtures and a deterministic Commander legality engine completed on 2026-05-04, a Solid Queue card corpus refresh job completed on 2026-05-04, and the first Phase 3 tranche covering self-service registration, account profile fields, and email verification completed on 2026-05-04.
+The repo now contains a verified Rails foundation scaffolded on 2026-05-03, the first Phase 2 domain model tranche completed on 2026-05-04, the first Scryfall card corpus ingestion and normalization tranches completed on 2026-05-04, source-controlled Commander rules and banlist snapshot storage completed on 2026-05-04, a source-controlled internal card tag taxonomy with curated overrides for role, salt, and social-friction tags completed on 2026-05-04, source-controlled representative Commander deck fixtures and a deterministic Commander legality engine completed on 2026-05-04, a Solid Queue card corpus refresh job completed on 2026-05-04, the first Phase 3 tranche covering self-service registration, account profile fields, and email verification completed on 2026-05-04, and an account deletion and JSON data export tranche completed on 2026-05-04.
 
 Shipped foundation:
 
@@ -56,12 +56,13 @@ Shipped foundation:
 - A deterministic Commander legality engine (`CommanderFormat::LegalityChecker`) evaluates deck size, commander count, banlist membership against the loaded `LegalitySnapshot`, singleton rules with basic-land and card-text exemptions (Relentless Rats, Rat Colony, Shadowborn Apostle, Persistent Petitioners, Dragon's Approach, Slime Against Humanity, Hare Apparent, Templar Knight, Seven Dwarves, Nazgul), commander type-line requirements, and color-identity violations, returning structured issues with severity, code, and JSON-serializable summaries suitable for analysis-run snapshots. Oracle-backed checks degrade gracefully when oracle data is missing.
 - A Solid Queue background job (`Scryfall::CardCorpusRefreshJob`) wraps `Scryfall::BulkImporter` with bounded retries for rate-limit and transport errors, runs on a dedicated `card_corpus` queue, and is wired into `config/recurring.yml` for daily production refreshes.
 - Self-service email/password registration (`RegistrationsController`), an authenticated account settings page (`AccountsController`) for display name, timezone, and preferred units, and a tokenized email verification flow (`EmailVerificationsController`, `UserMailer#verify_email`) are wired up. The `users` table now carries `display_name`, `timezone`, `preferred_units`, `email_verified_at`, and `email_verification_sent_at`, with `User` validating email format and uniqueness, normalizing display name and email, and exposing `User#email_verified?` and `User#attribution_name`.
+- Account deletion (`AccountDeletionsController`) requires password re-confirmation, terminates the session, destroys the user with cascading delete of decks, deck cards, commanders, provider links, pod evaluations, and analysis runs, and records an `account.deleted` audit event whose `user_id` is nullified after the user is removed. Account export (`AccountExportsController`, `Accounts::Exporter`) returns a downloadable JSON file with the account profile, decks, deck cards, commanders, provider links, analysis runs and scorecards, pod evaluations, and audit events, and records an `account.exported` audit event. Both flows are linked from the account settings page.
 - Lookup and history indexes exist for deck ownership, provider IDs and URLs, normalized card names, Scryfall oracle and printing IDs, analysis history, scorecard ownership, legality snapshots, and audit events.
 - Minitest is the primary test framework.
 - Brakeman, RuboCop, ERB linting, bundler-audit, importmap audit, and `bin/verify` are wired.
 - `.env.example`, `/up`, `/ready`, and an authenticated dashboard root route exist.
 
-No Codex App Server account-auth flow, account deletion or data export, deck import, collection import, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, or production configuration exists yet.
+No Codex App Server account-auth flow, deck import, collection import, scoring engine, Codex evaluation pipeline, provider integration implementation, Docker Compose runtime, deployment files, pod comparison workflow, game-night sessions, matchup journal, meta analytics, PWA offline behavior, or production configuration exists yet.
 
 GitHub repository visibility was verified as public on 2026-05-03 through `gh repo view dunamismax/ideal-magic`. No license file exists; licensing is explicitly pending.
 
@@ -385,8 +386,8 @@ ideal-magic/
 - [ ] Add per-user and global analysis quota controls backed by app policy and Codex rate-limit state.
 - [ ] Add visible rate-limit and expected runtime guidance before expensive analysis.
 - [ ] Add model, rate-limit, token-usage-if-reported, and latency tracking per analysis run.
-- [ ] Add account deletion and data export flows.
-- [ ] Ensure account export includes decks, analyses, collection records, sessions created by the user, matchup notes, and audit metadata that belongs to the account.
+- [x] Add account deletion and data export flows.
+- [ ] Ensure account export includes decks, analyses, collection records, sessions created by the user, matchup notes, and audit metadata that belongs to the account. (Decks, analysis runs, pod evaluations, and audit events are wired; collection records, game-night sessions, and matchup notes are added when those domains land.)
 - [ ] Add provider account link placeholders without requesting third-party passwords.
 - [ ] Add token-cache deletion and auth disconnect flows that clear local Codex credentials.
 
