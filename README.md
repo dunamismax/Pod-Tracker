@@ -13,7 +13,7 @@ Live at [ideal-magic.com](https://ideal-magic.com). The bracket guide, Game Chan
 - **Sub-band it honestly** with six 0–10 axes — Power, Speed, Interaction, Consistency, Salt, and Social Friction — that explain *where inside* a bracket the deck sits.
 - **See your collection** mapped against every deck so you know what you already own, what you're missing, and which cards your library is hungry for.
 - **Compare pods** of 2 to 4 decks before a game starts, get the bracket spread, and produce a copy-pasteable Rule 0 brief.
-- **Run game nights** with player check-in, deck registration, pod seating, and result recording.
+- **Run game nights** with player check-in and deck registration; pod seating and result recording are the next layer.
 - **Keep a matchup journal** tied to decks, commanders, opponents, pods, and sessions.
 - **Watch your meta** evolve over time across decks, commanders, players, win conditions, and friction.
 - **Get tuning advice** that uses the cards you actually own and the games you actually played.
@@ -60,7 +60,7 @@ Full rubric: [docs/analysis-rubric.md](docs/analysis-rubric.md).
 
 ## Status
 
-Ideal Magic is in active build and runs live at [ideal-magic.com](https://ideal-magic.com) so the product can be iterated against the real domain. The Rails foundation, card corpus pipeline, Commander legality engine, account system, and the self-hosted deployment shape are in place. Deck import, scoring, AI evaluation, pods, sessions, the matchup journal, meta analytics, and the PWA shell are still being built.
+Ideal Magic is in active build and runs live at [ideal-magic.com](https://ideal-magic.com) so the product can be iterated against the real domain. The Rails foundation, card corpus pipeline, Commander legality engine, account system, deck import, deterministic scoring, pods, game-night session check-in, and the self-hosted deployment shape are in place. AI evaluation, pod seating/results, the matchup journal, meta analytics, and the PWA shell are still being built.
 
 Build sequencing and current repo truth live in [BUILD.md](BUILD.md). Operational runbook for the live deployment lives in [docs/deployment.md](docs/deployment.md).
 

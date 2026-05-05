@@ -1,0 +1,61 @@
+<% content_for :title, @game_night.name %>
+
+<section class="space-y-6">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <p class="text-sm font-medium uppercase tracking-wide text-emerald-300">Game-night session</p>
+      <h1 class="mt-1 text-3xl font-semibold text-white"><%= @game_night.name %></h1>
+      <p class="mt-2 text-sm text-zinc-400">
+        <%= @game_night.played_on.to_fs(:long) %>
+        <% if @game_night.location.present? %>
+          · <%= @game_night.location %>
+        <% end %>
+      </p>
+    </div>
+    <%= button_to "Remove session", game_night_path(@game_night), method: :delete,
+                  form: { data: { turbo_confirm: "Remove this session and its check-ins?" } },
+                  class: "rounded-md border border-red-900 px-3 py-2 text-sm font-medium text-red-200 hover:bg-red-950/50" %>
+  </div>
+
+  <% if @game_night.notes.present? %>
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <h2 class="text-sm font-medium text-zinc-300">Notes</h2>
+      <p class="mt-2 whitespace-pre-line text-sm leading-6 text-zinc-400"><%= @game_night.notes %></p>
+    </div>
+  <% end %>
+
+  <div class="rounded-lg border border-zinc-800 bg-zinc-900">
+    <div class="border-b border-zinc-800 px-5 py-4">
+      <h2 class="text-lg font-medium text-white">Checked-in players</h2>
+      <p class="mt-1 text-sm text-zinc-500">Deck snapshots preserve what each player brought before later edits change a deck.</p>
+    </div>
+    <ul class="divide-y divide-zinc-800">
+      <% @checked_in.each do |check_in| %>
+        <% night_deck = @decks_by_player_id[check_in.player_id] %>
+        <li class="px-5 py-4">
+          <div class="flex flex-wrap items-baseline justify-between gap-4">
+            <div>
+              <p class="text-base font-medium text-white"><%= check_in.player.name %></p>
+              <% if night_deck %>
+                <p class="mt-1 text-sm text-zinc-400">
+                  <%= link_to night_deck.deck_name_snapshot, deck_path(night_deck.deck), class: "text-emerald-300 hover:text-emerald-200" %>
+                  <% if night_deck.commander_names_snapshot.present? %>
+                    · <%= night_deck.commander_names_snapshot.join(", ") %>
+                  <% end %>
+                </p>
+              <% end %>
+            </div>
+            <span class="text-xs uppercase tracking-wide text-zinc-500">Seat <%= check_in.position %></span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+
+  <div class="rounded-lg border border-dashed border-zinc-800 bg-zinc-950 p-5">
+    <h2 class="text-sm font-medium text-zinc-300">Next in this slice</h2>
+    <p class="mt-2 text-sm leading-6 text-zinc-500">
+      Pod seating, result recording, and analysis snapshots will build on this checked-in roster.
+    </p>
+  </div>
+</section>

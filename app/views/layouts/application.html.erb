@@ -77,10 +77,17 @@
         <% end %>
 
         <nav class="hidden items-center gap-5 text-sm text-zinc-300 sm:flex">
-          <%= link_to "Brackets", brackets_path, class: "hover:text-white" %>
-          <%= link_to "Game Changers", game_changers_path, class: "hover:text-white" %>
-          <%= link_to "Pregame template", pregame_template_path, class: "hover:text-white" %>
-          <%= link_to "About", about_path, class: "hover:text-white" %>
+          <% if authenticated? %>
+            <%= link_to "Decks", decks_path, class: "hover:text-white" %>
+            <%= link_to "Pods", pods_path, class: "hover:text-white" %>
+            <%= link_to "Sessions", game_nights_path, class: "hover:text-white" %>
+            <%= link_to "Site", root_path, class: "hover:text-white" %>
+          <% else %>
+            <%= link_to "Brackets", brackets_path, class: "hover:text-white" %>
+            <%= link_to "Game Changers", game_changers_path, class: "hover:text-white" %>
+            <%= link_to "Pregame template", pregame_template_path, class: "hover:text-white" %>
+            <%= link_to "About", about_path, class: "hover:text-white" %>
+          <% end %>
         </nav>
 
         <div class="flex items-center gap-2 text-sm">

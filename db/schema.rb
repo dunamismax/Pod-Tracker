@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_05_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_05_121000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -290,6 +290,89 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_110000) do
     t.index ["visibility"], name: "index_decks_on_visibility"
   end
 
+  create_table "game_night_decks", force: :cascade do |t|
+    t.string "commander_names_snapshot", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.bigint "deck_id", null: false
+    t.string "deck_name_snapshot", null: false
+    t.bigint "game_night_id", null: false
+    t.text "notes"
+    t.bigint "player_id", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["deck_id"], name: "index_game_night_decks_on_deck_id"
+    t.index ["game_night_id", "deck_id"], name: "index_game_night_decks_on_game_night_id_and_deck_id"
+    t.index ["game_night_id", "player_id"], name: "index_game_night_decks_on_game_night_id_and_player_id", unique: true
+    t.index ["game_night_id", "position"], name: "index_game_night_decks_on_game_night_id_and_position", unique: true
+    t.index ["game_night_id"], name: "index_game_night_decks_on_game_night_id"
+    t.index ["player_id"], name: "index_game_night_decks_on_player_id"
+  end
+
+  create_table "game_night_players", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "game_night_id", null: false
+    t.text "notes"
+    t.bigint "player_id", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_night_id", "player_id"], name: "index_game_night_players_on_game_night_id_and_player_id", unique: true
+    t.index ["game_night_id", "position"], name: "index_game_night_players_on_game_night_id_and_position", unique: true
+    t.index ["game_night_id"], name: "index_game_night_players_on_game_night_id"
+    t.index ["player_id"], name: "index_game_night_players_on_player_id"
+  end
+
+  create_table "game_night_pod_results", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.boolean "draw", default: false, null: false
+    t.bigint "game_night_id", null: false
+    t.text "notes"
+    t.integer "pod_number", null: false
+    t.integer "turns"
+    t.datetime "updated_at", null: false
+    t.string "win_condition"
+    t.bigint "winner_player_id"
+    t.index ["game_night_id", "pod_number"], name: "index_game_night_pod_results_on_game_night_id_and_pod_number", unique: true
+    t.index ["game_night_id"], name: "index_game_night_pod_results_on_game_night_id"
+    t.index ["winner_player_id"], name: "index_game_night_pod_results_on_winner_player_id"
+  end
+
+  create_table "game_night_pod_seats", force: :cascade do |t|
+    t.bigint "analysis_run_id"
+    t.jsonb "analysis_snapshot", default: {}, null: false
+    t.string "commander_names_snapshot", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.bigint "deck_id", null: false
+    t.string "deck_name_snapshot", null: false
+    t.bigint "game_night_id", null: false
+    t.text "notes"
+    t.bigint "player_id", null: false
+    t.integer "pod_number", null: false
+    t.integer "seat_number", null: false
+    t.datetime "updated_at", null: false
+    t.index ["analysis_run_id"], name: "index_game_night_pod_seats_on_analysis_run_id"
+    t.index ["deck_id"], name: "index_game_night_pod_seats_on_deck_id"
+    t.index ["game_night_id", "deck_id"], name: "index_game_night_pod_seats_on_game_night_id_and_deck_id"
+    t.index ["game_night_id", "player_id"], name: "index_game_night_pod_seats_on_game_night_id_and_player_id", unique: true
+    t.index ["game_night_id", "pod_number", "seat_number"], name: "idx_game_night_pod_seats_on_pod_and_seat", unique: true
+    t.index ["game_night_id"], name: "index_game_night_pod_seats_on_game_night_id"
+    t.index ["player_id"], name: "index_game_night_pod_seats_on_player_id"
+  end
+
+  create_table "game_nights", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "location"
+    t.string "name", null: false
+    t.text "notes"
+    t.date "played_on", null: false
+    t.string "status", default: "draft", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["status"], name: "index_game_nights_on_status"
+    t.index ["user_id", "played_on"], name: "index_game_nights_on_user_id_and_played_on"
+    t.index ["user_id", "updated_at"], name: "index_game_nights_on_user_id_and_updated_at"
+    t.index ["user_id"], name: "index_game_nights_on_user_id"
+  end
+
   create_table "legality_snapshots", force: :cascade do |t|
     t.string "banned_names", default: [], null: false, array: true
     t.string "banned_normalized_names", default: [], null: false, array: true
@@ -340,6 +423,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_110000) do
     t.index ["name"], name: "index_oracle_cards_on_name"
     t.index ["normalized_name"], name: "index_oracle_cards_on_normalized_name"
     t.index ["scryfall_oracle_id"], name: "index_oracle_cards_on_scryfall_oracle_id", unique: true
+  end
+
+  create_table "players", force: :cascade do |t|
+    t.datetime "archived_at"
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.string "normalized_name", null: false
+    t.text "notes"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id", "normalized_name"], name: "index_players_on_user_id_and_normalized_name", unique: true
+    t.index ["user_id"], name: "index_players_on_user_id"
   end
 
   create_table "pod_analysis_runs", force: :cascade do |t|
@@ -530,6 +625,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_110000) do
   add_foreign_key "deck_cards", "oracle_cards"
   add_foreign_key "decks", "pods", column: "guest_for_pod_id"
   add_foreign_key "decks", "users"
+  add_foreign_key "game_night_decks", "decks"
+  add_foreign_key "game_night_decks", "game_nights"
+  add_foreign_key "game_night_decks", "players"
+  add_foreign_key "game_night_players", "game_nights"
+  add_foreign_key "game_night_players", "players"
+  add_foreign_key "game_night_pod_results", "game_nights"
+  add_foreign_key "game_night_pod_results", "players", column: "winner_player_id"
+  add_foreign_key "game_night_pod_seats", "analysis_runs"
+  add_foreign_key "game_night_pod_seats", "decks"
+  add_foreign_key "game_night_pod_seats", "game_nights"
+  add_foreign_key "game_night_pod_seats", "players"
+  add_foreign_key "game_nights", "users"
+  add_foreign_key "players", "users"
   add_foreign_key "pod_analysis_runs", "pods"
   add_foreign_key "pod_analysis_runs", "users"
   add_foreign_key "pod_slots", "decks"

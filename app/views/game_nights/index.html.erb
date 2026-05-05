@@ -1,0 +1,39 @@
+<% content_for :title, "Sessions" %>
+
+<section class="space-y-6">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-white">Game-night sessions</h1>
+      <p class="mt-1 text-sm text-zinc-400">
+        Check players in with their decks of the night. Seating, results, and matchup history build from this record.
+      </p>
+    </div>
+    <%= link_to "Start a session", new_game_night_path, class: "rounded-md bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
+  </div>
+
+  <% if @game_nights.empty? %>
+    <div class="rounded-lg border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center">
+      <p class="text-sm text-zinc-400">No sessions yet. Start one when players arrive for Commander night.</p>
+    </div>
+  <% else %>
+    <ul class="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+      <% @game_nights.each do |game_night| %>
+        <li class="px-5 py-4">
+          <div class="flex flex-wrap items-baseline justify-between gap-4">
+            <div>
+              <%= link_to game_night.name, game_night_path(game_night), class: "text-base font-medium text-emerald-300 hover:text-emerald-200" %>
+              <p class="mt-1 text-xs text-zinc-500">
+                <%= game_night.played_on.to_fs(:long) %>
+                <% if game_night.location.present? %>
+                  · <%= game_night.location %>
+                <% end %>
+                · <%= pluralize(game_night.checked_in_count, "player") %>
+              </p>
+            </div>
+            <span class="text-xs uppercase tracking-wide text-zinc-500"><%= game_night.status %></span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>
