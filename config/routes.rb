@@ -38,6 +38,7 @@ Rails.application.routes.draw do
   get "about", to: "public#about", as: :about
   get "privacy", to: "public#privacy", as: :privacy
   get "terms", to: "public#terms", as: :terms
+  get "sitemap.xml", to: "public#sitemap", as: :sitemap, defaults: { format: :xml }
 
   # Authenticated app dashboard — root resolves to it for signed-in users via
   # PublicController#home, which renders the marketing landing for guests.

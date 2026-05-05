@@ -29,7 +29,27 @@ class PublicController < ApplicationController
   def terms
   end
 
+  def sitemap
+    @entries = sitemap_entries
+    respond_to do |format|
+      format.xml
+    end
+  end
+
   private
+
+  def sitemap_entries
+    today = Date.current.iso8601
+    [
+      { loc: root_url, changefreq: "weekly", priority: "1.0", lastmod: today },
+      { loc: brackets_url, changefreq: "monthly", priority: "0.9", lastmod: today },
+      { loc: game_changers_url, changefreq: "monthly", priority: "0.8", lastmod: today },
+      { loc: pregame_template_url, changefreq: "monthly", priority: "0.8", lastmod: today },
+      { loc: about_url, changefreq: "yearly", priority: "0.4", lastmod: today },
+      { loc: privacy_url, changefreq: "yearly", priority: "0.2", lastmod: today },
+      { loc: terms_url, changefreq: "yearly", priority: "0.2", lastmod: today }
+    ]
+  end
 
   def load_brackets_catalog
     JSON.parse(File.read(Rails.root.join("db/seeds/commander/brackets/game_changers.json")))

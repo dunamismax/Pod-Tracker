@@ -39,4 +39,38 @@ class PublicControllerTest < ActionDispatch::IntegrationTest
     get brackets_path
     assert_response :success
   end
+
+  test "the public layout emits the site-wide JSON-LD graph" do
+    get root_path
+    assert_response :success
+    assert_select "script[type='application/ld+json']", minimum: 1
+    assert_match %r{"@type":\s*"Organization"}, response.body
+    assert_match %r{"@type":\s*"WebSite"}, response.body
+  end
+
+  test "the brackets page emits Article and BreadcrumbList structured data" do
+    get brackets_path
+    assert_response :success
+    assert_match %r{"@type":\s*"Article"}, response.body
+    assert_match %r{"@type":\s*"BreadcrumbList"}, response.body
+  end
+
+  test "every public page declares a canonical link" do
+    [ root_path, brackets_path, game_changers_path, pregame_template_path,
+      about_path, privacy_path, terms_path ].each do |path|
+      get path
+      assert_response :success, "expected #{path} to render"
+      assert_select "link[rel='canonical']", count: 1
+    end
+  end
+
+  test "the sitemap renders the public marketing URLs as XML" do
+    get sitemap_path
+    assert_response :success
+    assert_equal "application/xml", response.media_type
+    assert_match %r{<urlset}, response.body
+    assert_match Regexp.new(Regexp.escape(brackets_url)), response.body
+    assert_match Regexp.new(Regexp.escape(game_changers_url)), response.body
+    assert_match Regexp.new(Regexp.escape(pregame_template_url)), response.body
+  end
 end

@@ -25,8 +25,43 @@
 
     <link rel="icon" href="/icon.png" type="image/png">
     <link rel="apple-touch-icon" href="/icon.png">
-    <meta property="og:image" content="<%= request.protocol %><%= request.host_with_port %>/hero-screens.png">
+    <% canonical_url = (content_for(:canonical_url).presence || request.original_url) %>
+    <link rel="canonical" href="<%= canonical_url %>">
+    <meta property="og:url" content="<%= canonical_url %>">
+    <% og_image = "#{request.protocol}#{request.host_with_port}/hero-screens.png" %>
+    <meta property="og:image" content="<%= og_image %>">
+    <meta property="og:image:alt" content="Ideal Magic — Commander Brackets, six-axis sub-band, and Rule 0 pregame template">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<%= content_for(:title) || 'Ideal Magic' %>">
+    <% if content_for?(:meta_description) %>
+      <meta name="twitter:description" content="<%= strip_tags(content_for(:meta_description)) %>">
+    <% else %>
+      <meta name="twitter:description" content="Ideal Magic — the serious Commander companion. Bracket-aware deck and pod analysis, source-backed, evidence-first.">
+    <% end %>
+    <meta name="twitter:image" content="<%= og_image %>">
+    <% site_origin = "#{request.protocol}#{request.host_with_port}" %>
+    <%= jsonld_tag(
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "#{site_origin}/#organization",
+          "name": "Ideal Magic",
+          "url": "#{site_origin}/",
+          "logo": "#{site_origin}/icon.png",
+          "sameAs": [ "https://github.com/dunamismax/ideal-magic" ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "#{site_origin}/#website",
+          "url": "#{site_origin}/",
+          "name": "Ideal Magic",
+          "description": "Bracket-aware Commander companion: deterministic deck analysis, pod Rule 0 briefs, evidence-first scoring.",
+          "publisher": { "@id": "#{site_origin}/#organization" }
+        }
+      ]
+    ) %>
+    <%= content_for(:jsonld_extra) %>
 
     <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>

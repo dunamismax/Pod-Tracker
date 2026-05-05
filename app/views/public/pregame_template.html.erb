@@ -1,5 +1,15 @@
 <% content_for :title, "Pregame template — Rule 0 the bracket way" %>
 <% content_for :meta_description, "A copy-pasteable pregame template that replaces 'my deck is a 7' with the actual features that determine a Commander game: bracket, Game Changers, mass land denial, extra turns, two-card combos, win conditions, expected turn." %>
+<% site_origin = "#{request.protocol}#{request.host_with_port}" %>
+<% content_for :jsonld_extra, jsonld_tag(
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Ideal Magic", "item": "#{site_origin}/" },
+    { "@type": "ListItem", "position": 2, "name": "Commander Brackets", "item": "#{site_origin}#{brackets_path}" },
+    { "@type": "ListItem", "position": 3, "name": "Pregame template" }
+  ]
+) %>
 
 <article class="space-y-8">
   <header class="space-y-3">

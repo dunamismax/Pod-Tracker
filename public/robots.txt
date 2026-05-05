@@ -1,1 +1,16 @@
 # See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
+User-agent: *
+Allow: /
+Disallow: /session
+Disallow: /sessions
+Disallow: /registration
+Disallow: /account
+Disallow: /accounts
+Disallow: /decks
+Disallow: /pods
+Disallow: /app
+Disallow: /passwords
+Disallow: /email_verifications
+Disallow: /p/
+
+Sitemap: https://ideal-magic.com/sitemap.xml

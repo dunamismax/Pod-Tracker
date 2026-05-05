@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-05 (Slice 2 — guest deck slot in pods via paste / public URL)
+Last updated: 2026-05-05 (Slice 3 — public-site SEO baseline + docs/public-site.md)
 
 ## How agents work this file
 
@@ -129,7 +129,7 @@ The site no longer redirects every visitor to `/session/new`. Public surface liv
 - [x] `/brackets/pregame-template` — the copy-pasteable pregame Rule 0 template with worked examples (Bracket 1 Weatherlight Crew, Bracket 2 Ghyrson Starn, Bracket 3 Voja, Bracket 4 Pantlaza, Bracket 5 Thoracle).
 - [x] `/about` — what Ideal Magic is, who builds it, fan-content disclaimer, link to GitHub.
 - [x] `/privacy` and `/terms` so footer links resolve.
-- [~] Meta tags + Open Graph on every public page so shared links render well. (Per-page `meta_description` + `og:title`/`og:description`/`og:site_name` shipped; `og:image`, full `twitter:` cards, sitemap, and structured data still open.)
+- [x] Meta tags + Open Graph on every public page so shared links render well. Per-page `meta_description`, `og:title`/`og:description`/`og:site_name`/`og:url`/`og:image`/`og:image:alt`, full `twitter:` cards (`twitter:title`/`twitter:description`/`twitter:image`), `<link rel="canonical">`, site-wide `Organization` + `WebSite` JSON-LD, `BreadcrumbList` on the bracket sub-pages, `Article` on `/brackets`, plus `/sitemap.xml` and a sitemap-aware `robots.txt`.
 - [x] Tests: request specs for every public page; assert no auth redirect, assert canonical content present.
 
 #### Auth gating + navigation
@@ -144,7 +144,7 @@ The site no longer redirects every visitor to `/session/new`. Public surface liv
 - [x] Update `docs/analysis-rubric.md`: replace 0–100 power band table with the bracket framing; document brackets as the primary axis and the six 0–10 axes as sub-band evidence.
 - [x] Update `README.md`: lead with brackets, demote 0–10 power language. Mention the public site surface.
 - [x] Confirm fan-content notice appears on the public marketing footer.
-- [ ] Add `docs/public-site.md` covering routes, layout, content edit workflow, and SEO baseline.
+- [x] Add `docs/public-site.md` covering routes, layout, content edit workflow, and SEO baseline.
 
 ---
 
@@ -217,6 +217,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-05 — Slice 3 SEO + docs: full Twitter cards, per-page canonical links, site-wide `Organization` + `WebSite` JSON-LD via `ApplicationHelper#jsonld_tag`, `Article` + `BreadcrumbList` JSON-LD on bracket pages, `/sitemap.xml` route + view, sitemap-aware `robots.txt`, and a new `docs/public-site.md` covering routes, content workflow, and SEO baseline.
 - 2026-05-05 — Slice 2 closed: pods now accept one guest deck via pasted decklist or public Archidekt / Moxfield URL. Guest decks attach to the pod (user_id=nil, guest_for_pod_id=pod.id), are analyzed inline, surface in the Rule 0 brief, and are destroyed when the pod is removed. Added `decks.guest_for_pod_id` reference column, `Pod#guest_decks` cascade, `PodForm` guest fields, and pod-controller + form-test coverage for paste / Archidekt-URL / multi-source / unparseable-decklist cases.
 - 2026-05-05 — Slice 3 follow-up: refreshed the legality snapshot to the 2026-02-09 banlist (Biorhythm unbanned, Lutri removed since Commander format does not assign companions), added a Tymna + Thrasios Thoracle/Consultation cEDH fixture that locks in Bracket 5 in `BenchmarkScoringTest`, and added bracket-aware `Pods::AnalyzerTest` cases (mismatched 2→5 four-pod produces `bracket_mismatch` alert; balanced Bracket 2 three-pod produces a single-bracket headline).
 - 2026-05-05 — Slice 3 opened: Commander Brackets (1–5) added as the primary deck-intent axis alongside the existing six axes; canonical Game Changers list, bracket evaluator service, deck/pod show pages surfacing the bracket badge + restrictions, and a public marketing surface (no-login landing + `/brackets` long-form explanation, About, Privacy, Terms). 0–10 axes are kept as sub-band evidence.
