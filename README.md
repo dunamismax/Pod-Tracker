@@ -1,22 +1,33 @@
 # Ideal Magic
 
-The serious Commander companion: import a deck, get an honest read on it, build pods that actually feel fair, remember every game night, and turn your real playgroup into useful tuning advice.
+The serious Commander companion: import a deck, get an honest read on it under Wizards' official Commander Brackets system, build pods that actually feel fair, remember every game night, and turn your real playgroup into useful tuning advice.
 
-Ideal Magic is a web app for Magic: The Gathering Commander players who want more than a power level guess. It scores decks from real evidence, compares pods before the cards hit the table, and remembers what happened the last time these commanders met.
+Ideal Magic is a web app for Magic: The Gathering Commander players who want more than a power level guess. It places decks on the official 1–5 Commander Brackets, scores them from real evidence, compares pods before the cards hit the table, and remembers what happened the last time these commanders met.
 
-Live at [ideal-magic.com](https://ideal-magic.com).
+Live at [ideal-magic.com](https://ideal-magic.com). The bracket guide, Game Changers list, and pregame template are public — no account needed to read them.
 
 ## What Ideal Magic Does
 
+- **Place a deck on the Commander Brackets** (1 Exhibition · 2 Core · 3 Upgraded · 4 Optimized · 5 cEDH) with the Game Changers, mass land denial, extra turns, and two-card combos that drove the call.
 - **Import a deck** by paste, text export, or public Archidekt / Moxfield URL.
-- **Score it honestly** on Power, Speed, Interaction, Consistency, Salt, and Social Friction — every score backed by the cards and patterns that drove it.
+- **Sub-band it honestly** with six 0–10 axes — Power, Speed, Interaction, Consistency, Salt, and Social Friction — that explain *where inside* a bracket the deck sits.
 - **See your collection** mapped against every deck so you know what you already own, what you're missing, and which cards your library is hungry for.
-- **Compare pods** of 2 to 4 decks before a game starts and produce a Rule 0 brief.
+- **Compare pods** of 2 to 4 decks before a game starts, get the bracket spread, and produce a copy-pasteable Rule 0 brief.
 - **Run game nights** with player check-in, deck registration, pod seating, and result recording.
 - **Keep a matchup journal** tied to decks, commanders, opponents, pods, and sessions.
 - **Watch your meta** evolve over time across decks, commanders, players, win conditions, and friction.
 - **Get tuning advice** that uses the cards you actually own and the games you actually played.
 - **Install as a PWA** on phone, tablet, or desktop and use it at the table.
+
+## Public Surface
+
+You can read the bracket guide and reference pages without an account:
+
+- [`/brackets`](https://ideal-magic.com/brackets) — the long-form Commander Brackets explanation.
+- [`/brackets/game-changers`](https://ideal-magic.com/brackets/game-changers) — the canonical Game Changers list, grouped by play pattern.
+- [`/brackets/pregame-template`](https://ideal-magic.com/brackets/pregame-template) — the Rule 0 template with worked examples.
+
+Importing decks, building pods, and running analysis still require an account.
 
 ## Why It's Different
 
@@ -28,9 +39,11 @@ Live at [ideal-magic.com](https://ideal-magic.com).
 - **Source-backed facts.** Card data and Commander legality come from deterministic sources, never model guesses.
 - **Self-hostable and inspectable.** Owned by the person who runs it.
 
-## Core Scores
+## How It Reads a Deck
 
-Every analysis surfaces six scores, each with confidence, evidence, and suggested improvements:
+The headline output is a **Commander Bracket** placement (1–5) plus a sub-band (`low`, `mid`, `high`) inside that bracket. The bracket call is deterministic, runs against a source-controlled Game Changers catalog and two-card-combo list, and surfaces the cards that drove the placement.
+
+The six 0–10 axes sub-band the bracket — they explain whether a Bracket 3 deck sits at the low end (close to Bracket 2) or pressing against Bracket 4:
 
 | Score | What it measures |
 | --- | --- |
@@ -41,7 +54,7 @@ Every analysis surfaces six scores, each with confidence, evidence, and suggeste
 | **Salt** | Likelihood of producing frustration at a typical table. |
 | **Social Friction** | How much Rule 0 conversation a deck or pod likely needs. |
 
-Pod evaluations also report Pod Fit — whether a set of decks is likely to produce a satisfying game together.
+Pod analysis aggregates bracket spread, GC count, and combo disclosures into a copy-pasteable Rule 0 brief.
 
 Full rubric: [docs/analysis-rubric.md](docs/analysis-rubric.md).
 

@@ -29,8 +29,9 @@ module Pods
         ensure_each_slot_analyzed(slot_payloads, slots)
 
         aggregates = AXES.index_with { |axis| aggregate_for(slot_payloads, axis) }
-        warnings = Pods::WarningGenerator.new.call(slot_payloads, aggregates)
-        brief = Pods::RuleZeroBrief.new.call(slot_payloads, aggregates, warnings)
+        bracket_aggregate = bracket_aggregate_for(slot_payloads)
+        warnings = Pods::WarningGenerator.new.call(slot_payloads, aggregates, bracket_aggregate)
+        brief = Pods::RuleZeroBrief.new.call(slot_payloads, aggregates, warnings, bracket_aggregate)
         suggestions = Pods::SuggestionsBuilder.new.call(slot_payloads, aggregates, warnings)
 
         run.update!(
@@ -39,7 +40,8 @@ module Pods
           snapshot: {
             "rubric_version" => RUBRIC_VERSION,
             "slots" => slot_payloads,
-            "aggregates" => aggregates
+            "aggregates" => aggregates,
+            "bracket" => bracket_aggregate
           },
           rule_zero_brief: brief,
           warnings: warnings,
@@ -66,6 +68,9 @@ module Pods
         "label" => slot.label,
         "analysis_run_id" => run&.id,
         "scores" => sc ? scorecard_to_h(sc) : nil,
+        "bracket" => sc&.bracket,
+        "bracket_sub_band" => sc&.bracket_sub_band,
+        "bracket_payload" => sc&.bracket_payload || {},
         "feature_vector" => run&.feature_vector || {},
         "rubric_version" => run&.rubric_version
       }
@@ -81,9 +86,39 @@ module Pods
         sc = run&.scorecard
         payload["analysis_run_id"] = run&.id
         payload["scores"] = sc ? scorecard_to_h(sc) : nil
+        payload["bracket"] = sc&.bracket
+        payload["bracket_sub_band"] = sc&.bracket_sub_band
+        payload["bracket_payload"] = sc&.bracket_payload || {}
         payload["feature_vector"] = run&.feature_vector || {}
         payload["rubric_version"] = run&.rubric_version
       end
+    end
+
+    def bracket_aggregate_for(slot_payloads)
+      brackets = slot_payloads.map { |s| s["bracket"] }.compact
+      return { "min" => nil, "max" => nil, "spread" => nil, "distinct" => [], "headline" => "Bracket data unavailable" } if brackets.empty?
+
+      min = brackets.min
+      max = brackets.max
+      distinct = brackets.uniq.sort
+      gc_total = slot_payloads.sum { |s| Array(s.dig("bracket_payload", "game_changers")).size }
+
+      headline =
+        if min == max
+          meta = Decks::BracketEvaluator::BRACKETS[min]
+          "Pod is Bracket #{min} · #{meta['label']}"
+        else
+          "Mixed pod — Brackets #{min}–#{max}"
+        end
+
+      {
+        "min" => min,
+        "max" => max,
+        "spread" => max - min,
+        "distinct" => distinct,
+        "game_changer_total" => gc_total,
+        "headline" => headline
+      }
     end
 
     def scorecard_to_h(sc)

@@ -2,8 +2,9 @@ module Pods
   class WarningGenerator
     # Returns a list of warning hashes:
     #   { "kind" => ..., "severity" => "info|notice|alert", "message" => ..., "decks" => [{"deck_id", "deck_name"}] }
-    def call(slots, aggregates)
+    def call(slots, aggregates, bracket_aggregate = nil)
       warnings = []
+      warnings.concat(bracket_mismatch_warning(slots, bracket_aggregate)) if bracket_aggregate
       warnings.concat(archenemy_warnings(slots, aggregates))
       warnings.concat(pubstomp_warning(slots, aggregates))
       warnings.concat(durdle_warning(slots, aggregates))
@@ -14,6 +15,27 @@ module Pods
     end
 
     private
+
+    def bracket_mismatch_warning(slots, bracket_aggregate)
+      spread = bracket_aggregate["spread"].to_i
+      return [] if spread.zero? || bracket_aggregate["min"].nil?
+
+      severity = spread >= 2 ? "alert" : "notice"
+      message =
+        if spread >= 2
+          "Bracket spread of #{spread} (Brackets #{bracket_aggregate['min']}–#{bracket_aggregate['max']}). Slower decks will sit out of the game. Run a Rule 0 conversation before keeping hands."
+        else
+          "Bracket spread of 1 (Brackets #{bracket_aggregate['min']}–#{bracket_aggregate['max']}). Disclose Game Changers and combo lines so the pod knows what to expect."
+        end
+
+      hot_decks = slots.select { |s| s["bracket"] == bracket_aggregate["max"] }
+      [ {
+        "kind" => "bracket_mismatch",
+        "severity" => severity,
+        "message" => message,
+        "decks" => hot_decks.map { |s| { "deck_id" => s["deck_id"], "deck_name" => s["deck_name"] } }
+      } ]
+    end
 
     def archenemy_warnings(slots, aggregates)
       power = aggregates["power"]

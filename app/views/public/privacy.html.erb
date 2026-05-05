@@ -1,0 +1,38 @@
+<% content_for :title, "Privacy — Ideal Magic" %>
+<% content_for :meta_description, "Ideal Magic stores only what's required to run accounts, decks, and pods. No third-party trackers. Data is yours and is exportable." %>
+
+<article class="prose prose-invert max-w-none space-y-5">
+  <header class="space-y-2">
+    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Privacy</p>
+    <h1 class="text-3xl font-semibold text-white sm:text-4xl">Privacy</h1>
+  </header>
+
+  <p>Ideal Magic is run by one person and does not exist to monetize you. Here is what it stores, why, and how to remove it.</p>
+
+  <h2 class="text-xl font-semibold text-white">What we store</h2>
+  <ul class="list-disc pl-6">
+    <li><strong>Account fields:</strong> email address, hashed password, display name, timezone, preferred units, and an email-verification timestamp.</li>
+    <li><strong>Decks:</strong> the decklists you import or paste, their commander, source URLs you give us, and the deterministic analysis we compute from them.</li>
+    <li><strong>Pods:</strong> pods you build, the slots they contain, and the Rule 0 brief produced for them.</li>
+    <li><strong>Audit events:</strong> a log of import, deletion, and account-relevant actions tied to your account.</li>
+    <li><strong>Codex credentials</strong> (if you opt in to AI evaluation): encrypted account-auth tokens. Never logged, never rendered to the browser.</li>
+  </ul>
+
+  <h2 class="text-xl font-semibold text-white">What we don't do</h2>
+  <ul class="list-disc pl-6">
+    <li>No third-party trackers or advertising scripts.</li>
+    <li>No selling your data.</li>
+    <li>No sharing decklists, notes, or pod data with anyone except via opt-in revocable share links you create yourself.</li>
+    <li>No scraping authenticated provider data on your behalf.</li>
+  </ul>
+
+  <h2 class="text-xl font-semibold text-white">Your controls</h2>
+  <ul class="list-disc pl-6">
+    <li><strong>Export:</strong> Account → Export downloads a JSON dump of your account and decks.</li>
+    <li><strong>Delete:</strong> Account → Delete account removes your records on the next request cycle.</li>
+    <li><strong>Revoke shares:</strong> Pod share links can be revoked at any time from the pod page.</li>
+  </ul>
+
+  <h2 class="text-xl font-semibold text-white">Hosting</h2>
+  <p>Ideal Magic is hosted on infrastructure operated by the project owner. Database backups exist for disaster recovery. If the project shuts down, accounts are notified before data is deleted.</p>
+</article>

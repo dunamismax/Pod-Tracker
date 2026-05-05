@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-05 (Slice 2 first pass — pods of user decks, share links)
+Last updated: 2026-05-05 (Slice 3 opened — Commander Brackets system + public marketing site)
 
 ## How agents work this file
 
@@ -79,7 +79,76 @@ The biggest gap right now: a user imports a deck and only sees a card list. Make
 - [x] Public pod share link, opt-in, revocable.
 - [x] Tests: pod service tests across balanced and mismatched fixtures; system test for create → analyze → share.
 
-### Slice 3 — Game-night sessions and result recording
+### Slice 3 — Commander Brackets + public marketing site
+
+The 0–10 power scale was the v0 framing. The official Commander Brackets system (Wizards, beta-style, last updated 2026-02-09) replaces it as Ideal Magic's primary axis for deck intent and Rule 0 conversation. Brackets 1–5 (Exhibition, Core, Upgraded, Optimized, cEDH) carry restrictions, Game Changers, turn expectations, and a shared vocabulary that 1–10 never had.
+
+Power, speed, interaction, consistency, salt, and friction stay — they sub-band a deck *inside* its bracket (low-power Bracket 3 vs high-power Bracket 3, etc.) and explain Rule 0 friction.
+
+This slice also opens the site up: today every page demands a login. Going forward, ideal-magic.com has a public marketing surface (bracket education, About, FAQ, fan-content notice) that anyone can read without signing in. Pods, decks, sessions, and anything tied to a user account stay behind auth.
+
+The bracket pages should be the best-on-the-internet explanation of the system — long-form, screenshot-friendly, link-shareable, and grounded in the actual Wizards rules, not paraphrase. Treat the writing surface as a deliverable on par with the code.
+
+#### Bracket data + scoring
+
+- [x] Land the canonical Game Changers list (53 cards as of 2026-02-09, including Farewell + Biorhythm) as deterministic source data under `db/seeds/commander/brackets/`. Version it, refresh it on update, and key it by normalized card name.
+- [ ] Land the canonical Commander banned list refresh: confirm Biorhythm is unbanned, Lutri is companion-only-banned, and the legality snapshot reflects the current banlist.
+- [~] Tag the curated overrides for mass land denial, extra-turn cards, and known two-card combo halves. (Two-card combo catalog landed at `db/seeds/commander/brackets/two_card_combos.json`. MLD/extra-turn tags already live in `card_tags/overrides.json`. Wider combo coverage still open.)
+- [x] `Decks::BracketEvaluator` service: returns `{ bracket: 1..5, label, sub_band: "low|mid|high", expected_min_turn, restrictions: [...met/violated...], game_changers: [{name, category}], evidence, headline }` from a feature vector + decklist + scorecard.
+- [x] Bracket placement rules encode the published gates: Bracket 1 (no GCs, no MLD, no extra turns, no two-card game-enders, theme-first), Bracket 2 (no GCs, no MLD, no chained extra turns, no two-card game-enders), Bracket 3 (≤3 GCs, no MLD, no chained extra turns, no two-card combo before turn 6), Bracket 4 (banned list only, optimized, non-cEDH intent), Bracket 5 (cEDH metagame intent).
+- [x] Sub-band uses the existing power/speed scorecard plus combo compactness so a deck can read as "low-power Bracket 3" or "high-power Bracket 3" without re-bucketing into another bracket.
+- [x] Migration: add `bracket`, `bracket_sub_band`, `bracket_payload` to `scorecards`.
+- [x] `Decks::Analyzer` writes the bracket alongside the existing six scores. Bracket is the headline; the 1–10 axes become sub-band evidence.
+- [x] Tests: `BracketEvaluator` unit tests across the five fixture archetypes plus targeted cases (combo-only, MLD-only, single GC vs four GCs, chained extra turns vs single splashy turn).
+- [~] Update `Decks::BenchmarkScoringTest` to assert bracket placement. (Done for precon/casual/upgraded/high-power; a Bracket 5 cEDH fixture is still TBD.)
+
+#### Pod analysis with brackets
+
+- [x] `Pods::Analyzer` aggregates bracket spread across slots (min/max/distinct), plus existing axis aggregates.
+- [x] `Pods::WarningGenerator` adds a bracket-mismatch warning when slots span 2+ brackets, replacing/augmenting today's archenemy/pubstomp signals where bracket gap is the real story.
+- [x] `Pods::RuleZeroBrief` is rewritten around the bracket vocabulary: headline is the pod bracket (or "mixed Brackets X–Y"), expected minimum turn, GC count across the pod, MLD/extra-turn/combo disclosure prompts, and an explicit Rule 0 prompt template.
+- [x] Pod show page surfaces each slot's bracket badge, the pod bracket headline, and a copyable Rule 0 prompt formatted for pasting into Discord / chat.
+- [ ] Tests: pod analyzer asserts bracket spread + warning across mismatched fixtures; balanced pod produces a single bracket headline.
+
+#### Deck + pod UI
+
+- [x] Deck show page: bracket badge + "what this means" link, sub-band line, GC list (with categories), restrictions met/violated, expected minimum turn, 1–10 axes demoted to a collapsed "Sub-band evidence" section.
+- [x] Pod show page: pod bracket headline, per-slot bracket badges, copyable pregame template populated from the deck data.
+- [x] Public pod share page mirrors the same surface (read-only) — it renders the same `pods/_analysis.html.erb` partial.
+- [x] Mobile-first layout for badges + restrictions; the bracket reads in one glance from across the table.
+
+#### Public marketing site
+
+The site no longer redirects every visitor to `/session/new`. Public surface lives under a dedicated `PublicController` with the existing application layout, which now adapts its header and footer for signed-in vs anonymous visitors.
+
+- [~] Marketing layout — the existing `application.html.erb` was rewritten with a public-aware header (logo, nav, sign-in/sign-up vs Open-app CTAs) and a fan-content footer (GitHub, privacy, terms). A separate `layouts/marketing.html.erb` was not needed; if/when the marketing surface diverges further, split it.
+- [x] Routes: `root` resolves to `public#home` for everyone (signed-in users see the same page with an "Open app" CTA); the dashboard moved to `/app`. `Authentication#require_authentication` remains a global before-action with `allow_unauthenticated_access` opt-out per public controller.
+- [x] `/` — landing page: one-liner pitch, "what brackets are", how Ideal Magic uses them, primary CTAs (Read about brackets / Try the demo / Sign up), Game Changers + pregame template teasers.
+- [x] `/brackets` — the headline bracket explanation page. Long-form, written from the supplied source. Sections: what brackets are, the four axes, each bracket in depth (1 Exhibition through 5 cEDH) with mindset / restrictions / right-vs-wrong reasons, mass land denial, extra turns, two-card combos, tutors, the Game Changers list (rendered from the canonical data file with categories), the current banned list (rendered from the legality snapshot), classification decision tree, pregame template, common misclassifications, final summary table.
+- [x] `/brackets/game-changers` — dedicated page rendering the canonical GC list grouped by category.
+- [x] `/brackets/pregame-template` — the copy-pasteable pregame Rule 0 template with worked examples (Bracket 1 Weatherlight Crew, Bracket 2 Ghyrson Starn, Bracket 3 Voja, Bracket 4 Pantlaza, Bracket 5 Thoracle).
+- [x] `/about` — what Ideal Magic is, who builds it, fan-content disclaimer, link to GitHub.
+- [x] `/privacy` and `/terms` so footer links resolve.
+- [~] Meta tags + Open Graph on every public page so shared links render well. (Per-page `meta_description` + `og:title`/`og:description`/`og:site_name` shipped; `og:image`, full `twitter:` cards, sitemap, and structured data still open.)
+- [x] Tests: request specs for every public page; assert no auth redirect, assert canonical content present.
+
+#### Auth gating + navigation
+
+- [x] Public controllers (home, brackets, game changers, pregame template, about, privacy, terms) explicitly allow anonymous via `allow_unauthenticated_access`. The remaining controllers stay behind the global `require_authentication` before-action.
+- [x] Header shows "Sign in" / "Create account" when anonymous and "Open app" + "Sign out" when signed in.
+- [x] No auth-required page leaks user data into the public surface.
+- [ ] Optional: a "Site" link inside the authenticated app surface back to the public marketing surface. (Footer links cover this for now; revisit if signed-in users want to reach the bracket guide quickly.)
+
+#### Docs + content
+
+- [x] Update `docs/analysis-rubric.md`: replace 0–100 power band table with the bracket framing; document brackets as the primary axis and the six 0–10 axes as sub-band evidence.
+- [x] Update `README.md`: lead with brackets, demote 0–10 power language. Mention the public site surface.
+- [x] Confirm fan-content notice appears on the public marketing footer.
+- [ ] Add `docs/public-site.md` covering routes, layout, content edit workflow, and SEO baseline.
+
+---
+
+### Slice 4 — Game-night sessions and result recording
 
 - [ ] Session model: session, player, session_player, session_deck, pod_seat, pod_result. Players are user-owned named entities — no public ranking surface.
 - [ ] Create a session (date, location, notes) and check players in with their deck of the night.
@@ -89,7 +158,7 @@ The biggest gap right now: a user imports a deck and only sees a card list. Make
 - [ ] Session summary page with the night's pods, results, and links back to deck/analysis snapshots.
 - [ ] Tests: session workflow system test from create → check-in → seat → record → summary.
 
-### Slice 4 — Collection and ownership
+### Slice 5 — Collection and ownership
 
 - [ ] Collection model: collection_card, collection_import, unresolved_entry.
 - [ ] Pasted and uploaded collection import (text + simple CSV).
@@ -100,7 +169,7 @@ The biggest gap right now: a user imports a deck and only sees a card list. Make
 - [ ] Recommendations distinguish "you already own this" from "you'd have to buy it." No price/marketplace flow.
 - [ ] Tests: import parser, ownership service, system test for collection → deck gaps.
 
-### Slice 5 — Matchup journal and meta trends
+### Slice 6 — Matchup journal and meta trends
 
 - [ ] Matchup note model: belongs to user, links to deck, commander, opponent (player), pod, session. Tags + free text.
 - [ ] Note CRUD with search by tag, deck, commander, player, pod, session.
@@ -111,7 +180,7 @@ The biggest gap right now: a user imports a deck and only sees a card list. Make
 - [ ] Revision performance: connect deck revisions to results so "what changed since this deck last won" is answerable.
 - [ ] Tests: matchup search, meta service against fixture sessions.
 
-### Slice 6 — Codex AI evaluation as augmentation
+### Slice 7 — Codex AI evaluation as augmentation
 
 The v1 differentiator. Build it on top of deterministic analysis, not as a replacement.
 
@@ -124,7 +193,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 - [ ] Recorded-fixture tests for the prompt → response → schema validation path. No live calls in CI.
 - [ ] AI explanations render alongside deterministic evidence; the deterministic numbers stay visible.
 
-### Slice 7 — PWA and table-side polish
+### Slice 8 — PWA and table-side polish
 
 - [ ] Web app manifest, service worker, app-shell cache.
 - [ ] Recent decks and analyses cached for read-only offline access.
@@ -133,7 +202,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 - [ ] Mobile bottom nav, desktop sidebar nav, responsive deck-list controls (search, tag filter, role filter).
 - [ ] Honest offline states: never pretend AI runs, imports, or new results have reached the server while offline.
 
-### Slice 8 — Exports, share links, and operational polish
+### Slice 9 — Exports, share links, and operational polish
 
 - [ ] Deck export to plain text, CSV, and JSON from the deck show page.
 - [ ] Analysis export to Markdown and JSON.
@@ -148,6 +217,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-05 — Slice 3 opened: Commander Brackets (1–5) added as the primary deck-intent axis alongside the existing six axes; canonical Game Changers list, bracket evaluator service, deck/pod show pages surfacing the bracket badge + restrictions, and a public marketing surface (no-login landing + `/brackets` long-form explanation, About, Privacy, Terms). 0–10 axes are kept as sub-band evidence.
 - 2026-05-05 — Slice 2 first pass: pods of the user's existing decks. `Pod`, `PodSlot`, `PodAnalysisRun`, share-token surface, `Pods::Analyzer` (spread, average, outliers, archenemy/pubstomp/durdle/salt/friction warnings), `Pods::RuleZeroBrief`, `Pods::SuggestionsBuilder`, mobile + print pod show page, opt-in revocable `/p/:token` public share. Guest-deck slot via paste / public URL deferred.
 - 2026-05-05 — Slice 1 closed: precon (Korlash) and high-power (Najeela 5C) benchmark fixtures plus a `Decks::BenchmarkScoringTest` that asserts power, salt, friction, tutor, fast-mana, stax, and combo counts grow across the precon → casual → upgraded → high-power band.
 - 2026-05-05 — Slice 1 first pass: deterministic feature extractor, six-axis scorer, legality-gated `Decks::Analyzer`, deck-show evidence drawers, and importer hook. Benchmark-fixture pass and score-band calibration still open.
@@ -170,7 +240,7 @@ Newest first. One line per shipped tranche.
 
 Not agent tasks. They depend on real beta usage and real games:
 
-- Calibrate score bands against actual precon / casual / upgraded / high-power / cEDH decks once Slice 1 ships and Stephen + a small group can play with it.
+- Calibrate score bands and bracket placements against actual precon / casual / upgraded / high-power / cEDH decks once Slice 1 + Slice 3 ship and Stephen + a small group can play with it.
 - Tune the salt/social-friction taxonomy from observed playgroup feedback.
 - Run a closed beta of pod evaluation and session recording with Stephen's actual playgroup before declaring v1.
 - Decide whether passkeys/WebAuthn lands before or after v1 based on how often password-only auth becomes friction.
@@ -181,6 +251,7 @@ If real-world feedback changes the engineering picture, fold the result into a s
 
 - Scryfall asks for <10 req/s and bulk data for large workloads.
 - Commander rules + banlist live at mtgcommander.net. Latest official update visible on 2026-05-04 was the 2024-09-23 quarterly update.
+- Commander Brackets (beta) are a Wizards property. Latest official update referenced is 2026-02-09: Farewell + Biorhythm added to Game Changers, Biorhythm unbanned, Lutri remains companion-banned only. Re-check before shipping bracket-list changes.
 - Codex App Server account-auth endpoints at https://developers.openai.com/codex/app-server are the supported surface for v1 AI.
 - Archidekt has a publicly observable API for public decks but no formal docs — adapter may break.
 - Moxfield has public deck pages and a public API (`api2.moxfield.com/v3/decks/all/<slug>`) but no formal docs — same caveat.

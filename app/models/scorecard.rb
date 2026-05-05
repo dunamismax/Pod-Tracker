@@ -9,6 +9,9 @@ class Scorecard < ApplicationRecord
     social_friction_score
   ].freeze
 
+  BRACKETS = (1..5).to_a.freeze
+  SUB_BANDS = %w[low mid high].freeze
+
   belongs_to :analysis_run
 
   validates :analysis_run, uniqueness: true
@@ -20,4 +23,6 @@ class Scorecard < ApplicationRecord
     greater_than_or_equal_to: 0,
     less_than_or_equal_to: 100
   }, allow_nil: true)
+  validates :bracket, inclusion: { in: BRACKETS }, allow_nil: true
+  validates :bracket_sub_band, inclusion: { in: SUB_BANDS }, allow_nil: true
 end

@@ -77,6 +77,23 @@ module Decks
       assert_operator high_power.role_counts.fetch("fast_mana"), :>, upgraded.role_counts.fetch("fast_mana")
     end
 
+    test "benchmark fixtures land in the expected Commander Brackets" do
+      assert_equal 2, analyze("precon_korlash_mono_black").scorecard.bracket,
+        "a precon-shaped deck with no GCs should land in Bracket 2 (Core)"
+      assert_equal 2, analyze("krenko_goblin_tribal").scorecard.bracket,
+        "a casual goblin deck without GCs should land in Bracket 2"
+      assert_equal 2, analyze("mono_green_omnath_stompy").scorecard.bracket,
+        "casual stompy without GCs should land in Bracket 2"
+
+      upgraded = analyze("atraxa_superfriends_upgraded").scorecard
+      assert_includes [ 3, 4 ], upgraded.bracket,
+        "upgraded fixtures should land in Bracket 3 (or 4 if they pile on GCs)"
+
+      high_power = analyze("high_power_najeela_5c").scorecard
+      assert_includes [ 4, 5 ], high_power.bracket,
+        "high-power Najeela should land in Bracket 4 or 5"
+    end
+
     test "every benchmark fixture yields a scorecard whose values stay within 0..10" do
       %w[precon_korlash_mono_black krenko_goblin_tribal mono_green_omnath_stompy
          atraxa_superfriends_upgraded high_power_najeela_5c].each do |slug|

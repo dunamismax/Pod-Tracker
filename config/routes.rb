@@ -31,5 +31,17 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  root "dashboard#show"
+  # Public marketing surface — readable without an account.
+  get "brackets", to: "public#brackets", as: :brackets
+  get "brackets/game-changers", to: "public#game_changers", as: :game_changers
+  get "brackets/pregame-template", to: "public#pregame_template", as: :pregame_template
+  get "about", to: "public#about", as: :about
+  get "privacy", to: "public#privacy", as: :privacy
+  get "terms", to: "public#terms", as: :terms
+
+  # Authenticated app dashboard — root resolves to it for signed-in users via
+  # PublicController#home, which renders the marketing landing for guests.
+  get "app", to: "dashboard#show", as: :app_dashboard
+
+  root "public#home"
 end

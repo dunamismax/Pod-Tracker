@@ -1,0 +1,308 @@
+<% content_for :title, "Commander Brackets — the system, explained" %>
+<% content_for :meta_description, "A complete, evidence-backed guide to the Commander Brackets system: what each bracket is, what it allows, the Game Changers list, the banned list, mass land denial, extra turns, two-card combos, tutors, classification rules, and a pregame template you can paste into chat." %>
+
+<article class="prose prose-invert prose-zinc max-w-none space-y-10">
+  <header class="space-y-3">
+    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Commander Brackets · Definitive guide</p>
+    <h1 class="text-3xl font-semibold text-white sm:text-5xl">The Commander Brackets system, in depth</h1>
+    <p class="max-w-3xl text-base leading-7 text-zinc-300">
+      The Commander Bracket system is Wizards of the Coast's official, beta-style framework for matchmaking and pregame conversation. It does not replace Rule 0; it gives Rule 0 vocabulary it never had. This page is the complete, current-as-of-the-2026-02-09-update explanation.
+    </p>
+    <p class="text-xs text-zinc-500">
+      Catalog version: <code class="font-mono"><%= @catalog["version"] %></code> · Source: Wizards of the Coast Commander Brackets beta. Ideal Magic uses this as deterministic data and never overrides it from a model.
+    </p>
+  </header>
+
+  <section id="what-it-is" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">1. What Commander Brackets are for</h2>
+    <p class="text-zinc-200">
+      Commander Brackets exist to answer one practical question before a pod starts: <em class="text-emerald-300">"What kind of Commander game are we trying to play?"</em>
+    </p>
+    <p class="text-zinc-200">
+      They are not a pure power scale. They are a shared language for describing deck intent, game speed, win-condition texture, interaction level, and tolerance for swingy or frustrating effects. Wizards originally framed the system as a replacement for the vague "power level 1–10" conversation, because <strong>"my deck is a 7"</strong> does not explain whether the deck wins with tribal combat, a protected combo, prison pieces, fast mana, or cEDH staples.
+    </p>
+    <p class="text-zinc-200">
+      The system divides Commander into five broad experiences:
+    </p>
+    <div class="overflow-x-auto">
+      <table class="min-w-full border border-zinc-800 text-sm">
+        <thead class="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-400">
+          <tr><th class="px-3 py-2">Bracket</th><th class="px-3 py-2">Name</th><th class="px-3 py-2">Mindset</th></tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-800 text-zinc-200">
+          <tr><td class="px-3 py-2 font-mono">1</td><td class="px-3 py-2">Exhibition</td><td class="px-3 py-2">Theme-first, ultra-casual, expressive</td></tr>
+          <tr><td class="px-3 py-2 font-mono">2</td><td class="px-3 py-2">Core</td><td class="px-3 py-2">Casual, functional, low-pressure</td></tr>
+          <tr><td class="px-3 py-2 font-mono">3</td><td class="px-3 py-2">Upgraded</td><td class="px-3 py-2">Tuned casual, stronger synergy, sharper interaction</td></tr>
+          <tr><td class="px-3 py-2 font-mono">4</td><td class="px-3 py-2">Optimized</td><td class="px-3 py-2">High-power, fast, lethal, non-cEDH</td></tr>
+          <tr><td class="px-3 py-2 font-mono">5</td><td class="px-3 py-2">cEDH</td><td class="px-3 py-2">Competitive, metagame-driven, tournament-minded</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-zinc-200">
+      The most important lesson from the latest update: <strong>intent matters more than checklist abuse.</strong> A deck can dodge every Game Changer and still be too strong for Bracket 2. A highly thematic Bracket 1 deck might ask for a Rule 0 exception because one card is central to the theme. Brackets work when players describe what their decks are actually trying to do.
+    </p>
+  </section>
+
+  <section id="the-four-axes" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">2. The four axes brackets care about</h2>
+
+    <h3 class="text-lg font-semibold text-emerald-300">A. Intent</h3>
+    <p class="text-zinc-200">
+      The most important axis. Did you build this deck to show off a theme, play a normal casual game, execute a tuned strategy, win quickly, or compete against the cEDH metagame? A Bear-typal deck that happens to contain some strong cards is different from a Lumra lands deck designed to assemble compact deterministic wins. Same commander, different intent, different bracket.
+    </p>
+
+    <h3 class="text-lg font-semibold text-emerald-300">B. Speed</h3>
+    <p class="text-zinc-200">The updated system gives rough turn expectations:</p>
+    <ul class="list-disc pl-6 text-zinc-200">
+      <li>Bracket 1 — at least 9 turns before a win/loss feels right.</li>
+      <li>Bracket 2 — at least 8 turns.</li>
+      <li>Bracket 3 — at least 6 turns.</li>
+      <li>Bracket 4 — at least 4 turns.</li>
+      <li>Bracket 5 — any turn.</li>
+    </ul>
+    <p class="text-zinc-200">If a deck regularly wins or loses before its bracket's turn floor, it probably belongs higher.</p>
+
+    <h3 class="text-lg font-semibold text-emerald-300">C. Texture of win conditions</h3>
+    <p class="text-zinc-200">
+      Lower brackets want wins that are visible, thematic, incremental, and disruptable. Higher brackets allow wins that are compact, sudden, efficient, and protected.
+    </p>
+
+    <h3 class="text-lg font-semibold text-emerald-300">D. Social tolerance</h3>
+    <p class="text-zinc-200">
+      Some effects are legal but change the game dramatically: mass land denial, chained extra turns, efficient tutors, fast mana, lock pieces, free interaction, and compact combos. Brackets tell the table where those effects should reasonably appear.
+    </p>
+  </section>
+
+  <% [1,2,3,4,5].each do |bracket| %>
+    <% meta = @bracket_meta[bracket] %>
+    <section id="<%= meta['label']&.parameterize %>" class="space-y-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-6">
+      <header class="flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-emerald-300">Bracket <%= bracket %></p>
+          <h2 class="text-2xl font-semibold text-white"><%= meta["label"] %></h2>
+          <p class="text-sm text-zinc-400"><%= meta["tagline"] %></p>
+        </div>
+        <div class="text-right text-sm text-zinc-300">
+          <p>Expected min turns: <span class="font-mono"><%= meta["expected_min_turn"] || "any" %></span></p>
+          <p>Game Changers allowed: <span class="font-mono"><%= meta["max_game_changers"].nil? ? "any" : meta["max_game_changers"] %></span></p>
+        </div>
+      </header>
+
+      <%= render "public/bracket_section_#{bracket}" %>
+    </section>
+  <% end %>
+
+  <section id="mass-land-denial" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">8. Mass land denial</h2>
+    <p class="text-zinc-200">
+      Mass land denial is one of the clearest "keep it out of Brackets 1–3" categories. It includes effects that destroy, exile, bounce, or lock down several lands; keep lands tapped; change what lands produce; or attack four or more lands per player without replacing them. Examples: Armageddon, Ruination, Sunder, Winter Orb, Blood Moon.
+    </p>
+    <p class="text-zinc-200">
+      <strong>Important distinction:</strong> accidentally producing a land-denial board state through unusual game events is not the same as building your deck to do it. Intentionally building around land denial moves the deck into Bracket 4 or higher.
+    </p>
+  </section>
+
+  <section id="extra-turns" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">9. Extra turns</h2>
+    <ul class="list-disc pl-6 text-zinc-200">
+      <li>Bracket 1: no extra-turn cards.</li>
+      <li>Bracket 2: no chaining or looping extra turns; a single splashy spell is fine.</li>
+      <li>Bracket 3: no chaining or looping extra turns.</li>
+      <li>Bracket 4: extra turns can be part of the strategy.</li>
+      <li>Bracket 5: extra turns are allowed if competitively justified.</li>
+    </ul>
+    <p class="text-zinc-200">
+      A single Time Warp in casual is very different from an Edric-style deck that takes four turns in a row. The former may be acceptable in a pregame conversation; the latter belongs higher.
+    </p>
+  </section>
+
+  <section id="two-card-combos" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">10. Two-card combos, lockouts, and infinites</h2>
+    <p class="text-zinc-200">The bracket system cares about game-ending two-card combos: infinite mana, infinite damage, infinite mill, infinite turns, deterministic lockouts, two-card "you cannot play" states, and compact combos that immediately win or functionally end the game.</p>
+    <ul class="list-disc pl-6 text-zinc-200">
+      <li>Bracket 1: no intentional two-card game-ending combos.</li>
+      <li>Bracket 2: no intentional two-card game-ending combos.</li>
+      <li>Bracket 3: no two-card game-ending combos before turn six.</li>
+      <li>Bracket 4: cheap and efficient combos allowed.</li>
+      <li>Bracket 5: fully optimized combo packages expected.</li>
+    </ul>
+    <p class="text-zinc-200">
+      The latest update reframed "early combo" around turn expectations: if a combo frequently happens before the bracket's expected minimum game length, the deck belongs higher.
+    </p>
+  </section>
+
+  <section id="tutors" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">11. Tutors</h2>
+    <p class="text-zinc-200">
+      Tutors are no longer separately restricted by the updated bracket rules — "few tutors" was too vague — but the most efficient tutors are Game Changers and therefore excluded from Brackets 1–2. Inefficient, thematic, narrow, or expensive tutors can appear in lower brackets if they don't enable inappropriate combos or repetitive wins.
+    </p>
+    <p class="text-zinc-200">
+      Best-in-class tutors that are Game Changers and therefore not Bracket 1 or 2 legal: Demonic Tutor, Vampiric Tutor, Mystical Tutor, Enlightened Tutor, Imperial Seal, Worldly Tutor, Crop Rotation, Gamble, Natural Order, Gifts Ungiven, Intuition.
+    </p>
+  </section>
+
+  <section id="game-changers" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">12. Game Changers</h2>
+    <p class="text-zinc-200">
+      Game Changers are legal Commander cards that strongly affect what kind of game a deck creates. They are not banned. They are bracket-signaling cards. A Game Changer typically dramatically accelerates the game, creates overwhelming resource advantage, efficiently tutors for the strongest cards, shuts players out of normal play, enables compact combos or storm turns, or resets/warps the table in ways many players want to opt into knowingly.
+    </p>
+    <div class="overflow-x-auto">
+      <table class="min-w-full border border-zinc-800 text-sm">
+        <thead class="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-400">
+          <tr><th class="px-3 py-2">Bracket</th><th class="px-3 py-2">Allowance</th></tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-800 text-zinc-200">
+          <tr><td class="px-3 py-2 font-mono">1</td><td class="px-3 py-2">None by default; rare thematic Rule 0 exceptions</td></tr>
+          <tr><td class="px-3 py-2 font-mono">2</td><td class="px-3 py-2">None</td></tr>
+          <tr><td class="px-3 py-2 font-mono">3</td><td class="px-3 py-2">Up to 3</td></tr>
+          <tr><td class="px-3 py-2 font-mono">4</td><td class="px-3 py-2">Any</td></tr>
+          <tr><td class="px-3 py-2 font-mono">5</td><td class="px-3 py-2">Any</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="mt-6 text-lg font-semibold text-emerald-300">Current Game Changers list (<%= @catalog["cards"].size %> cards · catalog <code class="font-mono"><%= @catalog["version"] %></code>)</h3>
+    <% @catalog["categories"].each do |slug, description| %>
+      <% group = @catalog["cards"].select { |c| c["category"] == slug } %>
+      <% next if group.empty? %>
+      <details class="rounded border border-zinc-800 bg-zinc-900/40">
+        <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-zinc-100">
+          <%= slug.tr("_", " ").capitalize %> · <%= group.size %> cards
+          <span class="ml-2 text-xs font-normal text-zinc-500"><%= description %></span>
+        </summary>
+        <ul class="grid gap-1 px-4 py-3 text-sm text-zinc-200 sm:grid-cols-2 lg:grid-cols-3">
+          <% group.each do |card| %>
+            <li class="font-mono text-xs"><%= card["name"] %></li>
+          <% end %>
+        </ul>
+      </details>
+    <% end %>
+    <p class="text-xs text-zinc-500">
+      The 2026-02-09 update added Farewell and Biorhythm. Biorhythm is unbanned. The full list is rendered above from a single source-controlled file; if Wizards updates it, Ideal Magic updates with it.
+    </p>
+  </section>
+
+  <section id="banned-list" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">13. Current Commander banned list</h2>
+    <% if @banned_list["snapshot"] %>
+      <p class="text-xs text-zinc-500">
+        Snapshot from <%= @banned_list["snapshot"]["source"] %> · effective <%= @banned_list["snapshot"]["effective_on"] %>
+        <% if @banned_list["snapshot"]["source_url"].present? %>
+          · <a class="underline hover:text-zinc-200" href="<%= @banned_list["snapshot"]["source_url"] %>">source</a>
+        <% end %>
+      </p>
+    <% end %>
+    <% if Array(@banned_list["categories"]).any? %>
+      <ul class="list-disc pl-6 text-zinc-200">
+        <% @banned_list["categories"].each do |c| %>
+          <li><%= c["label"] %> — <%= c["description"] %></li>
+        <% end %>
+      </ul>
+    <% end %>
+    <% if Array(@banned_list["names"]).any? %>
+      <details class="rounded border border-zinc-800 bg-zinc-900/40">
+        <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-zinc-100">
+          <%= @banned_list["names"].size %> individually banned cards
+        </summary>
+        <ul class="grid gap-1 px-4 py-3 text-sm text-zinc-200 sm:grid-cols-2 lg:grid-cols-3">
+          <% @banned_list["names"].each do |name| %>
+            <li class="font-mono text-xs"><%= name %></li>
+          <% end %>
+        </ul>
+      </details>
+    <% else %>
+      <p class="text-sm text-zinc-400">Banned-list snapshot not yet seeded into this environment.</p>
+    <% end %>
+    <p class="text-zinc-200">
+      <strong>Notable update:</strong> Biorhythm is no longer banned as of 2026-02-09. It is now legal in Commander and on the Game Changers list. Lutri, the Spellchaser is also legal as a commander or as a deck card — banned only as a companion.
+    </p>
+  </section>
+
+  <section id="classify" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">14. How to classify a deck</h2>
+    <ol class="list-decimal space-y-2 pl-6 text-zinc-200">
+      <li><strong>Is it built for the cEDH tournament metagame?</strong> If yes → Bracket 5.</li>
+      <li><strong>Is it designed to win quickly, consistently, and explosively, with no concern for casual restrictions?</strong> Fast mana package, efficient tutors, free interaction, compact combos, stax or mass land denial, multiple Game Changers, wins around turn 4 or earlier? → Bracket 4.</li>
+      <li><strong>Is it a tuned casual deck with strong synergy and up to 3 Game Changers?</strong> High card quality, meaningful interaction, clear win plan, some explosive turns, can win after building resources, doesn't usually end games before turn six? → Bracket 3.</li>
+      <li><strong>Is it a casual deck with a coherent plan but no Game Changers and no sudden game-ending patterns?</strong> Mechanically focused, tries to win but not brutally, win conditions visible and disruptable, no MLD, no intentional two-card game-enders, games usually reach turn eight? → Bracket 2.</li>
+      <li><strong>Is it mostly an expressive theme project?</strong> Theme over efficiency, suboptimal cards on purpose, may need Rule 0 flexibility, not primarily trying to win, games usually reach turn nine or later? → Bracket 1.</li>
+    </ol>
+  </section>
+
+  <section id="pregame-template" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">15. Pregame conversation template</h2>
+    <p class="text-zinc-200">Use this instead of "my deck is a 7":</p>
+    <pre class="overflow-x-auto rounded border border-zinc-800 bg-zinc-950 p-4 font-mono text-sm leading-6 text-zinc-100">This is a Bracket [X] deck.
+It is trying to win by:
+  [combat / value engine / aristocrats / spellslinger / combo / commander damage / stax / reanimator / etc.]
+It has:
+  [N] Game Changers
+  [yes/no] fast mana
+  [yes/no] free interaction
+  [yes/no] tutors for win pieces
+  [yes/no] two-card infinites or lockouts
+  [yes/no] extra-turn chaining
+  [yes/no] mass land denial
+It usually threatens to win around turn:
+  [N]
+The play experience is:
+  [theme showcase / casual battlecruiser / tuned synergy / high-power / cEDH]</pre>
+    <p class="text-zinc-200"><strong>Example:</strong> <em>"This is Bracket 3 Voja. It has 2 Game Changers, no mass land denial, no chained extra turns, and no early deterministic two-card combo. It can produce a huge combat turn after building a board, usually around turn six or later. It is tuned creature-combat snowball, not cEDH."</em></p>
+    <p>
+      <%= link_to "More worked examples →", pregame_template_path, class: "text-sm font-medium text-emerald-300 hover:text-emerald-200" %>
+    </p>
+  </section>
+
+  <section id="misclassifications" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">16. Common misclassifications</h2>
+    <ul class="space-y-2 text-zinc-200">
+      <li><strong>"No Game Changers means Bracket 2."</strong> False. A deck with no Game Changers can still be Bracket 3 or 4 if it is fast, redundant, optimized, or combo-focused.</li>
+      <li><strong>"A Game Changer makes my deck Bracket 4."</strong> False. Bracket 3 allows up to 3 Game Changers.</li>
+      <li><strong>"cEDH is just Bracket 4 with better cards."</strong> False. Bracket 5 is defined by competitive metagame intent, not just raw power.</li>
+      <li><strong>"Precon equals Bracket 2."</strong> No longer reliable. Some precons are stronger, weaker, or contain cards that complicate the label. Core is now defined by play experience, not precon comparison.</li>
+      <li><strong>"Rule 0 disappears under brackets."</strong> False. Brackets improve Rule 0 by giving the table more precise vocabulary.</li>
+    </ul>
+  </section>
+
+  <section id="summary" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">17. Final bracket summary</h2>
+    <div class="overflow-x-auto">
+      <table class="min-w-full border border-zinc-800 text-sm">
+        <thead class="bg-zinc-900 text-left text-xs uppercase tracking-wide text-zinc-400">
+          <tr>
+            <th class="px-3 py-2">Bracket</th>
+            <th class="px-3 py-2">Name</th>
+            <th class="px-3 py-2">Core identity</th>
+            <th class="px-3 py-2">Turns</th>
+            <th class="px-3 py-2">Restrictions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-800 align-top text-zinc-200">
+          <tr><td class="px-3 py-2 font-mono">1</td><td class="px-3 py-2">Exhibition</td><td class="px-3 py-2">Theme, showcase, unusual ideas</td><td class="px-3 py-2">9+</td><td class="px-3 py-2">No GCs, no MLD, no extra turns, no two-card game-enders; thematic Rule 0 flexibility</td></tr>
+          <tr><td class="px-3 py-2 font-mono">2</td><td class="px-3 py-2">Core</td><td class="px-3 py-2">Casual, functional, low-pressure</td><td class="px-3 py-2">8+</td><td class="px-3 py-2">No GCs, no MLD, no chained extra turns, no two-card game-enders</td></tr>
+          <tr><td class="px-3 py-2 font-mono">3</td><td class="px-3 py-2">Upgraded</td><td class="px-3 py-2">Tuned casual, strong synergy</td><td class="px-3 py-2">6+</td><td class="px-3 py-2">Up to 3 GCs, no MLD, no chained extra turns, no two-card game-enders before turn six</td></tr>
+          <tr><td class="px-3 py-2 font-mono">4</td><td class="px-3 py-2">Optimized</td><td class="px-3 py-2">High-power, fast, lethal, non-cEDH</td><td class="px-3 py-2">4+</td><td class="px-3 py-2">No restrictions beyond banned list</td></tr>
+          <tr><td class="px-3 py-2 font-mono">5</td><td class="px-3 py-2">cEDH</td><td class="px-3 py-2">Competitive metagame Commander</td><td class="px-3 py-2">any</td><td class="px-3 py-2">No restrictions beyond banned list</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="best-interpretation" class="space-y-4">
+    <h2 class="text-2xl font-semibold text-white">18. Best practical interpretation</h2>
+    <ul class="space-y-2 text-zinc-200">
+      <li><strong>Bracket 1</strong> = "Look what I made."</li>
+      <li><strong>Bracket 2</strong> = "Let's play normal casual Commander."</li>
+      <li><strong>Bracket 3</strong> = "My deck is tuned, but I still want a game."</li>
+      <li><strong>Bracket 4</strong> = "Bring your strongest non-cEDH deck."</li>
+      <li><strong>Bracket 5</strong> = "I am here to play competitive Commander."</li>
+    </ul>
+    <p class="text-zinc-200">
+      The system works when players are honest about what their deck is built to do, not when they search for loopholes. Use the bracket as the headline, then disclose the features that actually determine the game: Game Changers, speed, combos, tutors, fast mana, free interaction, mass land denial, and whether the deck is trying to maximize win rate or create a particular experience.
+    </p>
+  </section>
+
+  <footer class="border-t border-zinc-800 pt-6 text-xs text-zinc-500">
+    <p>This page is the canonical Ideal Magic reference for the Commander Brackets system. The Game Changers list and banned-list categories above render from source-controlled data files; when Wizards updates either, this page updates automatically. Brackets are a Wizards property; this guide is unofficial fan content.</p>
+  </footer>
+</article>

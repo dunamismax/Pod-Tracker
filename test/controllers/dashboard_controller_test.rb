@@ -1,8 +1,8 @@
 require "test_helper"
 
 class DashboardControllerTest < ActionDispatch::IntegrationTest
-  test "redirects unauthenticated users" do
-    get root_path
+  test "redirects unauthenticated users away from the dashboard" do
+    get app_dashboard_path
 
     assert_redirected_to new_session_path
   end
@@ -10,7 +10,7 @@ class DashboardControllerTest < ActionDispatch::IntegrationTest
   test "shows the dashboard for authenticated users" do
     sign_in_as users(:one)
 
-    get root_path
+    get app_dashboard_path
 
     assert_response :success
     assert_select "h1", "Ideal Magic"

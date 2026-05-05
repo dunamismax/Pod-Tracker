@@ -25,15 +25,35 @@
       <header class="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <h2 class="text-lg font-medium text-white print:text-zinc-900">Rule 0 brief</h2>
+          <% br = brief["bracket"] || {} %>
+          <% if br["label"].present? %>
+            <p class="mt-1 text-base font-semibold text-emerald-300 print:text-emerald-700">
+              <%= br["label"] %>
+            </p>
+            <p class="mt-1 text-sm text-zinc-300 print:text-zinc-700">
+              <%= br["summary"] %>
+            </p>
+            <% if br["game_changers"].present? %>
+              <p class="mt-1 text-xs text-zinc-400 print:text-zinc-600">
+                <%= br["game_changers"] %>
+              </p>
+            <% end %>
+          <% end %>
           <% pb = brief["power_band"] || {} %>
           <% if pb["label"].present? %>
-            <p class="mt-1 text-sm text-zinc-300 print:text-zinc-700">
-              <span class="font-semibold text-emerald-300 print:text-emerald-700"><%= pb["label"] %></span>
-              · <%= pb["summary"] %>
+            <p class="mt-2 text-xs text-zinc-500 print:text-zinc-600">
+              Sub-band: <%= pb["label"] %> · <%= pb["summary"] %>
             </p>
           <% end %>
         </div>
       </header>
+
+      <% if brief["pregame_template"].present? %>
+        <div class="mt-4 rounded border border-zinc-800/60 bg-zinc-950/40 p-3 print:border-zinc-300 print:bg-zinc-50">
+          <p class="text-xs uppercase tracking-wide text-zinc-500">Pregame template (paste into chat)</p>
+          <pre class="mt-1 whitespace-pre-wrap font-mono text-xs text-zinc-100 print:text-zinc-900"><%= brief["pregame_template"] %></pre>
+        </div>
+      <% end %>
 
       <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         <% if brief.dig("speed", "summary").present? %>
@@ -117,6 +137,7 @@
           <thead class="text-left text-xs uppercase tracking-wide text-zinc-500">
             <tr>
               <th class="py-2 pr-4">Deck</th>
+              <th class="py-2 pr-3 text-right">Bracket</th>
               <% axes.each do |axis| %>
                 <th class="py-2 pr-3 text-right"><%= axis[:label] %></th>
               <% end %>
@@ -125,12 +146,24 @@
           <tbody class="divide-y divide-zinc-800 print:divide-zinc-300">
             <% slots.each do |slot| %>
               <% scores = slot["scores"] || {} %>
+              <% bp = slot["bracket_payload"] || {} %>
               <tr>
                 <td class="py-2 pr-4">
                   <p class="font-medium text-zinc-100 print:text-zinc-900"><%= slot["deck_name"] %></p>
                   <p class="text-xs text-zinc-500"><%= Array(slot["commander_names"]).join(", ") %></p>
                   <% if slot["label"].present? %>
                     <p class="text-xs text-emerald-400 print:text-emerald-700"><%= slot["label"] %></p>
+                  <% end %>
+                </td>
+                <td class="py-2 pr-3 text-right">
+                  <% if slot["bracket"].present? %>
+                    <p class="font-mono text-base text-zinc-100 print:text-zinc-900">B<%= slot["bracket"] %></p>
+                    <p class="text-xs text-zinc-500"><%= bp["label"] %></p>
+                    <% if slot["bracket_sub_band"].present? %>
+                      <p class="text-xs text-zinc-500"><%= slot["bracket_sub_band"] %>-band</p>
+                    <% end %>
+                  <% else %>
+                    <p class="text-xs text-zinc-500">—</p>
                   <% end %>
                 </td>
                 <% axes.each do |axis| %>
@@ -140,8 +173,12 @@
                 <% end %>
               </tr>
             <% end %>
+            <% bracket_summary = snapshot["bracket"] || {} %>
             <tr class="bg-zinc-950/40 print:bg-zinc-100">
               <td class="py-2 pr-4 text-xs uppercase tracking-wide text-zinc-500">Spread (max − min)</td>
+              <td class="py-2 pr-3 text-right text-zinc-300 print:text-zinc-800">
+                <%= bracket_summary["spread"] || "—" %>
+              </td>
               <% axes.each do |axis| %>
                 <% agg = aggregates[axis[:key]] || {} %>
                 <td class="py-2 pr-3 text-right text-zinc-300 print:text-zinc-800">
@@ -151,6 +188,9 @@
             </tr>
             <tr class="bg-zinc-950/40 print:bg-zinc-100">
               <td class="py-2 pr-4 text-xs uppercase tracking-wide text-zinc-500">Pod average</td>
+              <td class="py-2 pr-3 text-right text-zinc-300 print:text-zinc-800">
+                <%= bracket_summary["min"].present? && bracket_summary["max"].present? ? "B#{bracket_summary['min']}–B#{bracket_summary['max']}" : "—" %>
+              </td>
               <% axes.each do |axis| %>
                 <% agg = aggregates[axis[:key]] || {} %>
                 <td class="py-2 pr-3 text-right text-zinc-300 print:text-zinc-800">

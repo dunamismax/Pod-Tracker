@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_05_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_05_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -452,6 +452,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_000000) do
 
   create_table "scorecards", force: :cascade do |t|
     t.bigint "analysis_run_id", null: false
+    t.integer "bracket"
+    t.jsonb "bracket_payload", default: {}, null: false
+    t.string "bracket_sub_band"
     t.decimal "confidence", precision: 5, scale: 4
     t.integer "consistency_score"
     t.datetime "created_at", null: false
@@ -467,6 +470,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_000000) do
     t.integer "speed_score"
     t.datetime "updated_at", null: false
     t.index ["analysis_run_id"], name: "index_scorecards_on_analysis_run_id", unique: true
+    t.index ["bracket"], name: "index_scorecards_on_bracket"
     t.index ["salt_rating"], name: "index_scorecards_on_salt_rating"
   end
 

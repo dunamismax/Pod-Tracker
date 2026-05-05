@@ -6,6 +6,15 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="application-name" content="Ideal Magic">
     <meta name="mobile-web-app-capable" content="yes">
+    <% if content_for?(:meta_description) %>
+      <meta name="description" content="<%= strip_tags(content_for(:meta_description)) %>">
+      <meta property="og:description" content="<%= strip_tags(content_for(:meta_description)) %>">
+    <% else %>
+      <meta name="description" content="Ideal Magic — the serious Commander companion. Bracket-aware deck and pod analysis, source-backed, evidence-first.">
+    <% end %>
+    <meta property="og:title" content="<%= content_for(:title) || 'Ideal Magic' %>">
+    <meta property="og:site_name" content="Ideal Magic">
+    <meta property="og:type" content="website">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
@@ -24,7 +33,33 @@
   </head>
 
   <body class="bg-zinc-950 text-zinc-100 antialiased">
-    <main class="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-8">
+    <header class="border-b border-zinc-900 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80">
+      <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <%= link_to root_path, class: "flex items-center gap-2 text-sm font-semibold text-white" do %>
+          <span class="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
+          <span>Ideal Magic</span>
+        <% end %>
+
+        <nav class="hidden items-center gap-5 text-sm text-zinc-300 sm:flex">
+          <%= link_to "Brackets", brackets_path, class: "hover:text-white" %>
+          <%= link_to "Game Changers", game_changers_path, class: "hover:text-white" %>
+          <%= link_to "Pregame template", pregame_template_path, class: "hover:text-white" %>
+          <%= link_to "About", about_path, class: "hover:text-white" %>
+        </nav>
+
+        <div class="flex items-center gap-2 text-sm">
+          <% if authenticated? %>
+            <%= link_to "Open app", app_dashboard_path, class: "rounded-md bg-emerald-600 px-3 py-1.5 font-medium text-white hover:bg-emerald-500" %>
+            <%= button_to "Sign out", session_path, method: :delete, form: { class: "inline" }, class: "rounded-md border border-zinc-800 px-3 py-1.5 text-zinc-200 hover:bg-zinc-900" %>
+          <% else %>
+            <%= link_to "Sign in", new_session_path, class: "rounded-md border border-zinc-800 px-3 py-1.5 text-zinc-200 hover:bg-zinc-900" %>
+            <%= link_to "Create account", new_registration_path, class: "rounded-md bg-emerald-600 px-3 py-1.5 font-medium text-white hover:bg-emerald-500" %>
+          <% end %>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-6xl flex-col px-4 py-8 sm:px-6 lg:px-8">
       <% if alert = flash[:alert] %>
         <p class="py-2 px-3 mb-5 rounded-lg bg-red-50 text-red-600 font-medium" id="alert"><%= alert %></p>
       <% end %>
@@ -33,5 +68,20 @@
       <% end %>
       <%= yield %>
     </main>
+
+    <footer class="border-t border-zinc-900">
+      <div class="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-6 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+        <div>
+          <p>Ideal Magic is unofficial fan content. Not approved or endorsed by Wizards of the Coast.</p>
+          <p class="mt-1">Card data via <a href="https://scryfall.com" class="underline hover:text-zinc-300">Scryfall</a>. Commander rules via <a href="https://mtgcommander.net" class="underline hover:text-zinc-300">mtgcommander.net</a>. Brackets reference Wizards' published Commander Brackets system.</p>
+        </div>
+        <nav class="flex flex-wrap gap-4">
+          <%= link_to "About", about_path, class: "hover:text-zinc-300" %>
+          <%= link_to "Privacy", privacy_path, class: "hover:text-zinc-300" %>
+          <%= link_to "Terms", terms_path, class: "hover:text-zinc-300" %>
+          <a href="https://github.com/dunamismax/ideal-magic" class="hover:text-zinc-300">GitHub</a>
+        </nav>
+      </div>
+    </footer>
   </body>
 </html>

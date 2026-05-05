@@ -22,11 +22,23 @@ module Decks
         scoring = Scorer.new.call(features)
         legality = CommanderFormat::LegalityChecker.new.check(deck)
 
+        card_names = deck.deck_cards.where(board: %w[main commander]).pluck(:name) +
+                     deck.commanders.pluck(:name)
+        provisional_scorecard = Struct.new(:power_score, :speed_score).new(
+          scoring.scores["power"].value, scoring.scores["speed"].value
+        )
+        bracket = BracketEvaluator.new.call(
+          features: features,
+          card_names: card_names,
+          scorecard: provisional_scorecard
+        )
+
         analysis_run.update!(
           feature_vector: features.to_h,
           deterministic_snapshot: {
             "legality" => legality.to_h,
-            "rubric_version" => scoring.rubric_version
+            "rubric_version" => scoring.rubric_version,
+            "bracket" => bracket.to_h
           }
         )
 
@@ -38,11 +50,15 @@ module Decks
           consistency_score: scoring.scores["consistency"].value,
           salt_score: scoring.scores["salt"].value,
           social_friction_score: scoring.scores["social_friction"].value,
+          bracket: bracket.bracket,
+          bracket_sub_band: bracket.sub_band,
+          bracket_payload: bracket.to_h,
           confidence: confidence_for(features),
           evidence: scoring.scores.transform_values(&:to_h),
           improvement_suggestions: scoring.recommendations,
           raw_payload: {
             "rubric_version" => scoring.rubric_version,
+            "bracket_catalog_version" => bracket.version,
             "computed_at" => Time.current.iso8601
           }
         )

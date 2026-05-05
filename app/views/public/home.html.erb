@@ -1,0 +1,82 @@
+<% content_for :title, "Ideal Magic — Bracket-aware Commander companion" %>
+<% content_for :meta_description, "Ideal Magic is a bracket-aware Commander companion. Import a deck, get an honest read on it under the official Commander Brackets system, and run Rule 0 conversations that don't depend on guessing a number from 1 to 10." %>
+
+<section class="space-y-12 py-6">
+  <div class="space-y-5">
+    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Commander companion · Bracket-aware</p>
+    <h1 class="text-3xl font-semibold leading-tight text-white sm:text-5xl">
+      The serious Commander companion.<br class="hidden sm:inline">
+      Built around the official <%= link_to "Commander Brackets", brackets_path, class: "underline decoration-emerald-500 underline-offset-4 hover:text-emerald-200" %>.
+    </h1>
+    <p class="max-w-3xl text-base leading-7 text-zinc-300 sm:text-lg">
+      Import a Commander deck, get a deterministic read on its bracket, see exactly which Game Changers, mass land denial, extra-turn spells, or two-card combos triggered the call, and walk into Rule 0 with a real conversation instead of "uh, my deck is a 7."
+    </p>
+    <div class="flex flex-wrap gap-3 pt-2">
+      <%= link_to "Read the bracket guide", brackets_path, class: "rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
+      <% if authenticated? %>
+        <%= link_to "Open the app", app_dashboard_path, class: "rounded-md border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-900" %>
+      <% else %>
+        <%= link_to "Try the demo", new_session_path, class: "rounded-md border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-900" %>
+        <%= link_to "Create an account", new_registration_path, class: "rounded-md border border-zinc-700 px-4 py-2.5 text-sm font-medium text-zinc-100 hover:bg-zinc-900" %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <article class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-5">
+      <h2 class="text-base font-semibold text-white">Brackets, not a number</h2>
+      <p class="mt-2 text-sm leading-6 text-zinc-300">
+        Every analyzed deck gets a 1–5 bracket placement (Exhibition, Core, Upgraded, Optimized, cEDH) with sub-band positioning, expected minimum turns, and a list of every Game Changer, MLD card, and combo line we found.
+      </p>
+    </article>
+    <article class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-5">
+      <h2 class="text-base font-semibold text-white">Pod analysis with a Rule 0 brief</h2>
+      <p class="mt-2 text-sm leading-6 text-zinc-300">
+        Build a pod of 2–4 decks. Get the bracket spread, GC totals, combo disclosures, and a copy-pasteable pregame template you can drop into Discord before anyone keeps a hand.
+      </p>
+    </article>
+    <article class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-5">
+      <h2 class="text-base font-semibold text-white">Deterministic where it matters</h2>
+      <p class="mt-2 text-sm leading-6 text-zinc-300">
+        Card facts, Commander legality, the Game Changers list, and the banned list come from source-controlled data. AI is allowed to interpret — never to invent legality or a bracket call.
+      </p>
+    </article>
+  </div>
+
+  <article class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-6">
+    <h2 class="text-lg font-semibold text-white">What the Commander Brackets system actually does</h2>
+    <p class="mt-2 text-sm leading-7 text-zinc-300">
+      Wizards' Commander Brackets system replaces "rate your deck 1 to 10" with five named experiences and the actual restrictions that define each one. A Bracket 2 deck has no Game Changers, no mass land denial, no chained extra turns, and no intentional two-card game-ending combos. A Bracket 4 deck can have all of those — but isn't built for the cEDH metagame. The conversation stops being "your seven beat my five" and starts being "we're playing a Bracket 3 game; here are the things in my deck that would push it higher."
+    </p>
+    <p class="mt-3 text-sm leading-7 text-zinc-300">
+      Ideal Magic reads your decklist for the cards and patterns that move a deck between brackets and shows you the call with the evidence attached.
+    </p>
+    <p class="mt-4">
+      <%= link_to "Read the full bracket explanation →", brackets_path, class: "text-sm font-medium text-emerald-300 hover:text-emerald-200" %>
+    </p>
+  </article>
+
+  <div class="grid gap-5 lg:grid-cols-2">
+    <article class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-6">
+      <h2 class="text-base font-semibold text-white">Pregame template</h2>
+      <p class="mt-2 text-sm text-zinc-300">A Rule 0 prompt your pod can read aloud at the table.</p>
+      <pre class="mt-4 whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs leading-5 text-zinc-200">This is a Bracket [X] deck.
+It is trying to win by: [combat / engine / aristocrats / spellslinger / combo / commander damage / stax / ...]
+It has: [N] Game Changers, [yes/no] fast mana, [yes/no] free interaction,
+        [yes/no] tutors for win pieces, [yes/no] two-card infinites,
+        [yes/no] extra-turn chaining, [yes/no] mass land denial.
+It usually threatens to win around turn: [N].
+The play experience is: [theme showcase / casual battlecruiser / tuned synergy / high-power / cEDH].</pre>
+      <p class="mt-3">
+        <%= link_to "See worked examples →", pregame_template_path, class: "text-sm font-medium text-emerald-300 hover:text-emerald-200" %>
+      </p>
+    </article>
+    <article class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-6">
+      <h2 class="text-base font-semibold text-white">Game Changers, in one place</h2>
+      <p class="mt-2 text-sm text-zinc-300">The 53 cards that define the bracket conversation, with categories and short explanations.</p>
+      <p class="mt-4">
+        <%= link_to "Open the Game Changers list →", game_changers_path, class: "text-sm font-medium text-emerald-300 hover:text-emerald-200" %>
+      </p>
+    </article>
+  </div>
+</section>

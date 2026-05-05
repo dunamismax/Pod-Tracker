@@ -2,16 +2,33 @@
 
 Ideal Magic scores Commander decks and pods from deterministic evidence first. AI evaluation may refine explanations and judgment later, but every score must remain traceable to stored facts, rubric versions, and source data.
 
-Scores are stored internally on a 0-100 scale and displayed with plain-language bands. The bands are intentionally broad at v1 because Commander power varies by local meta.
+The primary axis is Wizards' official Commander Brackets system (1–5). Six 0–10 sub-axes — power, speed, interaction, consistency, salt, and social friction — sub-band a deck *inside* its bracket and explain Rule 0 friction.
 
-## Score Bands
+## Commander Brackets (primary axis)
 
-- 0-19: Nonfunctional or illegal for the requested context.
-- 20-39: Very low power, inconsistent, or heavily constrained.
-- 40-54: Casual or precon-like.
-- 55-69: Tuned casual or upgraded precon.
-- 70-84: Optimized or high-power.
-- 85-100: cEDH-like speed, density, resilience, or combo pressure.
+The Commander Brackets system is the headline output of the analyzer. It sets the deck's expected experience, expected minimum turns, and the restrictions the pod can rely on.
+
+| Bracket | Name | Mindset | Min turns | Game Changers | Mass land denial | Extra turns | Two-card combos |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Exhibition | Theme-first showcase | 9+ | None (rare Rule 0 exception) | No | No | No |
+| 2 | Core | Casual, functional | 8+ | None | No | No chaining | No |
+| 3 | Upgraded | Tuned casual | 6+ | Up to 3 | No | No chaining | Not before turn 6 |
+| 4 | Optimized | High-power, non-cEDH | 4+ | Any | Allowed | Allowed | Allowed |
+| 5 | cEDH | Competitive metagame | any | Any | Allowed | Allowed | Allowed |
+
+The bracket evaluator (`Decks::BracketEvaluator`) runs deterministically against the deck's feature vector plus the Game Changers and two-card-combo catalogs (`db/seeds/commander/brackets/*.json`). Decks that look like cEDH builds (deep tutors + fast mana + GC stack + combo pressure) land in Bracket 5; decks that violate any Bracket 3 restriction (more than 3 GCs, MLD, chained extra turns, immediate-win combos) land in Bracket 4; everything else flows down through Brackets 3, 2, and 1 by the published gates.
+
+The bracket call is augmented by a sub-band (`low`, `mid`, `high`) inside each bracket so a "low-power Bracket 3" deck and a "high-power Bracket 3" deck do not look identical in a pod brief. Sub-band reads the deterministic 0–10 power score, fast-mana count, tutor count, combo count, and GC count.
+
+## Sub-band axes (0–10)
+
+Sub-band axes are stored as integer 0–10 values and rendered with plain-language hints. They never override the bracket call — they describe how a deck sits inside it.
+
+- 0: nonfunctional / illegal for the requested context.
+- 1–3: very low pressure or heavily constrained.
+- 4–6: typical of the bracket.
+- 7–8: high-end of the bracket; close to the next gate.
+- 9–10: pressing against the next bracket's restrictions.
 
 Band labels are descriptive, not moral judgments. The UI should explain what moved a deck into a band and what would move it out.
 
