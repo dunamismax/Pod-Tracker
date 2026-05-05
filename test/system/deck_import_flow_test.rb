@@ -22,6 +22,10 @@ class DeckImportFlowTest < ApplicationSystemTestCase
     assert_text "Atraxa Brew"
     assert_text "Atraxa, Praetors' Voice"
     assert_text "Sol Ring"
+    assert_text "Deterministic analysis"
+    assert_text "Power"
+    assert_text "Salt"
+    assert_text "Social friction"
   end
 
   test "blank decklist is rejected with an inline error" do

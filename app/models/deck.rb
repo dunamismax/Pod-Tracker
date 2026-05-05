@@ -14,4 +14,16 @@ class Deck < ApplicationRecord
   validates :format, inclusion: { in: FORMATS }
   validates :status, inclusion: { in: STATUSES }
   validates :visibility, inclusion: { in: VISIBILITIES }
+
+  def latest_deterministic_run
+    analysis_runs
+      .where(kind: "deterministic", status: "succeeded")
+      .order(completed_at: :desc, id: :desc)
+      .includes(:scorecard)
+      .first
+  end
+
+  def recompute_deterministic_analysis!
+    Decks::Analyzer.run(self)
+  end
 end

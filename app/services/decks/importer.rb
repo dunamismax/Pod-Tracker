@@ -59,6 +59,7 @@ module Decks
       Deck.transaction do
         deck.save!
       end
+      run_deterministic_analysis(deck)
       Result.new(deck: deck, parsed: parsed_with_hint, error_messages: [])
     rescue Adapters::TextFile::InvalidFile,
            Adapters::Archidekt::InvalidUrl,
@@ -71,6 +72,12 @@ module Decks
     end
 
     private
+
+    def run_deterministic_analysis(deck)
+      Analyzer.run(deck)
+    rescue StandardError => e
+      Rails.logger.error("[decks/importer] analyzer failed for deck=#{deck&.id}: #{e.class}: #{e.message}")
+    end
 
     def apply_commander_hint(parsed, hint)
       cleaned = hint.to_s.strip

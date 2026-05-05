@@ -3,10 +3,10 @@ module CommanderFormat
     DECK_SIZE_TOTAL = 100
     MAX_COMMANDERS = 2
 
-    BASIC_LAND_NORMALIZED_NAMES = %w[
-      plains island swamp mountain forest wastes
-      snow covered plains snow covered island snow covered swamp
-      snow covered mountain snow covered forest snow covered wastes
+    BASIC_LAND_NORMALIZED_NAMES = [
+      "plains", "island", "swamp", "mountain", "forest", "wastes",
+      "snow covered plains", "snow covered island", "snow covered swamp",
+      "snow covered mountain", "snow covered forest", "snow covered wastes"
     ].freeze
 
     SINGLETON_EXEMPT_LIMITS = {

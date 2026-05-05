@@ -1,0 +1,76 @@
+<%
+  data ||= {}
+%>
+
+<% case key %>
+<% when "power" %>
+  <% %w[fast_mana tutors combo_pieces card_draw].each do |k| %>
+    <% block = data[k] || { "count" => 0, "cards" => [] } %>
+    <p>
+      <span class="text-zinc-400"><%= k.tr("_", " ").capitalize %>:</span>
+      <span class="text-white"><%= block["count"] %></span>
+      <% if Array(block["cards"]).any? %>
+        <span class="text-zinc-500">— <%= Array(block["cards"]).first(5).join(", ") %></span>
+      <% end %>
+    </p>
+  <% end %>
+
+<% when "speed" %>
+  <p><span class="text-zinc-400">Mana sources:</span> <span class="text-white"><%= data["mana_sources"] %></span> (lands <%= data["lands"] %>)</p>
+  <% fm = data["fast_mana"] || {} %>
+  <p>
+    <span class="text-zinc-400">Fast mana:</span> <span class="text-white"><%= fm["count"] %></span>
+    <% if Array(fm["cards"]).any? %>
+      <span class="text-zinc-500">— <%= Array(fm["cards"]).first(5).join(", ") %></span>
+    <% end %>
+  </p>
+  <p><span class="text-zinc-400">Cards at MV ≤ 2:</span> <span class="text-white"><%= data["low_curve_count"] %></span></p>
+
+<% when "interaction" %>
+  <% %w[removal stack_interaction board_wipes protection].each do |k| %>
+    <% block = data[k] || { "count" => 0, "cards" => [] } %>
+    <p>
+      <span class="text-zinc-400"><%= k.tr("_", " ").capitalize %>:</span>
+      <span class="text-white"><%= block["count"] %></span>
+      <% if Array(block["cards"]).any? %>
+        <span class="text-zinc-500">— <%= Array(block["cards"]).first(5).join(", ") %></span>
+      <% end %>
+    </p>
+  <% end %>
+
+<% when "consistency" %>
+  <% draw = data["card_draw"] || {} %>
+  <% tutors = data["tutors"] || {} %>
+  <p>
+    <span class="text-zinc-400">Card draw:</span> <span class="text-white"><%= draw["count"] %></span>
+    <% if Array(draw["cards"]).any? %>
+      <span class="text-zinc-500">— <%= Array(draw["cards"]).first(5).join(", ") %></span>
+    <% end %>
+  </p>
+  <p>
+    <span class="text-zinc-400">Tutors:</span> <span class="text-white"><%= tutors["count"] %></span>
+    <% if Array(tutors["cards"]).any? %>
+      <span class="text-zinc-500">— <%= Array(tutors["cards"]).first(5).join(", ") %></span>
+    <% end %>
+  </p>
+  <p><span class="text-zinc-400">Lands:</span> <span class="text-white"><%= data["lands"] %></span> · <span class="text-zinc-400">Mana sources:</span> <span class="text-white"><%= data["mana_sources"] %></span></p>
+  <% if data["missing_oracle_count"].to_i.positive? %>
+    <p class="text-amber-300">Missing oracle data for <%= data["missing_oracle_count"] %> cards — confidence reduced.</p>
+  <% end %>
+
+<% when "salt", "social_friction" %>
+  <% drivers = Array(data["drivers"]) %>
+  <% if drivers.empty? %>
+    <p class="text-zinc-500">No drivers detected.</p>
+  <% else %>
+    <% drivers.each do |driver| %>
+      <p>
+        <span class="text-zinc-200"><%= driver["label"] %>:</span>
+        <span class="text-white"><%= driver["count"] %></span>
+        <% if Array(driver["cards"]).any? %>
+          <span class="text-zinc-500">— <%= Array(driver["cards"]).first(5).join(", ") %></span>
+        <% end %>
+      </p>
+    <% end %>
+  <% end %>
+<% end %>

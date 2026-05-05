@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-04
+Last updated: 2026-05-05
 
 ## How agents work this file
 
@@ -45,6 +45,7 @@ These don't move:
 - **Provider link placeholders** for Archidekt and Moxfield public profile URLs (no third-party password collection).
 - **Card corpus:** Scryfall bulk-data ingestion, Commander rules/banlist snapshot, internal tag taxonomy with curated salt/social-friction overrides, deterministic legality checker, daily Solid Queue refresh job.
 - **Deck import:** pasted text, uploaded text file, public Archidekt URL, public Moxfield URL. Imports surface unparsed lines, source attribution, audit events.
+- **Deterministic deck analysis:** every import runs feature extraction, Commander legality, and a six-axis scorecard (Power, Speed, Interaction, Consistency, Salt, Social Friction). Deck show page renders per-score evidence drawers, legality result, and a tuning recommendation list. AI evaluation is not wired up yet.
 - **Seeded users:** admin (`stephenvsawyer@gmail.com`, password from `IDEAL_MAGIC_ADMIN_PASSWORD`) and demo (`demo@demo.com` / `demo1234`). `bin/rails demo:reset` factory-resets the demo account.
 - **Production:** live at https://ideal-magic.com via Caddy + systemd + host PostgreSQL. `bin/redeploy` is the iteration loop.
 
@@ -58,14 +59,14 @@ In rough value order. Each slice is one or two passes of work and ships a user-v
 
 The biggest gap right now: a user imports a deck and only sees a card list. Make it show an honest read. No AI yet — that's Slice 6.
 
-- [ ] Compute and persist a feature vector per deck: counts for ramp, fast mana, draw, tutors, interaction, wipes, protection, lands, mana sources, recursion, win-condition markers, plus mana curve and color requirements. Use the existing tag taxonomy.
-- [ ] Run deterministic Commander legality on every import and store the result against the deck.
-- [ ] Estimate power, speed, interaction, and consistency from feature bands. Each gets a 1–10 value plus a short evidence list (the cards/tags that drove it).
-- [ ] Compute deterministic salt score and social-friction score from salt/friction-tagged cards, fast mana, mass land denial, extra turns, theft, chaos, repetitive locks, stax, and combo compactness. Neutral labels.
-- [ ] Render a deck show page surfacing all six scores, an evidence drawer per score, the legality result, and a recommendation list (mana, draw, ramp, interaction, salt-reduction).
-- [ ] Re-compute scores when a deck's cards change. Synchronous on save is fine — no background job needed yet.
+- [x] Compute and persist a feature vector per deck: counts for ramp, fast mana, draw, tutors, interaction, wipes, protection, lands, mana sources, recursion, win-condition markers, plus mana curve and color requirements. Use the existing tag taxonomy.
+- [x] Run deterministic Commander legality on every import and store the result against the deck.
+- [x] Estimate power, speed, interaction, and consistency from feature bands. Each gets a 1–10 value plus a short evidence list (the cards/tags that drove it).
+- [x] Compute deterministic salt score and social-friction score from salt/friction-tagged cards, fast mana, mass land denial, extra turns, theft, chaos, repetitive locks, stax, and combo compactness. Neutral labels.
+- [x] Render a deck show page surfacing all six scores, an evidence drawer per score, the legality result, and a recommendation list (mana, draw, ramp, interaction, salt-reduction).
+- [x] Re-compute scores when a deck's cards change. Synchronous on save is fine — no background job needed yet.
 - [ ] Add benchmark deck fixtures spanning precon / casual / upgraded / high-power so the score bands are reviewable.
-- [ ] Tests: feature extraction unit, scoring against benchmark fixtures, system test that imports a deck and asserts evidence-backed scores render.
+- [~] Tests: feature extraction unit, scoring against benchmark fixtures, system test that imports a deck and asserts evidence-backed scores render. (Unit + scoring + analyzer + system tests landed; benchmark-fixture coverage waits on the fixture box above.)
 
 ### Slice 2 — Pods (2–4 deck comparison and Rule 0 brief)
 
@@ -146,6 +147,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-05 — Slice 1 first pass: deterministic feature extractor, six-axis scorer, legality-gated `Decks::Analyzer`, deck-show evidence drawers, and importer hook. Benchmark-fixture pass and score-band calibration still open.
 - 2026-05-04 — BUILD.md rewritten as user-visible slices; phase-by-phase plan retired.
 - 2026-05-04 — Seeded admin + demo accounts and `bin/rails demo:reset` rake task for factory-resetting the demo user.
 - 2026-05-04 — Public Moxfield deck URL import (`Decks::MoxfieldClient` + `Decks::Adapters::Moxfield`).

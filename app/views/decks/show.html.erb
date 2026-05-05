@@ -31,6 +31,14 @@
     </div>
   <% end %>
 
+  <% if @scorecard.present? %>
+    <%= render "analysis", scorecard: @scorecard, run: @analysis_run, legality: @legality %>
+  <% else %>
+    <div class="rounded-md border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-300">
+      Deterministic analysis has not run for this deck yet.
+    </div>
+  <% end %>
+
   <div class="grid gap-6 lg:grid-cols-2">
     <% if @deck.commanders.any? %>
       <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">

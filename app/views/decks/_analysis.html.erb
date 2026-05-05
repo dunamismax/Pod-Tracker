@@ -1,0 +1,102 @@
+<%
+  scorecard ||= nil
+  run ||= nil
+  legality ||= nil
+
+  evidence = scorecard.evidence.is_a?(Hash) ? scorecard.evidence : {}
+  recs = Array(scorecard.improvement_suggestions)
+
+  score_specs = [
+    { key: "power", label: "Power", value: scorecard.power_score, hint: "Goldfish ceiling: ramp + tutors + combo + draw." },
+    { key: "speed", label: "Speed", value: scorecard.speed_score, hint: "How fast the deck wants to act." },
+    { key: "interaction", label: "Interaction", value: scorecard.interaction_score, hint: "Removal, counters, wipes, protection." },
+    { key: "consistency", label: "Consistency", value: scorecard.consistency_score, hint: "Mana, draw, tutors, fixing." },
+    { key: "salt", label: "Salt", value: scorecard.salt_score, hint: "Drivers of resentment at the table. Neutral, not a judgment." },
+    { key: "social_friction", label: "Social friction", value: scorecard.social_friction_score, hint: "Table-experience patterns separate from raw power." }
+  ]
+%>
+
+<section class="space-y-4" data-testid="deck-analysis">
+  <header class="flex flex-wrap items-baseline justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-medium text-white">Deterministic analysis</h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        Rubric <code class="font-mono"><%= run&.rubric_version || scorecard.raw_payload["rubric_version"] %></code>
+        <% if scorecard.confidence.present? %>
+          · Confidence <%= number_to_percentage(scorecard.confidence.to_f * 100, precision: 0) %>
+        <% end %>
+        <% if run&.completed_at %>
+          · Computed <%= time_ago_in_words(run.completed_at) %> ago
+        <% end %>
+      </p>
+    </div>
+  </header>
+
+  <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <% score_specs.each do |spec| %>
+      <% score_block = evidence[spec[:key]] || {} %>
+      <% score_evidence = score_block["evidence"] || {} %>
+      <li class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+        <details class="group">
+          <summary class="flex cursor-pointer list-none items-baseline justify-between gap-3">
+            <div>
+              <p class="text-xs uppercase tracking-wide text-zinc-400"><%= spec[:label] %></p>
+              <p class="mt-1 text-2xl font-semibold text-white"><%= spec[:value] || "—" %><span class="text-sm text-zinc-500">/10</span></p>
+            </div>
+            <span class="text-xs text-emerald-300 group-open:hidden">Evidence ▸</span>
+            <span class="text-xs text-emerald-300 hidden group-open:inline">Hide ▾</span>
+          </summary>
+          <p class="mt-2 text-xs text-zinc-500"><%= spec[:hint] %></p>
+          <div class="mt-3 space-y-2 text-xs text-zinc-300">
+            <%= render "decks/score_evidence", key: spec[:key], data: score_evidence %>
+          </div>
+        </details>
+      </li>
+    <% end %>
+  </ul>
+
+  <% if legality.present? %>
+    <% issues = Array(legality["issues"]) %>
+    <% legal = legality["legal"] %>
+    <div class="rounded-lg border <%= legal ? 'border-emerald-800 bg-emerald-950/30' : 'border-amber-800 bg-amber-950/30' %> p-4 text-sm">
+      <p class="font-medium <%= legal ? 'text-emerald-200' : 'text-amber-200' %>">
+        Commander legality:
+        <%= legal ? "Legal" : "Issues found" %>
+      </p>
+      <% if legality["snapshot_effective_on"].present? %>
+        <p class="mt-1 text-xs text-zinc-400">
+          Snapshot <%= legality["snapshot_source"] %> · effective <%= legality["snapshot_effective_on"] %>
+        </p>
+      <% end %>
+      <% if issues.any? %>
+        <ul class="mt-3 space-y-1 text-xs">
+          <% issues.first(20).each do |issue| %>
+            <li class="flex gap-2">
+              <span class="font-mono uppercase text-zinc-500"><%= issue["severity"] %></span>
+              <span class="text-zinc-200">
+                <%= issue["message"] %>
+                <% if issue["card_name"].present? %>
+                  <span class="text-zinc-500">(<%= issue["card_name"] %>)</span>
+                <% end %>
+              </span>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if recs.any? %>
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <h3 class="text-sm font-medium text-white">Suggestions</h3>
+      <ul class="mt-2 space-y-2 text-sm text-zinc-200">
+        <% recs.each do |rec| %>
+          <li class="flex flex-col">
+            <span class="font-medium"><%= rec["title"] %></span>
+            <span class="text-xs text-zinc-400"><%= rec["detail"] %></span>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+</section>

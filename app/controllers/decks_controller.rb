@@ -9,6 +9,9 @@ class DecksController < ApplicationController
   end
 
   def show
+    @analysis_run = @deck.latest_deterministic_run
+    @scorecard = @analysis_run&.scorecard
+    @legality = @analysis_run&.deterministic_snapshot&.dig("legality")
   end
 
   def new
