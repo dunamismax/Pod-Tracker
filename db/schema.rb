@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_05_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_05_110000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -271,6 +271,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_100000) do
     t.datetime "created_at", null: false
     t.text "description"
     t.string "format", default: "commander", null: false
+    t.bigint "guest_for_pod_id"
     t.jsonb "import_metadata", default: {}, null: false
     t.datetime "last_imported_at"
     t.string "name", null: false
@@ -281,6 +282,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_100000) do
     t.string "visibility", default: "private", null: false
     t.index ["color_identity"], name: "index_decks_on_color_identity", using: :gin
     t.index ["format"], name: "index_decks_on_format"
+    t.index ["guest_for_pod_id"], name: "index_decks_on_guest_for_pod_id"
     t.index ["status"], name: "index_decks_on_status"
     t.index ["user_id", "name"], name: "index_decks_on_user_id_and_name"
     t.index ["user_id", "updated_at"], name: "index_decks_on_user_id_and_updated_at"
@@ -526,6 +528,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_100000) do
   add_foreign_key "deck_cards", "card_printings"
   add_foreign_key "deck_cards", "decks"
   add_foreign_key "deck_cards", "oracle_cards"
+  add_foreign_key "decks", "pods", column: "guest_for_pod_id"
   add_foreign_key "decks", "users"
   add_foreign_key "pod_analysis_runs", "pods"
   add_foreign_key "pod_analysis_runs", "users"

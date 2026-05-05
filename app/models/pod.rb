@@ -9,6 +9,11 @@ class Pod < ApplicationRecord
   has_many :decks, through: :pod_slots
   has_many :pod_analysis_runs, dependent: :destroy
   has_many :audit_events, as: :auditable, dependent: :nullify
+  has_many :guest_decks,
+           class_name: "Deck",
+           foreign_key: :guest_for_pod_id,
+           inverse_of: :guest_for_pod,
+           dependent: :destroy
 
   validates :name, presence: true
   validates :format, inclusion: { in: FORMATS }

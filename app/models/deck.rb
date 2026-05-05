@@ -4,6 +4,7 @@ class Deck < ApplicationRecord
   VISIBILITIES = %w[private unlisted public].freeze
 
   belongs_to :user, optional: true
+  belongs_to :guest_for_pod, class_name: "Pod", optional: true
   has_many :deck_cards, dependent: :destroy
   has_many :commanders, dependent: :destroy
   has_many :provider_links, dependent: :destroy
@@ -14,6 +15,10 @@ class Deck < ApplicationRecord
   validates :format, inclusion: { in: FORMATS }
   validates :status, inclusion: { in: STATUSES }
   validates :visibility, inclusion: { in: VISIBILITIES }
+
+  def guest?
+    guest_for_pod_id.present?
+  end
 
   def latest_deterministic_run
     analysis_runs

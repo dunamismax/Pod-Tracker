@@ -58,4 +58,54 @@ class PodFormTest < ActiveSupport::TestCase
     assert_equal "Bob", form.slot_label_for("2")
     assert_equal "", form.slot_label_for(99)
   end
+
+  test "guest_deck counts toward minimum slot count" do
+    form = PodForm.new(
+      name: "Pod",
+      deck_ids: [ @decks.first.id.to_s ],
+      guest_deck: { decklist: "1 Sol Ring" }
+    )
+    form.user = @user
+    assert form.guest_deck_provided?
+    assert_equal 2, form.total_slot_count
+    assert form.valid?, form.errors.full_messages.inspect
+  end
+
+  test "guest_deck plus four owned decks exceeds the maximum slot count" do
+    form = PodForm.new(
+      name: "Pod",
+      deck_ids: @decks.map(&:id).map(&:to_s),
+      guest_deck: { decklist: "1 Sol Ring" }
+    )
+    form.user = @user
+    assert_not form.valid?
+    assert_match(/at most/, form.errors[:deck_ids].first.to_s)
+  end
+
+  test "guest_deck rejects multiple sources" do
+    form = PodForm.new(
+      name: "Pod",
+      deck_ids: @decks.first(2).map(&:id).map(&:to_s),
+      guest_deck: {
+        decklist: "1 Sol Ring",
+        archidekt_url: "https://archidekt.com/decks/123"
+      }
+    )
+    form.user = @user
+    assert_not form.valid?
+    assert_match(/only one of/, form.errors[:guest_deck].first.to_s)
+  end
+
+  test "guest_source picks the supplied source" do
+    moxfield_form = PodForm.new(guest_deck: { moxfield_url: "https://moxfield.com/decks/abc" })
+    archidekt_form = PodForm.new(guest_deck: { archidekt_url: "https://archidekt.com/decks/12345" })
+    pasted_form = PodForm.new(guest_deck: { decklist: "1 Sol Ring" })
+    blank_form = PodForm.new(guest_deck: { decklist: "  " })
+
+    assert_equal :moxfield, moxfield_form.guest_source
+    assert_equal :archidekt, archidekt_form.guest_source
+    assert_equal :pasted, pasted_form.guest_source
+    assert_nil blank_form.guest_source
+    assert_not blank_form.guest_deck_provided?
+  end
 end

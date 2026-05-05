@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-05 (Slice 3 — bracket data refresh, cEDH benchmark fixture, bracket-aware pod tests)
+Last updated: 2026-05-05 (Slice 2 — guest deck slot in pods via paste / public URL)
 
 ## How agents work this file
 
@@ -46,7 +46,7 @@ These don't move:
 - **Card corpus:** Scryfall bulk-data ingestion, Commander rules/banlist snapshot, internal tag taxonomy with curated salt/social-friction overrides, deterministic legality checker, daily Solid Queue refresh job.
 - **Deck import:** pasted text, uploaded text file, public Archidekt URL, public Moxfield URL. Imports surface unparsed lines, source attribution, audit events.
 - **Deterministic deck analysis:** every import runs feature extraction, Commander legality, and a six-axis scorecard (Power, Speed, Interaction, Consistency, Salt, Social Friction). Deck show page renders per-score evidence drawers, legality result, and a tuning recommendation list. AI evaluation is not wired up yet.
-- **Pods (2–4 of the user's decks):** build a pod, get per-axis spread/average/outliers, archenemy/pubstomp/durdle warnings, a Rule 0 brief (power band, tempo, combo/stax notes, salt/friction notes), and per-deck swap suggestions. Mobile-readable and printable show page. Opt-in revocable public share link. Guest deck import (paste / public URL) is the next pass.
+- **Pods (2–4 decks):** build a pod from your own decks, optionally including one guest deck via pasted decklist or public Archidekt / Moxfield URL. Pods get per-axis spread/average/outliers, archenemy/pubstomp/durdle warnings, a Rule 0 brief (power band, tempo, combo/stax notes, salt/friction notes), and per-deck swap suggestions. Mobile-readable and printable show page. Opt-in revocable public share link. Guest decks live only with the pod and are removed when the pod is removed.
 - **Seeded users:** admin (`stephenvsawyer@gmail.com`, password from `IDEAL_MAGIC_ADMIN_PASSWORD`) and demo (`demo@demo.com` / `demo1234`). `bin/rails demo:reset` factory-resets the demo account.
 - **Production:** live at https://ideal-magic.com via Caddy + systemd + host PostgreSQL. `bin/redeploy` is the iteration loop.
 
@@ -72,7 +72,7 @@ The biggest gap right now: a user imports a deck and only sees a card list. Make
 ### Slice 2 — Pods (2–4 deck comparison and Rule 0 brief)
 
 - [x] Pod model: pod, pod slot, pod analysis run, plus a shareable-link token.
-- [~] Build a pod from 2–4 of the user's decks. Allow a guest deck via paste or public URL. (User-deck pods ship; guest deck via paste/URL pending.)
+- [x] Build a pod from 2–4 of the user's decks. Allow a guest deck via paste or public URL.
 - [x] Pod analysis: per-axis spread, average, outliers, archenemy/pubstomp/durdle warnings, salt and social-friction spread.
 - [x] Rule 0 brief: power band, speed expectations, combo/stax notes, salt/friction notes, suggested swaps.
 - [x] Pod show page that's mobile-readable and printable.
@@ -217,6 +217,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-05 — Slice 2 closed: pods now accept one guest deck via pasted decklist or public Archidekt / Moxfield URL. Guest decks attach to the pod (user_id=nil, guest_for_pod_id=pod.id), are analyzed inline, surface in the Rule 0 brief, and are destroyed when the pod is removed. Added `decks.guest_for_pod_id` reference column, `Pod#guest_decks` cascade, `PodForm` guest fields, and pod-controller + form-test coverage for paste / Archidekt-URL / multi-source / unparseable-decklist cases.
 - 2026-05-05 — Slice 3 follow-up: refreshed the legality snapshot to the 2026-02-09 banlist (Biorhythm unbanned, Lutri removed since Commander format does not assign companions), added a Tymna + Thrasios Thoracle/Consultation cEDH fixture that locks in Bracket 5 in `BenchmarkScoringTest`, and added bracket-aware `Pods::AnalyzerTest` cases (mismatched 2→5 four-pod produces `bracket_mismatch` alert; balanced Bracket 2 three-pod produces a single-bracket headline).
 - 2026-05-05 — Slice 3 opened: Commander Brackets (1–5) added as the primary deck-intent axis alongside the existing six axes; canonical Game Changers list, bracket evaluator service, deck/pod show pages surfacing the bracket badge + restrictions, and a public marketing surface (no-login landing + `/brackets` long-form explanation, About, Privacy, Terms). 0–10 axes are kept as sub-band evidence.
 - 2026-05-05 — Slice 2 first pass: pods of the user's existing decks. `Pod`, `PodSlot`, `PodAnalysisRun`, share-token surface, `Pods::Analyzer` (spread, average, outliers, archenemy/pubstomp/durdle/salt/friction warnings), `Pods::RuleZeroBrief`, `Pods::SuggestionsBuilder`, mobile + print pod show page, opt-in revocable `/p/:token` public share. Guest-deck slot via paste / public URL deferred.
