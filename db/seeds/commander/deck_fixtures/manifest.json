@@ -1,7 +1,17 @@
 {
-  "version": "2026-05-04",
-  "notes": "Representative Commander deck fixtures used for legality, parser, and analysis tests. Each entry references a sibling .txt file containing a pasted-decklist style card list with explicit Commander, Mainboard, and optional Sideboard sections. Color identity, banlist intent, and power band are recorded to make legality and analysis assertions stable.",
+  "version": "2026-05-05",
+  "notes": "Representative Commander deck fixtures used for legality, parser, and analysis tests. Each entry references a sibling .txt file containing a pasted-decklist style card list with explicit Commander, Mainboard, and optional Sideboard sections. Color identity, banlist intent, and power band are recorded to make legality and analysis assertions stable. Power bands span precon, casual, upgraded, and high_power so deterministic scoring can be reviewed against representative builds.",
   "decks": [
+    {
+      "slug": "precon_korlash_mono_black",
+      "name": "Korlash Mono-Black Zombies (Precon Band)",
+      "format": "commander",
+      "color_identity": ["B"],
+      "expected_main_card_count": 99,
+      "intent": "Stock-precon-band mono-black zombies build: minimal staples, no fast-mana stack beyond Sol Ring, no tutors, no compact combos. Used as the low-power benchmark for deterministic scoring.",
+      "power_band": "precon",
+      "file": "precon_korlash_mono_black.txt"
+    },
     {
       "slug": "mono_green_omnath_stompy",
       "name": "Omnath Mono-Green Stompy",
@@ -31,6 +41,16 @@
       "intent": "Legal mono-red goblin tribal aggro build for parser and ownership tests.",
       "power_band": "casual",
       "file": "krenko_goblin_tribal.txt"
+    },
+    {
+      "slug": "high_power_najeela_5c",
+      "name": "Najeela 5-Color High Power",
+      "format": "commander",
+      "color_identity": ["B", "G", "R", "U", "W"],
+      "expected_main_card_count": 99,
+      "intent": "High-power five-color benchmark with the legal-under-current-banlist fast-mana stack, full tutor suite, Thoracle/Consultation/Tainted-Pact compact combo line, dense counter/protection/wipe density, and stax + extra-turn + mass-land-denial salt drivers. Used as the upper benchmark for deterministic scoring.",
+      "power_band": "high_power",
+      "file": "high_power_najeela_5c.txt"
     },
     {
       "slug": "illegal_banned_card_demo",

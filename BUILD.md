@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-05
+Last updated: 2026-05-05 (benchmark fixtures pass)
 
 ## How agents work this file
 
@@ -65,8 +65,8 @@ The biggest gap right now: a user imports a deck and only sees a card list. Make
 - [x] Compute deterministic salt score and social-friction score from salt/friction-tagged cards, fast mana, mass land denial, extra turns, theft, chaos, repetitive locks, stax, and combo compactness. Neutral labels.
 - [x] Render a deck show page surfacing all six scores, an evidence drawer per score, the legality result, and a recommendation list (mana, draw, ramp, interaction, salt-reduction).
 - [x] Re-compute scores when a deck's cards change. Synchronous on save is fine — no background job needed yet.
-- [ ] Add benchmark deck fixtures spanning precon / casual / upgraded / high-power so the score bands are reviewable.
-- [~] Tests: feature extraction unit, scoring against benchmark fixtures, system test that imports a deck and asserts evidence-backed scores render. (Unit + scoring + analyzer + system tests landed; benchmark-fixture coverage waits on the fixture box above.)
+- [x] Add benchmark deck fixtures spanning precon / casual / upgraded / high-power so the score bands are reviewable.
+- [x] Tests: feature extraction unit, scoring against benchmark fixtures, system test that imports a deck and asserts evidence-backed scores render.
 
 ### Slice 2 — Pods (2–4 deck comparison and Rule 0 brief)
 
@@ -147,6 +147,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-05 — Slice 1 closed: precon (Korlash) and high-power (Najeela 5C) benchmark fixtures plus a `Decks::BenchmarkScoringTest` that asserts power, salt, friction, tutor, fast-mana, stax, and combo counts grow across the precon → casual → upgraded → high-power band.
 - 2026-05-05 — Slice 1 first pass: deterministic feature extractor, six-axis scorer, legality-gated `Decks::Analyzer`, deck-show evidence drawers, and importer hook. Benchmark-fixture pass and score-band calibration still open.
 - 2026-05-04 — BUILD.md rewritten as user-visible slices; phase-by-phase plan retired.
 - 2026-05-04 — Seeded admin + demo accounts and `bin/rails demo:reset` rake task for factory-resetting the demo user.
