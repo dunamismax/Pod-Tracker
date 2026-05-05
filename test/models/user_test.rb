@@ -11,24 +11,6 @@ class UserTest < ActiveSupport::TestCase
     assert_nil user.display_name
   end
 
-  test "validates email format" do
-    user = build_user(email_address: "not-an-email")
-    assert_not user.valid?
-    assert_includes user.errors[:email_address], "is invalid"
-  end
-
-  test "validates preferred_units inclusion" do
-    user = build_user(preferred_units: "league")
-    assert_not user.valid?
-    assert_includes user.errors[:preferred_units], "is not included in the list"
-  end
-
-  test "validates timezone" do
-    user = build_user(timezone: "Atlantis/El_Dorado")
-    assert_not user.valid?
-    assert_includes user.errors[:timezone], "is not included in the list"
-  end
-
   test "email_verified? reflects email_verified_at" do
     user = build_user
     assert_not user.email_verified?

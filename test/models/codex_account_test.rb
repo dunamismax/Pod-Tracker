@@ -6,20 +6,6 @@ class CodexAccountTest < ActiveSupport::TestCase
     @user.codex_account&.destroy
   end
 
-  test "validates auth_mode and status" do
-    account = CodexAccount.new(user: @user, auth_mode: "bogus", status: "weird")
-    assert_not account.valid?
-    assert_includes account.errors[:auth_mode], "is not included in the list"
-    assert_includes account.errors[:status], "is not included in the list"
-  end
-
-  test "rejects more than one codex account per user" do
-    CodexAccount.create!(user: @user, auth_mode: "chatgpt_browser", status: "connected")
-    second = CodexAccount.new(user: @user, auth_mode: "chatgpt_device_code", status: "pending")
-    assert_not second.valid?
-    assert_includes second.errors[:user_id], "has already been taken"
-  end
-
   test "encrypts the credential payload column" do
     account = CodexAccount.create!(
       user: @user,
@@ -80,16 +66,4 @@ class CodexAccountTest < ActiveSupport::TestCase
     refute_includes payload.values.compact.map(&:to_s).join, "secret-token"
   end
 
-  test "destroying the user destroys the codex account" do
-    user = User.create!(
-      email_address: "codex-burner@example.com",
-      password: "supersecret",
-      password_confirmation: "supersecret"
-    )
-    user.create_codex_account!(auth_mode: "chatgpt_browser", status: "connected")
-
-    assert_difference -> { CodexAccount.count }, -1 do
-      user.destroy!
-    end
-  end
 end

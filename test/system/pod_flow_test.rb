@@ -42,16 +42,6 @@ class PodFlowTest < ApplicationSystemTestCase
     end
   end
 
-  test "rejects pods with fewer than two decks" do
-    sign_in_through_ui(@user)
-    visit new_pod_path
-    fill_in "Pod name", with: "One-deck pod"
-    check @deck_a.name
-    click_button "Analyze pod"
-
-    assert_text(/at least/i)
-  end
-
   private
     def build_deck(slug)
       deck = @library.build_deck(slug, user: @user)

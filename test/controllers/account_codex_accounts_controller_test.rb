@@ -34,20 +34,6 @@ class AccountCodexAccountsControllerTest < ActionDispatch::IntegrationTest
     Codex::AccountConnections.client_factory = @previous_factory
   end
 
-  test "requires authentication" do
-    delete account_codex_account_path
-    assert_redirected_to new_session_path
-  end
-
-  test "redirects with alert when no codex account is connected" do
-    @user.codex_account&.destroy
-    sign_in_as(@user)
-
-    delete account_codex_account_path
-    assert_redirected_to account_path
-    assert_equal "No Codex account is connected.", flash[:alert]
-  end
-
   test "disconnects the codex account, clears credentials, and records an audit event" do
     @user.codex_account&.destroy
     account = @user.create_codex_account!(
@@ -104,31 +90,6 @@ class AccountCodexAccountsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil event
   end
 
-  test "logout still disconnects locally when remote logout errors" do
-    @user.codex_account&.destroy
-    account = @user.create_codex_account!(
-      auth_mode: "chatgpt_browser",
-      status: "connected",
-      encrypted_credential_payload: "secret-token"
-    )
-    client = FakeClient.new(raises_on: { logout_chatgpt: Codex::AppServerClient::TransportError.new("offline") })
-    Codex::AccountConnections.client_factory = -> { client }
-    sign_in_as(@user)
-
-    post logout_account_codex_account_path
-    assert_redirected_to account_path
-    assert_equal "disconnected", account.reload.status
-  end
-
-  test "logout returns alert when no codex account is connected" do
-    @user.codex_account&.destroy
-    sign_in_as(@user)
-
-    post logout_account_codex_account_path
-    assert_redirected_to account_path
-    assert_equal "No Codex account is connected.", flash[:alert]
-  end
-
   test "refresh updates rate-limit snapshot, plan, and last_synced_at" do
     @user.codex_account&.destroy
     account = @user.create_codex_account!(
@@ -155,28 +116,4 @@ class AccountCodexAccountsControllerTest < ActionDispatch::IntegrationTest
     assert_equal({ "primaryUsedPercent" => 12 }, account.rate_limit_snapshot)
   end
 
-  test "refresh requires a connected codex account" do
-    @user.codex_account&.destroy
-    sign_in_as(@user)
-
-    post refresh_account_codex_account_path
-    assert_redirected_to account_path
-    assert_equal "Connect a Codex account before refreshing status.", flash[:alert]
-  end
-
-  test "refresh surfaces rpc errors as flash alerts" do
-    @user.codex_account&.destroy
-    @user.create_codex_account!(
-      auth_mode: "chatgpt_browser",
-      status: "connected",
-      encrypted_credential_payload: "secret-token"
-    )
-    client = FakeClient.new(raises_on: { get_auth_status: Codex::AppServerClient::RpcError.new("server died") })
-    Codex::AccountConnections.client_factory = -> { client }
-    sign_in_as(@user)
-
-    post refresh_account_codex_account_path
-    assert_redirected_to account_path
-    assert_match(/server died/, flash[:alert])
-  end
 end

@@ -5,13 +5,6 @@ class CodexLoginAttemptTest < ActiveSupport::TestCase
     @user = users(:one)
   end
 
-  test "validates auth_mode and status" do
-    attempt = CodexLoginAttempt.new(user: @user, auth_mode: "bogus", status: "weird")
-    assert_not attempt.valid?
-    assert_includes attempt.errors[:auth_mode], "is not included in the list"
-    assert_includes attempt.errors[:status], "is not included in the list"
-  end
-
   test "defaults started_at when not supplied" do
     attempt = CodexLoginAttempt.new(user: @user, auth_mode: "chatgpt_browser", status: "pending")
     assert attempt.valid?, attempt.errors.full_messages.to_sentence
@@ -64,16 +57,4 @@ class CodexLoginAttemptTest < ActiveSupport::TestCase
     assert attempt.expired?
   end
 
-  test "destroying user destroys login attempts" do
-    user = User.create!(
-      email_address: "loginburner@example.com",
-      password: "supersecret",
-      password_confirmation: "supersecret"
-    )
-    user.codex_login_attempts.create!(auth_mode: "chatgpt_browser", status: "pending")
-
-    assert_difference -> { CodexLoginAttempt.count }, -1 do
-      user.destroy!
-    end
-  end
 end

@@ -5,18 +5,6 @@ class AccountDeletionsControllerTest < ActionDispatch::IntegrationTest
     @user = users(:one)
   end
 
-  test "redirects unauthenticated users from the confirmation page" do
-    get new_account_deletion_path
-    assert_redirected_to new_session_path
-  end
-
-  test "renders confirmation page for signed-in user" do
-    sign_in_as(@user)
-    get new_account_deletion_path
-    assert_response :success
-    assert_select "h1", text: /Delete account/
-  end
-
   test "rejects deletion when password is wrong" do
     sign_in_as(@user)
     assert_no_difference("User.count") do

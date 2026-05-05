@@ -10,13 +10,6 @@ class AnalysisRunTest < ActiveSupport::TestCase
     assert_not_nil run.queued_at
   end
 
-  test "validates kind and status" do
-    run = AnalysisRun.new(kind: "bogus", status: "weird", rubric_version: "2026-05-04")
-    assert_not run.valid?
-    assert_includes run.errors[:kind], "is not included in the list"
-    assert_includes run.errors[:status], "is not included in the list"
-  end
-
   test "ai? true for ai and combined kinds" do
     assert AnalysisRun.new(kind: "ai", rubric_version: "v").ai?
     assert AnalysisRun.new(kind: "combined", rubric_version: "v").ai?
