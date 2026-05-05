@@ -16,4 +16,16 @@ class GameNight < ApplicationRecord
   def checked_in_count
     game_night_players.size
   end
+
+  def pod_numbers
+    game_night_pod_seats.map(&:pod_number).uniq.sort
+  end
+
+  def pod_seats_by_number
+    game_night_pod_seats.group_by(&:pod_number).sort.to_h
+  end
+
+  def pod_results_by_number
+    game_night_pod_results.index_by(&:pod_number)
+  end
 end

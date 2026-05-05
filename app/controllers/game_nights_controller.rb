@@ -1,5 +1,5 @@
 class GameNightsController < ApplicationController
-  before_action :load_game_night, only: %i[show destroy]
+  before_action :load_game_night, only: %i[show seat_pods pod_results destroy]
 
   def index
     @game_nights = current_user.game_nights
@@ -11,6 +11,31 @@ class GameNightsController < ApplicationController
   def show
     @checked_in = @game_night.game_night_players.includes(:player)
     @decks_by_player_id = @game_night.game_night_decks.includes(:deck).index_by(&:player_id)
+    @seating_rows = seating_rows
+    @pod_seats_by_number = @game_night.pod_seats_by_number
+    @pod_results_by_number = @game_night.pod_results_by_number
+  end
+
+  def seat_pods
+    result = GameNights::PodSeater.call(@game_night, assignments: seating_params)
+
+    if result.success?
+      record_audit("game_night.seated", game_night: @game_night)
+      redirect_to game_night_path(@game_night), notice: "Pods seated."
+    else
+      redirect_to game_night_path(@game_night), alert: result.errors.to_sentence
+    end
+  end
+
+  def pod_results
+    result = GameNights::ResultRecorder.call(@game_night, results: result_params)
+
+    if result.success?
+      record_audit("game_night.results_recorded", game_night: @game_night)
+      redirect_to game_night_path(@game_night), notice: "Results recorded."
+    else
+      redirect_to game_night_path(@game_night), alert: result.errors.to_sentence
+    end
   end
 
   def new
@@ -87,6 +112,30 @@ class GameNightsController < ApplicationController
 
   def game_night_params
     params.require(:game_night_form).permit(:name, :played_on, :location, :notes, check_ins: %i[player_name deck_id])
+  end
+
+  def seating_params
+    params.fetch(:seating, ActionController::Parameters.new)
+          .permit(rows: %i[player_id pod_number seat_number])
+          .fetch(:rows, [])
+  end
+
+  def result_params
+    params.fetch(:results, ActionController::Parameters.new)
+          .permit(rows: %i[pod_number winner_player_id draw turns win_condition notes])
+          .fetch(:rows, [])
+  end
+
+  def seating_rows
+    existing_rows = @game_night.game_night_pod_seats.map do |seat|
+      {
+        "player_id" => seat.player_id.to_s,
+        "pod_number" => seat.pod_number.to_s,
+        "seat_number" => seat.seat_number.to_s
+      }
+    end
+
+    existing_rows.presence || GameNights::SeatingSuggester.call(@game_night)
   end
 
   def default_name

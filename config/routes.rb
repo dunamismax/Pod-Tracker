@@ -16,7 +16,10 @@ Rails.application.routes.draw do
   resources :pods, only: %i[index show new create destroy] do
     resource :share, only: %i[create destroy], controller: "pod_shares"
   end
-  resources :game_nights, path: "sessions", only: %i[index show new create destroy]
+  resources :game_nights, path: "sessions", only: %i[index show new create destroy] do
+    post :seat_pods, on: :member
+    patch :pod_results, on: :member
+  end
   get "p/:token", to: "public_pods#show", as: :public_pod
   resources :passwords, param: :token
 

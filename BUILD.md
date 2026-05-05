@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-05 (Slice 4 — game-night session check-in)
+Last updated: 2026-05-05 (Slice 4 — game-night pod seating and results)
 
 ## How agents work this file
 
@@ -47,7 +47,7 @@ These don't move:
 - **Deck import:** pasted text, uploaded text file, public Archidekt URL, public Moxfield URL. Imports surface unparsed lines, source attribution, audit events.
 - **Deterministic deck analysis:** every import runs feature extraction, Commander legality, and a six-axis scorecard (Power, Speed, Interaction, Consistency, Salt, Social Friction). Deck show page renders per-score evidence drawers, legality result, and a tuning recommendation list. AI evaluation is not wired up yet.
 - **Pods (2–4 decks):** build a pod from your own decks, optionally including one guest deck via pasted decklist or public Archidekt / Moxfield URL. Pods get per-axis spread/average/outliers, archenemy/pubstomp/durdle warnings, a Rule 0 brief (power band, tempo, combo/stax notes, salt/friction notes), and per-deck swap suggestions. Mobile-readable and printable show page. Opt-in revocable public share link. Guest decks live only with the pod and are removed when the pod is removed.
-- **Game-night sessions:** signed-in users can create a session at `/sessions`, save date/location/notes, create or reuse user-owned players, and check each player in with one owned deck of the night. The session stores deck-name and commander snapshots for the checked-in decks; pod seating and result recording models exist but the workflow UI is still pending.
+- **Game-night sessions:** signed-in users can create a session at `/sessions`, save date/location/notes, create or reuse user-owned players, and check each player in with one owned deck of the night. Sessions suggest pod seating from the checked-in roster, allow manual pod/seat overrides, snapshot each seated deck's name, commanders, deck timestamp, card count, and deterministic analysis, record pod results, and render a session summary.
 - **Seeded users:** admin (`stephenvsawyer@gmail.com`, password from `IDEAL_MAGIC_ADMIN_PASSWORD`) and demo (`demo@demo.com` / `demo1234`). `bin/rails demo:reset` factory-resets the demo account.
 - **Production:** live at https://ideal-magic.com via Caddy + systemd + host PostgreSQL. `bin/redeploy` is the iteration loop.
 
@@ -153,11 +153,11 @@ The site no longer redirects every visitor to `/session/new`. Public surface liv
 
 - [x] Session model: `GameNight`, `Player`, `GameNightPlayer`, `GameNightDeck`, `GameNightPodSeat`, and `GameNightPodResult`. Product copy still says "sessions"; the model is named `GameNight` to avoid colliding with auth `Session`. Players are user-owned named entities — no public ranking surface.
 - [x] Create a session (date, location, notes) and check players in with their deck of the night. `/sessions/new` creates/reuses player records and snapshots deck name + commanders.
-- [ ] Suggest pod seating from checked-in players; allow manual overrides.
-- [ ] Record results: winner, draw state, turns, win condition, free-text notes.
-- [ ] Snapshot the deck revision and analysis used for each pod seat so meta history is honest later.
-- [ ] Session summary page with the night's pods, results, and links back to deck/analysis snapshots.
-- [ ] Tests: session workflow system test from create → check-in → seat → record → summary.
+- [x] Suggest pod seating from checked-in players; allow manual overrides. `GameNights::SeatingSuggester` balances bracket/power when deterministic analysis exists; the session show form lets users edit pod and seat numbers before saving.
+- [x] Record results: winner, draw state, turns, win condition, free-text notes.
+- [x] Snapshot the deck revision and analysis used for each pod seat so meta history is honest later. Seat snapshots store deck name, commanders, deck `updated_at`, deck card count, latest deterministic analysis run, bracket, and six-axis scores.
+- [x] Session summary page with the night's pods, results, and links back to deck/analysis snapshots.
+- [x] Tests: session workflow system test from create → check-in → seat → record → summary.
 
 ### Slice 5 — Collection and ownership
 
@@ -218,6 +218,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-05 — Slice 4 closed: sessions now suggest bracket/power-balanced pod seating with manual pod/seat overrides, snapshot seated decks plus latest deterministic analysis, record winner/draw/turns/win-condition/notes, and render a session summary; focused model/controller tests plus a create → check-in → seat → record → summary system test cover the flow.
 - 2026-05-05 — Slice 4 opened: game-night sessions now have `GameNight`-named models to avoid auth `Session` collision, user-owned players, check-in records, deck-of-the-night snapshots, pod-seat/result model foundations, `/sessions` index/new/show pages, dashboard/header links, and focused model/form/controller tests.
 - 2026-05-05 — Slice 3 SEO + docs: full Twitter cards, per-page canonical links, site-wide `Organization` + `WebSite` JSON-LD via `ApplicationHelper#jsonld_tag`, `Article` + `BreadcrumbList` JSON-LD on bracket pages, `/sitemap.xml` route + view, sitemap-aware `robots.txt`, and a new `docs/public-site.md` covering routes, content workflow, and SEO baseline.
 - 2026-05-05 — Slice 2 closed: pods now accept one guest deck via pasted decklist or public Archidekt / Moxfield URL. Guest decks attach to the pod (user_id=nil, guest_for_pod_id=pod.id), are analyzed inline, surface in the Rule 0 brief, and are destroyed when the pod is removed. Added `decks.guest_for_pod_id` reference column, `Pod#guest_decks` cascade, `PodForm` guest fields, and pod-controller + form-test coverage for paste / Archidekt-URL / multi-source / unparseable-decklist cases.
