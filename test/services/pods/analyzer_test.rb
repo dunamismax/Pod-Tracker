@@ -58,6 +58,67 @@ module Pods
       assert power_aggregate["max"] - power_aggregate["min"] < 3
     end
 
+    test "mismatched-bracket pod produces a bracket spread aggregate and a bracket_mismatch warning" do
+      pod = build_pod_from_fixtures(
+        "Bracket-mismatched four-pod",
+        %w[precon_korlash_mono_black mono_green_omnath_stompy atraxa_superfriends_upgraded cedh_tymna_thrasios_thoracle]
+      )
+
+      run = Pods::Analyzer.run(pod, user: @user)
+
+      bracket = run.snapshot["bracket"]
+      assert bracket, "expected bracket aggregate to be present"
+      assert_operator bracket["spread"], :>=, 2,
+        "expected bracket spread of at least 2 across precon → cEDH, got #{bracket.inspect}"
+      assert_equal 2, bracket["min"]
+      assert_equal 5, bracket["max"]
+      assert_includes bracket["headline"], "Mixed pod"
+      assert_includes bracket["distinct"], 5
+      assert_operator bracket["game_changer_total"].to_i, :>=, 6,
+        "cEDH slot alone should push the pod GC total well above 6"
+
+      warnings = run.warnings
+      kinds = warnings.map { |w| w["kind"] }
+      assert_includes kinds, "bracket_mismatch",
+        "expected a bracket_mismatch warning across a Bracket 2 → Bracket 5 spread"
+
+      mismatch = warnings.find { |w| w["kind"] == "bracket_mismatch" }
+      assert_includes mismatch["message"], "Bracket spread"
+      assert_equal "alert", mismatch["severity"]
+      hot_names = Array(mismatch["decks"]).map { |d| d["deck_name"] }
+      assert_includes hot_names, "Tymna + Thrasios cEDH (Thoracle Consultation)"
+
+      brief = run.rule_zero_brief
+      assert_match(/Brackets 2.+5/, brief.dig("bracket", "label").to_s)
+      template = brief["pregame_template"]
+      assert_match(/Brackets 2/, template.first.to_s) if template.is_a?(Array) && template.any?
+    end
+
+    test "balanced single-bracket pod produces a single-bracket headline and no bracket_mismatch warning" do
+      pod = build_pod_from_fixtures(
+        "Balanced bracket-2 three-pod",
+        %w[precon_korlash_mono_black mono_green_omnath_stompy krenko_goblin_tribal]
+      )
+
+      run = Pods::Analyzer.run(pod, user: @user)
+
+      bracket = run.snapshot["bracket"]
+      assert bracket
+      assert_equal 0, bracket["spread"], "balanced pod should have a bracket spread of zero"
+      assert_equal bracket["min"], bracket["max"]
+      assert_equal 2, bracket["min"]
+      assert_equal [ 2 ], bracket["distinct"]
+      assert_match(/Bracket 2/, bracket["headline"])
+
+      kinds = run.warnings.map { |w| w["kind"] }
+      assert_not_includes kinds, "bracket_mismatch"
+
+      brief = run.rule_zero_brief
+      headline = brief.dig("bracket", "label")
+      assert_match(/Bracket 2/, headline.to_s)
+      assert_no_match(/Mixed/i, headline.to_s)
+    end
+
     test "rejects pods with fewer than the minimum slot count" do
       pod = Pod.create!(user: @user, name: "Solo", format: "commander", status: "draft")
       assert_raises(ArgumentError) { Pods::Analyzer.run(pod, user: @user) }

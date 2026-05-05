@@ -17,7 +17,9 @@ class AccountAuthFlowsTest < ApplicationSystemTestCase
     assert_text "new-player@example.com"
     assert_text "New Player"
 
-    click_button "Sign out"
+    within "header" do
+      click_button "Sign out"
+    end
     assert_text "Sign in"
 
     fill_in "email_address", with: "new-player@example.com"

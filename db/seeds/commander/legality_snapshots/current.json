@@ -1,15 +1,14 @@
 {
   "source": "mtgcommander",
   "format": "commander",
-  "effective_on": "2024-09-23",
-  "fetched_at": "2026-05-04T00:00:00Z",
-  "source_checked_on": "2026-05-04",
+  "effective_on": "2026-02-09",
+  "fetched_at": "2026-05-05T00:00:00Z",
+  "source_checked_on": "2026-05-05",
   "source_url": "https://mtgcommander.net/index.php/banned-list/",
   "rules_url": "https://mtgcommander.net/index.php/rules/",
   "banned_names": [
     "Ancestral Recall",
     "Balance",
-    "Biorhythm",
     "Black Lotus",
     "Channel",
     "Chaos Orb",
@@ -28,7 +27,6 @@
     "Leovold, Emissary of Trest",
     "Library of Alexandria",
     "Limited Resources",
-    "Lutri, the Spellchaser",
     "Mana Crypt",
     "Mox Emerald",
     "Mox Jet",
@@ -100,5 +98,5 @@
       "banned_list": "https://mtgcommander.net/index.php/banned-list/"
     }
   },
-  "notes": "Source-controlled Commander legality seed snapshot. Re-check the official Commander rules and banned-list pages before updating this file."
+  "notes": "Source-controlled Commander legality seed snapshot. Reflects the 2026-02-09 update: Biorhythm is unbanned (now on the Game Changers list). Lutri, the Spellchaser is legal as a commander or as a deck card and is banned only as a Companion; Commander format does not normally assign companions, so Lutri is omitted from banned_names and the legality checker treats it as a legal card. Re-check the official Commander rules and banned-list pages before updating this file."
 }

@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-05 (Slice 3 opened — Commander Brackets system + public marketing site)
+Last updated: 2026-05-05 (Slice 3 — bracket data refresh, cEDH benchmark fixture, bracket-aware pod tests)
 
 ## How agents work this file
 
@@ -92,7 +92,7 @@ The bracket pages should be the best-on-the-internet explanation of the system �
 #### Bracket data + scoring
 
 - [x] Land the canonical Game Changers list (53 cards as of 2026-02-09, including Farewell + Biorhythm) as deterministic source data under `db/seeds/commander/brackets/`. Version it, refresh it on update, and key it by normalized card name.
-- [ ] Land the canonical Commander banned list refresh: confirm Biorhythm is unbanned, Lutri is companion-only-banned, and the legality snapshot reflects the current banlist.
+- [x] Land the canonical Commander banned list refresh: Biorhythm is unbanned (now on the Game Changers list), Lutri is companion-only-banned (legal as a commander or deck card; companions are not assigned in Commander format, so it is omitted from `banned_names`), and the legality snapshot is dated 2026-02-09 with `source_checked_on` 2026-05-05.
 - [~] Tag the curated overrides for mass land denial, extra-turn cards, and known two-card combo halves. (Two-card combo catalog landed at `db/seeds/commander/brackets/two_card_combos.json`. MLD/extra-turn tags already live in `card_tags/overrides.json`. Wider combo coverage still open.)
 - [x] `Decks::BracketEvaluator` service: returns `{ bracket: 1..5, label, sub_band: "low|mid|high", expected_min_turn, restrictions: [...met/violated...], game_changers: [{name, category}], evidence, headline }` from a feature vector + decklist + scorecard.
 - [x] Bracket placement rules encode the published gates: Bracket 1 (no GCs, no MLD, no extra turns, no two-card game-enders, theme-first), Bracket 2 (no GCs, no MLD, no chained extra turns, no two-card game-enders), Bracket 3 (≤3 GCs, no MLD, no chained extra turns, no two-card combo before turn 6), Bracket 4 (banned list only, optimized, non-cEDH intent), Bracket 5 (cEDH metagame intent).
@@ -100,7 +100,7 @@ The bracket pages should be the best-on-the-internet explanation of the system �
 - [x] Migration: add `bracket`, `bracket_sub_band`, `bracket_payload` to `scorecards`.
 - [x] `Decks::Analyzer` writes the bracket alongside the existing six scores. Bracket is the headline; the 1–10 axes become sub-band evidence.
 - [x] Tests: `BracketEvaluator` unit tests across the five fixture archetypes plus targeted cases (combo-only, MLD-only, single GC vs four GCs, chained extra turns vs single splashy turn).
-- [~] Update `Decks::BenchmarkScoringTest` to assert bracket placement. (Done for precon/casual/upgraded/high-power; a Bracket 5 cEDH fixture is still TBD.)
+- [x] Update `Decks::BenchmarkScoringTest` to assert bracket placement across all five bracket bands, including the new `cedh_tymna_thrasios_thoracle` Partner fixture (Tymna + Thrasios Thoracle/Consultation shell) which locks in Bracket 5 with the Game Changer count + immediate-win combo pair surfaced through the bracket payload.
 
 #### Pod analysis with brackets
 
@@ -108,7 +108,7 @@ The bracket pages should be the best-on-the-internet explanation of the system �
 - [x] `Pods::WarningGenerator` adds a bracket-mismatch warning when slots span 2+ brackets, replacing/augmenting today's archenemy/pubstomp signals where bracket gap is the real story.
 - [x] `Pods::RuleZeroBrief` is rewritten around the bracket vocabulary: headline is the pod bracket (or "mixed Brackets X–Y"), expected minimum turn, GC count across the pod, MLD/extra-turn/combo disclosure prompts, and an explicit Rule 0 prompt template.
 - [x] Pod show page surfaces each slot's bracket badge, the pod bracket headline, and a copyable Rule 0 prompt formatted for pasting into Discord / chat.
-- [ ] Tests: pod analyzer asserts bracket spread + warning across mismatched fixtures; balanced pod produces a single bracket headline.
+- [x] Tests: `Pods::AnalyzerTest` asserts bracket spread + `bracket_mismatch` warning across a Bracket 2 → Bracket 5 mismatched four-pod, and a balanced Bracket 2 three-pod produces a single-bracket headline with no `bracket_mismatch` warning.
 
 #### Deck + pod UI
 
@@ -217,6 +217,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-05 — Slice 3 follow-up: refreshed the legality snapshot to the 2026-02-09 banlist (Biorhythm unbanned, Lutri removed since Commander format does not assign companions), added a Tymna + Thrasios Thoracle/Consultation cEDH fixture that locks in Bracket 5 in `BenchmarkScoringTest`, and added bracket-aware `Pods::AnalyzerTest` cases (mismatched 2→5 four-pod produces `bracket_mismatch` alert; balanced Bracket 2 three-pod produces a single-bracket headline).
 - 2026-05-05 — Slice 3 opened: Commander Brackets (1–5) added as the primary deck-intent axis alongside the existing six axes; canonical Game Changers list, bracket evaluator service, deck/pod show pages surfacing the bracket badge + restrictions, and a public marketing surface (no-login landing + `/brackets` long-form explanation, About, Privacy, Terms). 0–10 axes are kept as sub-band evidence.
 - 2026-05-05 — Slice 2 first pass: pods of the user's existing decks. `Pod`, `PodSlot`, `PodAnalysisRun`, share-token surface, `Pods::Analyzer` (spread, average, outliers, archenemy/pubstomp/durdle/salt/friction warnings), `Pods::RuleZeroBrief`, `Pods::SuggestionsBuilder`, mobile + print pod show page, opt-in revocable `/p/:token` public share. Guest-deck slot via paste / public URL deferred.
 - 2026-05-05 — Slice 1 closed: precon (Korlash) and high-power (Najeela 5C) benchmark fixtures plus a `Decks::BenchmarkScoringTest` that asserts power, salt, friction, tutor, fast-mana, stax, and combo counts grow across the precon → casual → upgraded → high-power band.

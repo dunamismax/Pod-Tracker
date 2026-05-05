@@ -53,6 +53,16 @@
       "file": "high_power_najeela_5c.txt"
     },
     {
+      "slug": "cedh_tymna_thrasios_thoracle",
+      "name": "Tymna + Thrasios cEDH (Thoracle Consultation)",
+      "format": "commander",
+      "color_identity": ["B", "G", "U", "W"],
+      "expected_main_card_count": 98,
+      "intent": "cEDH-shaped four-color partner deck (Tymna + Thrasios) with the canonical Thoracle/Consultation/Tainted-Pact win line, the full Game-Changers fast-mana + tutor stack legal under the current banlist (Mana Vault, Mox Diamond, Chrome Mox, Lion's Eye Diamond, Ancient Tomb), Bolas's Citadel, The One Ring, Smothering Tithe, Necropotence, Rhystic Study, dense counter/protection density, and stax pressure (Drannith Magistrate, Opposition Agent, Trinisphere, Grand Abolisher). Used as the Bracket 5 cEDH benchmark for deterministic placement.",
+      "power_band": "cedh",
+      "file": "cedh_tymna_thrasios_thoracle.txt"
+    },
+    {
       "slug": "illegal_banned_card_demo",
       "name": "Atraxa With Banned Card",
       "format": "commander",

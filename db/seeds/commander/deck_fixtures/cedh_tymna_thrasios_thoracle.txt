@@ -1,0 +1,101 @@
+# Commander
+1 Tymna the Weaver
+1 Thrasios, Triton Hero
+
+# Mainboard
+1 Sol Ring
+1 Mana Vault
+1 Chrome Mox
+1 Mox Diamond
+1 Mox Opal
+1 Lotus Petal
+1 Lion's Eye Diamond
+1 Arcane Signet
+1 Cultivate
+1 Three Visits
+1 Birds of Paradise
+1 Noble Hierarch
+1 Demonic Tutor
+1 Vampiric Tutor
+1 Imperial Seal
+1 Mystical Tutor
+1 Enlightened Tutor
+1 Worldly Tutor
+1 Eladamri's Call
+1 Diabolic Intent
+1 Brainstorm
+1 Ponder
+1 Preordain
+1 Rhystic Study
+1 Mystic Remora
+1 Sylvan Library
+1 Necropotence
+1 Esper Sentinel
+1 The One Ring
+1 Bolas's Citadel
+1 Counterspell
+1 Force of Will
+1 Mana Drain
+1 Force of Negation
+1 Fierce Guardianship
+1 Pact of Negation
+1 Swan Song
+1 Flusterstorm
+1 Dispel
+1 Spell Pierce
+1 Mental Misstep
+1 Negate
+1 Snapcaster Mage
+1 Swords to Plowshares
+1 Path to Exile
+1 Beast Within
+1 Anguished Unmaking
+1 Heroic Intervention
+1 Teferi's Protection
+1 Veil of Summer
+1 Toxic Deluge
+1 Cyclonic Rift
+1 Farewell
+1 Thassa's Oracle
+1 Demonic Consultation
+1 Tainted Pact
+1 Dramatic Reversal
+1 Isochron Scepter
+1 Drannith Magistrate
+1 Opposition Agent
+1 Notion Thief
+1 Trinisphere
+1 Grand Abolisher
+1 Smothering Tithe
+1 Survival of the Fittest
+1 Reanimate
+1 Animate Dead
+1 Ancient Tomb
+1 Gaea's Cradle
+1 Mana Confluence
+1 City of Brass
+1 Reflecting Pool
+1 Prismatic Vista
+1 Mystic Sanctuary
+1 Tundra
+1 Underground Sea
+1 Tropical Island
+1 Bayou
+1 Scrubland
+1 Savannah
+1 Polluted Delta
+1 Flooded Strand
+1 Misty Rainforest
+1 Verdant Catacombs
+1 Marsh Flats
+1 Windswept Heath
+1 Hallowed Fountain
+1 Watery Grave
+1 Breeding Pool
+1 Overgrown Tomb
+1 Godless Shrine
+1 Temple Garden
+2 Island
+2 Swamp
+1 Plains
+1 Forest

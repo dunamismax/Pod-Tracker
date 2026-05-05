@@ -7,12 +7,15 @@ module CommanderFormat
 
       assert_equal("mtgcommander", snapshot.source)
       assert_equal("commander", snapshot.format)
-      assert_equal(Date.new(2024, 9, 23), snapshot.effective_on)
-      assert_equal(Date.new(2026, 5, 4), snapshot.source_checked_on)
+      assert_equal(Date.new(2026, 2, 9), snapshot.effective_on)
+      assert_equal(Date.new(2026, 5, 5), snapshot.source_checked_on)
       assert(snapshot.banned_card?("Dockside Extortionist"))
       assert(snapshot.banned_card?("Mana Crypt"))
       assert(snapshot.banned_card?("Yawgmoth's Bargain"))
       assert_not snapshot.banned_card?("Sol Ring")
+      assert_not snapshot.banned_card?("Biorhythm"), "Biorhythm was unbanned on 2026-02-09"
+      assert_not snapshot.banned_card?("Lutri, the Spellchaser"),
+        "Lutri is companion-banned only and is legal as a commander or deck card in Commander format"
       assert_empty(snapshot.restricted_names)
       assert_equal(3, snapshot.category_bans.size)
       assert_equal(100, snapshot.rules_snapshot.dig("deck_construction", "deck_size_including_commander"))

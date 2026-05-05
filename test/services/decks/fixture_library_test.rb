@@ -14,7 +14,8 @@ module Decks
           entry.expected_main_card_count, result.main_card_count,
           "Mainboard card count mismatch for #{entry.slug}"
         )
-        assert_equal(1, result.commanders.size, "#{entry.slug} should declare exactly one commander entry")
+        assert_includes(1..2, result.commanders.size,
+          "#{entry.slug} should declare one commander, or two for Partner pairs (got #{result.commanders.size})")
         assert_empty(result.unparsed_lines, "#{entry.slug} produced unparsed lines: #{result.unparsed_lines.inspect}")
       end
     end

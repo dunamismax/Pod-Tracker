@@ -92,11 +92,22 @@ module Decks
       high_power = analyze("high_power_najeela_5c").scorecard
       assert_includes [ 4, 5 ], high_power.bracket,
         "high-power Najeela should land in Bracket 4 or 5"
+
+      cedh = analyze("cedh_tymna_thrasios_thoracle").scorecard
+      assert_equal 5, cedh.bracket,
+        "Tymna + Thrasios cEDH with the Thoracle/Consultation line, GC stack, fast-mana, and tutor density should land in Bracket 5"
+      assert_equal "cEDH", cedh.bracket_payload["label"]
+      assert cedh.bracket_payload["game_changers"].size >= 6,
+        "cEDH fixture should expose >=6 Game Changers in the bracket payload"
+      combo_pairs = cedh.bracket_payload["combo_pairs"]
+      assert combo_pairs.any? { |p| p["wins_immediately"] },
+        "cEDH fixture should detect at least one immediate-win two-card combo"
     end
 
     test "every benchmark fixture yields a scorecard whose values stay within 0..10" do
       %w[precon_korlash_mono_black krenko_goblin_tribal mono_green_omnath_stompy
-         atraxa_superfriends_upgraded high_power_najeela_5c].each do |slug|
+         atraxa_superfriends_upgraded high_power_najeela_5c
+         cedh_tymna_thrasios_thoracle].each do |slug|
         run = analyze(slug)
         scorecard = run.scorecard
         %i[power_score speed_score interaction_score consistency_score salt_score social_friction_score].each do |field|
