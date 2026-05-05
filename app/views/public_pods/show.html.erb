@@ -1,0 +1,22 @@
+<% content_for :title, "#{@pod.name} (shared pod)" %>
+
+<section class="space-y-6">
+  <div>
+    <p class="text-xs uppercase tracking-wide text-emerald-300">Shared Commander pod</p>
+    <h1 class="mt-1 text-2xl font-semibold text-white print:text-zinc-900"><%= @pod.name %></h1>
+    <p class="mt-1 text-sm text-zinc-400 print:text-zinc-700">
+      Read-only Rule 0 brief and per-deck scores.
+      <% if @latest_run&.completed_at %>
+        Analyzed <%= time_ago_in_words(@latest_run.completed_at) %> ago.
+      <% end %>
+    </p>
+  </div>
+
+  <% if @latest_run.present? %>
+    <%= render "pods/analysis", pod: @pod, snapshot: @snapshot, brief: @brief, warnings: @warnings, suggestions: @suggestions, read_only: true %>
+  <% else %>
+    <div class="rounded-md border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-300">
+      Pod analysis not available.
+    </div>
+  <% end %>
+</section>

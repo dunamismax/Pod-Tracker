@@ -1,0 +1,48 @@
+<% content_for :title, @pod.name %>
+
+<section class="space-y-6">
+  <div class="flex flex-wrap items-baseline justify-between gap-4 print:hidden">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-emerald-300">Commander pod</p>
+      <h1 class="mt-1 text-2xl font-semibold text-white"><%= @pod.name %></h1>
+      <p class="mt-1 text-sm text-zinc-400">
+        <%= pluralize(@pod.pod_slots.size, "deck") %>
+        <% if @latest_run&.completed_at %>
+          · Analyzed <%= time_ago_in_words(@latest_run.completed_at) %> ago
+        <% end %>
+        <% if @pod.shared? %>
+          · Public link active
+        <% end %>
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <%= link_to "All pods", pods_path, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
+      <% if @pod.shared? %>
+        <%= button_to "Revoke share link", pod_share_path(@pod), method: :delete, form: { data: { turbo_confirm: "Revoke this pod's public link?" } }, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
+      <% else %>
+        <%= button_to "Create share link", pod_share_path(@pod), method: :post, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
+      <% end %>
+      <%= button_to "Remove pod", pod_path(@pod), method: :delete, form: { data: { turbo_confirm: "Remove this pod?" } }, class: "rounded-md bg-red-700 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-red-600" %>
+    </div>
+  </div>
+
+  <% if @pod.shared? %>
+    <div class="rounded-md border border-emerald-800 bg-emerald-950/30 p-4 text-sm text-emerald-200 print:hidden">
+      <p class="font-medium">Public share link</p>
+      <p class="mt-1 break-all font-mono text-xs">
+        <%= public_pod_url(@pod.share_token) %>
+      </p>
+      <p class="mt-1 text-xs text-emerald-200/80">
+        Anyone with the link can read the pod analysis. Revoke it anytime.
+      </p>
+    </div>
+  <% end %>
+
+  <% if @latest_run.present? %>
+    <%= render "analysis", pod: @pod, snapshot: @snapshot, brief: @brief, warnings: @warnings, suggestions: @suggestions %>
+  <% else %>
+    <div class="rounded-md border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-300">
+      No pod analysis yet.
+    </div>
+  <% end %>
+</section>

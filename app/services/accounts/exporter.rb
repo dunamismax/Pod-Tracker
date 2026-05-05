@@ -16,7 +16,7 @@ module Accounts
         provider_links: provider_links_payload,
         decks: decks_payload,
         analysis_runs: analysis_runs_payload,
-        pod_evaluations: pod_evaluations_payload,
+        pods: pods_payload,
         audit_events: audit_events_payload
       }
     end
@@ -117,15 +117,18 @@ module Accounts
         end
       end
 
-      def pod_evaluations_payload
-        @user.pod_evaluations.order(:id).map do |pod|
+      def pods_payload
+        @user.pods.includes(:pod_slots).order(:id).map do |pod|
           {
             id: pod.id,
             name: pod.name,
             status: pod.status,
-            deck_count: pod.deck_count,
+            shared: pod.shared?,
             created_at: iso(pod.created_at),
-            updated_at: iso(pod.updated_at)
+            updated_at: iso(pod.updated_at),
+            slots: pod.pod_slots.order(:position).map do |slot|
+              { id: slot.id, position: slot.position, deck_id: slot.deck_id, label: slot.label }
+            end
           }
         end
       end

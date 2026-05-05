@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_04_240000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_05_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -340,22 +340,55 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_240000) do
     t.index ["scryfall_oracle_id"], name: "index_oracle_cards_on_scryfall_oracle_id", unique: true
   end
 
-  create_table "pod_evaluations", force: :cascade do |t|
+  create_table "pod_analysis_runs", force: :cascade do |t|
+    t.datetime "completed_at"
     t.datetime "created_at", null: false
-    t.integer "deck_count", default: 0, null: false
-    t.jsonb "deck_snapshot", default: [], null: false
-    t.datetime "evaluated_at"
-    t.jsonb "mismatch_warnings", default: [], null: false
+    t.string "error_code"
+    t.text "error_message"
+    t.datetime "failed_at"
+    t.bigint "pod_id", null: false
+    t.datetime "queued_at", null: false
+    t.string "rubric_version", null: false
+    t.jsonb "rule_zero_brief", default: {}, null: false
+    t.jsonb "snapshot", default: {}, null: false
+    t.datetime "started_at"
+    t.string "status", default: "queued", null: false
+    t.jsonb "suggestions", default: [], null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id"
+    t.jsonb "warnings", default: [], null: false
+    t.index ["pod_id", "created_at"], name: "index_pod_analysis_runs_on_pod_id_and_created_at"
+    t.index ["pod_id"], name: "index_pod_analysis_runs_on_pod_id"
+    t.index ["status"], name: "index_pod_analysis_runs_on_status"
+    t.index ["user_id"], name: "index_pod_analysis_runs_on_user_id"
+  end
+
+  create_table "pod_slots", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "deck_id", null: false
+    t.string "label"
+    t.bigint "pod_id", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["deck_id"], name: "index_pod_slots_on_deck_id"
+    t.index ["pod_id", "position"], name: "index_pod_slots_on_pod_id_and_position", unique: true
+    t.index ["pod_id"], name: "index_pod_slots_on_pod_id"
+  end
+
+  create_table "pods", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "format", default: "commander", null: false
     t.string "name", null: false
-    t.string "rubric_version"
-    t.jsonb "score_snapshot", default: {}, null: false
+    t.text "notes"
+    t.datetime "share_revoked_at"
+    t.string "share_token"
+    t.datetime "shared_at"
     t.string "status", default: "draft", null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id"
-    t.index ["rubric_version"], name: "index_pod_evaluations_on_rubric_version"
-    t.index ["status"], name: "index_pod_evaluations_on_status"
-    t.index ["user_id", "updated_at"], name: "index_pod_evaluations_on_user_id_and_updated_at"
-    t.index ["user_id"], name: "index_pod_evaluations_on_user_id"
+    t.index ["share_token"], name: "index_pods_on_share_token", unique: true, where: "(share_token IS NOT NULL)"
+    t.index ["user_id", "updated_at"], name: "index_pods_on_user_id_and_updated_at"
+    t.index ["user_id"], name: "index_pods_on_user_id"
   end
 
   create_table "provider_links", force: :cascade do |t|
@@ -490,7 +523,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_04_240000) do
   add_foreign_key "deck_cards", "decks"
   add_foreign_key "deck_cards", "oracle_cards"
   add_foreign_key "decks", "users"
-  add_foreign_key "pod_evaluations", "users"
+  add_foreign_key "pod_analysis_runs", "pods"
+  add_foreign_key "pod_analysis_runs", "users"
+  add_foreign_key "pod_slots", "decks"
+  add_foreign_key "pod_slots", "pods"
+  add_foreign_key "pods", "users"
   add_foreign_key "provider_links", "decks"
   add_foreign_key "rulings", "card_printings"
   add_foreign_key "rulings", "oracle_cards"

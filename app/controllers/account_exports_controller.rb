@@ -26,7 +26,7 @@ class AccountExportsController < ApplicationController
           schema_version: Accounts::Exporter::SCHEMA_VERSION,
           deck_count: @user.decks.count,
           analysis_run_count: @user.analysis_runs.count,
-          pod_evaluation_count: @user.pod_evaluations.count,
+          pod_count: @user.pods.count,
           audit_event_count: @user.audit_events.count
         }
       )

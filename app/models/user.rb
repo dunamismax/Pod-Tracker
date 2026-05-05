@@ -6,7 +6,7 @@ class User < ApplicationRecord
   has_many :sessions, dependent: :destroy
   has_many :decks, dependent: :destroy
   has_many :analysis_runs, dependent: :nullify
-  has_many :pod_evaluations, dependent: :destroy
+  has_many :pods, dependent: :destroy
   has_many :audit_events, dependent: :nullify
   has_one :codex_account, dependent: :destroy
   has_many :codex_login_attempts, dependent: :destroy

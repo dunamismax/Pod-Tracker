@@ -14,8 +14,8 @@ namespace :demo do
       summary[:analysis_runs] = user.analysis_runs.count
       user.analysis_runs.destroy_all
 
-      summary[:pod_evaluations] = user.pod_evaluations.count
-      user.pod_evaluations.destroy_all
+      summary[:pods] = user.pods.count
+      user.pods.destroy_all
 
       summary[:codex_login_attempts] = user.codex_login_attempts.count
       user.codex_login_attempts.destroy_all
@@ -56,7 +56,7 @@ namespace :demo do
     puts "Demo user #{demo_email} (id=#{user.id})"
     puts "  decks:                #{user.decks.count}"
     puts "  analysis_runs:        #{user.analysis_runs.count}"
-    puts "  pod_evaluations:      #{user.pod_evaluations.count}"
+    puts "  pods:                 #{user.pods.count}"
     puts "  codex_login_attempts: #{user.codex_login_attempts.count}"
     puts "  codex_account:        #{user.codex_account ? "linked" : "none"}"
     puts "  provider_links:       #{user.provider_links.count}"

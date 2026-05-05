@@ -13,6 +13,10 @@ Rails.application.routes.draw do
   end
   resources :account_provider_links, only: %i[new create destroy]
   resources :decks, only: %i[index show new create destroy]
+  resources :pods, only: %i[index show new create destroy] do
+    resource :share, only: %i[create destroy], controller: "pod_shares"
+  end
+  get "p/:token", to: "public_pods#show", as: :public_pod
   resources :passwords, param: :token
 
   get "email_verifications/:token", to: "email_verifications#show", as: :email_verification

@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-05 (benchmark fixtures pass)
+Last updated: 2026-05-05 (Slice 2 first pass — pods of user decks, share links)
 
 ## How agents work this file
 
@@ -46,6 +46,7 @@ These don't move:
 - **Card corpus:** Scryfall bulk-data ingestion, Commander rules/banlist snapshot, internal tag taxonomy with curated salt/social-friction overrides, deterministic legality checker, daily Solid Queue refresh job.
 - **Deck import:** pasted text, uploaded text file, public Archidekt URL, public Moxfield URL. Imports surface unparsed lines, source attribution, audit events.
 - **Deterministic deck analysis:** every import runs feature extraction, Commander legality, and a six-axis scorecard (Power, Speed, Interaction, Consistency, Salt, Social Friction). Deck show page renders per-score evidence drawers, legality result, and a tuning recommendation list. AI evaluation is not wired up yet.
+- **Pods (2–4 of the user's decks):** build a pod, get per-axis spread/average/outliers, archenemy/pubstomp/durdle warnings, a Rule 0 brief (power band, tempo, combo/stax notes, salt/friction notes), and per-deck swap suggestions. Mobile-readable and printable show page. Opt-in revocable public share link. Guest deck import (paste / public URL) is the next pass.
 - **Seeded users:** admin (`stephenvsawyer@gmail.com`, password from `IDEAL_MAGIC_ADMIN_PASSWORD`) and demo (`demo@demo.com` / `demo1234`). `bin/rails demo:reset` factory-resets the demo account.
 - **Production:** live at https://ideal-magic.com via Caddy + systemd + host PostgreSQL. `bin/redeploy` is the iteration loop.
 
@@ -70,13 +71,13 @@ The biggest gap right now: a user imports a deck and only sees a card list. Make
 
 ### Slice 2 — Pods (2–4 deck comparison and Rule 0 brief)
 
-- [ ] Pod model: pod, pod slot, pod analysis run, plus a shareable-link token.
-- [ ] Build a pod from 2–4 of the user's decks. Allow a guest deck via paste or public URL.
-- [ ] Pod analysis: per-axis spread, average, outliers, archenemy/pubstomp/durdle warnings, salt and social-friction spread.
-- [ ] Rule 0 brief: power band, speed expectations, combo/stax notes, salt/friction notes, suggested swaps.
-- [ ] Pod show page that's mobile-readable and printable.
-- [ ] Public pod share link, opt-in, revocable.
-- [ ] Tests: pod service tests across balanced and mismatched fixtures; system test for create → analyze → share.
+- [x] Pod model: pod, pod slot, pod analysis run, plus a shareable-link token.
+- [~] Build a pod from 2–4 of the user's decks. Allow a guest deck via paste or public URL. (User-deck pods ship; guest deck via paste/URL pending.)
+- [x] Pod analysis: per-axis spread, average, outliers, archenemy/pubstomp/durdle warnings, salt and social-friction spread.
+- [x] Rule 0 brief: power band, speed expectations, combo/stax notes, salt/friction notes, suggested swaps.
+- [x] Pod show page that's mobile-readable and printable.
+- [x] Public pod share link, opt-in, revocable.
+- [x] Tests: pod service tests across balanced and mismatched fixtures; system test for create → analyze → share.
 
 ### Slice 3 — Game-night sessions and result recording
 
@@ -147,6 +148,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-05 — Slice 2 first pass: pods of the user's existing decks. `Pod`, `PodSlot`, `PodAnalysisRun`, share-token surface, `Pods::Analyzer` (spread, average, outliers, archenemy/pubstomp/durdle/salt/friction warnings), `Pods::RuleZeroBrief`, `Pods::SuggestionsBuilder`, mobile + print pod show page, opt-in revocable `/p/:token` public share. Guest-deck slot via paste / public URL deferred.
 - 2026-05-05 — Slice 1 closed: precon (Korlash) and high-power (Najeela 5C) benchmark fixtures plus a `Decks::BenchmarkScoringTest` that asserts power, salt, friction, tutor, fast-mana, stax, and combo counts grow across the precon → casual → upgraded → high-power band.
 - 2026-05-05 — Slice 1 first pass: deterministic feature extractor, six-axis scorer, legality-gated `Decks::Analyzer`, deck-show evidence drawers, and importer hook. Benchmark-fixture pass and score-band calibration still open.
 - 2026-05-04 — BUILD.md rewritten as user-visible slices; phase-by-phase plan retired.

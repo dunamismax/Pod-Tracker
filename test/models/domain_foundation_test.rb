@@ -71,23 +71,15 @@ class DomainFoundationTest < ActiveSupport::TestCase
     ).valid?
   end
 
-  test "legality snapshots and pod evaluations keep deterministic source metadata" do
+  test "legality snapshots keep deterministic source metadata" do
     snapshot = LegalitySnapshot.create!(
       source: "mtgcommander",
       effective_on: Date.new(2026, 5, 3),
       banned_names: [ "Biorhythm" ],
       source_url: "https://mtgcommander.net/index.php/rules/"
     )
-    pod = users(:one).pod_evaluations.create!(
-      name: "Friday pod",
-      deck_count: 4,
-      rubric_version: "2026-05-03",
-      deck_snapshot: [ { "deck" => "Kinnan Test Deck" } ]
-    )
 
     assert_includes(snapshot.banned_names, "Biorhythm")
     assert_not_nil(snapshot.fetched_at)
-    assert_equal(4, pod.deck_count)
-    assert_equal("draft", pod.status)
   end
 end

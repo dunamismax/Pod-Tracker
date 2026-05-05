@@ -32,7 +32,7 @@ class AccountDeletionsController < ApplicationController
           display_name: @user.display_name,
           deck_count: @user.decks.count,
           analysis_run_count: @user.analysis_runs.count,
-          pod_evaluation_count: @user.pod_evaluations.count
+          pod_count: @user.pods.count
         }
       )
     end
