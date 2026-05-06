@@ -77,6 +77,8 @@ class GameNightsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h2", "Session summary"
     assert_select "span", /Mara won/
     assert_select "p", /Combat damage/
+    assert_select "h3", "Post-game prompts"
+    assert_select "li", /What actually caused this win/
   end
 
   test "show renders prior matchup notes for seated pod context" do

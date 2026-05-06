@@ -22,6 +22,47 @@
         <%= link_to "Open journal", matchup_notes_path, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
       </div>
     </div>
+
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+      <div class="flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-medium text-white">Commander meta</h2>
+          <p class="mt-1 text-sm text-zinc-400">Appearances and wins from completed game-night pods. Thin samples are labeled.</p>
+        </div>
+        <%= link_to "Sessions", game_nights_path, class: "text-sm font-medium text-emerald-300 hover:text-emerald-200" %>
+      </div>
+
+      <% if @commander_meta.empty? %>
+        <p class="mt-4 text-sm text-zinc-400">Record session results to start seeing commander trends.</p>
+      <% else %>
+        <div class="mt-4 overflow-x-auto">
+          <table class="min-w-full divide-y divide-zinc-800 text-sm">
+            <thead>
+              <tr class="text-left text-xs uppercase tracking-wide text-zinc-500">
+                <th class="py-2 pr-4 font-medium">Commander</th>
+                <th class="py-2 pr-4 font-medium">Games</th>
+                <th class="py-2 pr-4 font-medium">Wins</th>
+                <th class="py-2 pr-4 font-medium">Win rate</th>
+                <th class="py-2 pr-4 font-medium">Avg turns</th>
+                <th class="py-2 font-medium">Signal</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-800 text-zinc-300">
+              <% @commander_meta.each do |commander| %>
+                <tr>
+                  <td class="py-2 pr-4 font-medium text-zinc-100"><%= commander.name %></td>
+                  <td class="py-2 pr-4"><%= commander.games %></td>
+                  <td class="py-2 pr-4"><%= commander.wins %><% if commander.draws.positive? %> · <%= commander.draws %> draws<% end %></td>
+                  <td class="py-2 pr-4"><%= number_to_percentage(commander.win_rate.to_f * 100, precision: 0) %></td>
+                  <td class="py-2 pr-4"><%= commander.average_turns ? number_with_precision(commander.average_turns, precision: 1) : "n/a" %></td>
+                  <td class="py-2"><%= commander.confidence_label %> · <%= commander.trend_label %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
+    </div>
   </div>
 
   <aside class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">

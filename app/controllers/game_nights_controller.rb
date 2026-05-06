@@ -14,6 +14,7 @@ class GameNightsController < ApplicationController
     @seating_rows = seating_rows
     @pod_seats_by_number = @game_night.pod_seats_by_number
     @pod_results_by_number = @game_night.pod_results_by_number
+    @post_game_prompts = Meta::PerformanceSummary.for_user(current_user).post_game_prompts(@game_night)
     @prior_notes_by_pod = Matchups::SessionContext.for_seating(
       user: current_user,
       game_night: @game_night,

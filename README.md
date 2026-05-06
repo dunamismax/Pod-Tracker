@@ -15,7 +15,7 @@ Live at [ideal-magic.com](https://ideal-magic.com). The bracket guide, Game Chan
 - **Compare pods** of 2 to 4 decks before a game starts, get the bracket spread, and produce a copy-pasteable Rule 0 brief.
 - **Run game nights** with player check-in, deck registration, suggested pod seating, manual seat overrides, and result recording.
 - **Keep a matchup journal** tied to decks, commanders, opponents, pods, and sessions, with searchable tags and prior notes surfaced during session seating.
-- **Watch your meta** evolve over time across decks, commanders, players, win conditions, and friction.
+- **Watch your meta** evolve over time across decks, commanders, recorded results, deck revisions, win conditions, and friction.
 - **Get tuning advice** that uses the cards you actually own and the games you actually played.
 - **Install as a PWA** on phone, tablet, or desktop and use it at the table.
 
@@ -60,7 +60,7 @@ Full rubric: [docs/analysis-rubric.md](docs/analysis-rubric.md).
 
 ## Status
 
-Ideal Magic is in active build and runs live at [ideal-magic.com](https://ideal-magic.com) so the product can be iterated against the real domain. The Rails foundation, card corpus pipeline, Commander legality engine, account system, deck import, deterministic scoring, collection import, deck gaps, demand pressure, recommendation ownership labels, pods, game-night check-in, pod seating, result recording, matchup note capture/search, and the self-hosted deployment shape are in place. AI evaluation, post-game prompts, meta analytics, and the PWA shell are still being built.
+Ideal Magic is in active build and runs live at [ideal-magic.com](https://ideal-magic.com) so the product can be iterated against the real domain. The Rails foundation, card corpus pipeline, Commander legality engine, account system, deck import, deterministic scoring, collection import, deck gaps, demand pressure, recommendation ownership labels, pods, game-night check-in, pod seating, result recording, matchup note capture/search, post-game prompts, deck/commander meta summaries, revision-level result history, and the self-hosted deployment shape are in place. AI evaluation and the PWA shell are still being built.
 
 Build sequencing and current repo truth live in [BUILD.md](BUILD.md). Operational runbook for the live deployment lives in [docs/deployment.md](docs/deployment.md).
 

@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-06 (Slice 6 - matchup journal opened)
+Last updated: 2026-05-06 (Slice 6 - meta trends opened)
 
 ## How agents work this file
 
@@ -49,7 +49,7 @@ These don't move:
 - **Collection:** signed-in users can import owned cards from pasted text, uploaded text, or simple CSV, manually add/edit/remove card quantities, review unresolved rows, see owned-vs-missing deck gaps on each deck page, review demand pressure across decks, and see whether tuning suggestions have matching owned options or likely need acquisition.
 - **Pods (2–4 decks):** build a pod from your own decks, optionally including one guest deck via pasted decklist or public Archidekt / Moxfield URL. Pods get per-axis spread/average/outliers, archenemy/pubstomp/durdle warnings, a Rule 0 brief (power band, tempo, combo/stax notes, salt/friction notes), and per-deck swap suggestions. Mobile-readable and printable show page. Opt-in revocable public share link. Guest decks live only with the pod and are removed when the pod is removed.
 - **Game-night sessions:** signed-in users can create a session at `/sessions`, save date/location/notes, create or reuse user-owned players, and check each player in with one owned deck of the night. Sessions suggest pod seating from the checked-in roster, allow manual pod/seat overrides, snapshot each seated deck's name, commanders, deck timestamp, card count, and deterministic analysis, record pod results, and render a session summary.
-- **Matchup journal:** signed-in users can create, search, edit, and remove matchup notes tied to a deck, optional commander, opponent, saved pod, and/or game-night session pod number. Session seating surfaces recent prior notes matching the seated decks, commanders, or opponents.
+- **Matchup journal and meta:** signed-in users can create, search, edit, and remove matchup notes tied to a deck, optional commander, opponent, saved pod, and/or game-night session pod number. Session seating surfaces recent prior notes matching the seated decks, commanders, or opponents. Completed session results now feed post-game prompts, per-deck record/win-rate/average-turn summaries, revision-level result history, and commander meta tables with sample-size labels.
 - **Seeded users:** admin (`stephenvsawyer@gmail.com`, password from `IDEAL_MAGIC_ADMIN_PASSWORD`) and demo (`demo@demo.com` / `demo1234`). `bin/rails demo:reset` factory-resets the demo account.
 - **Production:** live at https://ideal-magic.com via Caddy + systemd + host PostgreSQL. `bin/redeploy` is the iteration loop.
 
@@ -177,11 +177,11 @@ The site no longer redirects every visitor to `/session/new`. Public surface liv
 - [x] Matchup note model: belongs to user, links to deck, commander, opponent (player), pod, session. Tags + free text.
 - [x] Note CRUD with search by tag, deck, commander, player, pod, session.
 - [x] Pre-game context surface: when seating a pod, show prior notes for those decks/commanders/opponents.
-- [ ] Post-game prompt for wins/losses/draws/short games/dead draws/missing cards.
-- [ ] Deck performance: games, wins, draws, win rate with sample-size confidence, average turns, last played.
-- [ ] Commander meta: appearances, wins, win rate, recent trend. Sample size visible; never pretend thin data is certain.
-- [ ] Revision performance: connect deck revisions to results so "what changed since this deck last won" is answerable.
-- [ ] Tests: matchup search, meta service against fixture sessions.
+- [x] Post-game prompt for wins/losses/draws/short games/dead draws/missing cards.
+- [x] Deck performance: games, wins, draws, win rate with sample-size confidence, average turns, last played.
+- [x] Commander meta: appearances, wins, win rate, recent trend. Sample size visible; never pretend thin data is certain.
+- [x] Revision performance: connect deck revisions to results so "what changed since this deck last won" is answerable.
+- [x] Tests: matchup search, meta service against fixture sessions.
 
 ### Slice 7 — Codex AI evaluation as augmentation
 
@@ -220,6 +220,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-06 — Slice 6 meta trends: completed game-night results now drive post-game note prompts for wins/losses/draws/short games/dead draws/missing collection cards, deck table-performance summaries, revision-level result history from seat snapshots, commander meta tables with confidence/trend labels, and focused service/controller coverage.
 - 2026-05-06 — Slice 6 opened: matchup notes now store deck-linked table memory with optional commander, opponent, saved pod, session pod number, normalized tags, account-scoped CRUD/search, journal navigation, and session seating context that surfaces recent notes matching the seated decks, commanders, or opponents.
 - 2026-05-06 — Slice 5 closed: collection pages now rank shared missing-card demand pressure across decks, and deck tuning suggestions are labeled with matching owned options versus likely borrow/trade/buy gaps; focused service/controller/system tests cover the flow.
 - 2026-05-06 — Slice 5 opened: collection storage, pasted/uploaded text and simple CSV import, manual quantity management, unresolved-row review, deck-page owned-vs-missing gaps, and focused service/controller/system tests are in place; demand pressure and recommendation ownership labels remain open.

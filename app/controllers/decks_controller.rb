@@ -18,6 +18,9 @@ class DecksController < ApplicationController
       deck: @deck,
       recommendations: @scorecard&.improvement_suggestions
     )
+    performance = Meta::PerformanceSummary.for_user(current_user)
+    @deck_performance = performance.deck_performance(@deck)
+    @revision_performance = performance.revision_performance(@deck)
   end
 
   def new
