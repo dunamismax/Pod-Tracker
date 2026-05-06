@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-05 (Slice 4 — game-night pod seating and results)
+Last updated: 2026-05-06 (Slice 5 — collection import and deck gaps)
 
 ## How agents work this file
 
@@ -46,6 +46,7 @@ These don't move:
 - **Card corpus:** Scryfall bulk-data ingestion, Commander rules/banlist snapshot, internal tag taxonomy with curated salt/social-friction overrides, deterministic legality checker, daily Solid Queue refresh job.
 - **Deck import:** pasted text, uploaded text file, public Archidekt URL, public Moxfield URL. Imports surface unparsed lines, source attribution, audit events.
 - **Deterministic deck analysis:** every import runs feature extraction, Commander legality, and a six-axis scorecard (Power, Speed, Interaction, Consistency, Salt, Social Friction). Deck show page renders per-score evidence drawers, legality result, and a tuning recommendation list. AI evaluation is not wired up yet.
+- **Collection:** signed-in users can import owned cards from pasted text, uploaded text, or simple CSV, manually add/edit/remove card quantities, review unresolved rows, and see owned-vs-missing deck gaps on each deck page.
 - **Pods (2–4 decks):** build a pod from your own decks, optionally including one guest deck via pasted decklist or public Archidekt / Moxfield URL. Pods get per-axis spread/average/outliers, archenemy/pubstomp/durdle warnings, a Rule 0 brief (power band, tempo, combo/stax notes, salt/friction notes), and per-deck swap suggestions. Mobile-readable and printable show page. Opt-in revocable public share link. Guest decks live only with the pod and are removed when the pod is removed.
 - **Game-night sessions:** signed-in users can create a session at `/sessions`, save date/location/notes, create or reuse user-owned players, and check each player in with one owned deck of the night. Sessions suggest pod seating from the checked-in roster, allow manual pod/seat overrides, snapshot each seated deck's name, commanders, deck timestamp, card count, and deterministic analysis, record pod results, and render a session summary.
 - **Seeded users:** admin (`stephenvsawyer@gmail.com`, password from `IDEAL_MAGIC_ADMIN_PASSWORD`) and demo (`demo@demo.com` / `demo1234`). `bin/rails demo:reset` factory-resets the demo account.
@@ -161,14 +162,14 @@ The site no longer redirects every visitor to `/session/new`. Public surface liv
 
 ### Slice 5 — Collection and ownership
 
-- [ ] Collection model: collection_card, collection_import, unresolved_entry.
-- [ ] Pasted and uploaded collection import (text + simple CSV).
-- [ ] Manual add / edit / remove / quantity adjust.
-- [ ] Unresolved-card review for ambiguous names.
-- [ ] Owned vs missing per deck on the deck show page.
+- [x] Collection model: `CollectionCard`, `CollectionImport`, `UnresolvedEntry`.
+- [x] Pasted and uploaded collection import (text + simple CSV).
+- [x] Manual add / edit / remove / quantity adjust.
+- [x] Unresolved-card review for ambiguous names.
+- [x] Owned vs missing per deck on the deck show page.
 - [ ] Demand pressure: which missing cards matter across multiple decks.
 - [ ] Recommendations distinguish "you already own this" from "you'd have to buy it." No price/marketplace flow.
-- [ ] Tests: import parser, ownership service, system test for collection → deck gaps.
+- [x] Tests: import parser, ownership service, system test for collection → deck gaps.
 
 ### Slice 6 — Matchup journal and meta trends
 
@@ -218,6 +219,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-06 — Slice 5 opened: collection storage, pasted/uploaded text and simple CSV import, manual quantity management, unresolved-row review, deck-page owned-vs-missing gaps, and focused service/controller/system tests are in place; demand pressure and recommendation ownership labels remain open.
 - 2026-05-05 — Slice 4 closed: sessions now suggest bracket/power-balanced pod seating with manual pod/seat overrides, snapshot seated decks plus latest deterministic analysis, record winner/draw/turns/win-condition/notes, and render a session summary; focused model/controller tests plus a create → check-in → seat → record → summary system test cover the flow.
 - 2026-05-05 — Slice 4 opened: game-night sessions now have `GameNight`-named models to avoid auth `Session` collision, user-owned players, check-in records, deck-of-the-night snapshots, pod-seat/result model foundations, `/sessions` index/new/show pages, dashboard/header links, and focused model/form/controller tests.
 - 2026-05-05 — Slice 3 SEO + docs: full Twitter cards, per-page canonical links, site-wide `Organization` + `WebSite` JSON-LD via `ApplicationHelper#jsonld_tag`, `Article` + `BreadcrumbList` JSON-LD on bracket pages, `/sitemap.xml` route + view, sitemap-aware `robots.txt`, and a new `docs/public-site.md` covering routes, content workflow, and SEO baseline.

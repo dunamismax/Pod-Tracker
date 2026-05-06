@@ -13,6 +13,10 @@ Rails.application.routes.draw do
   end
   resources :account_provider_links, only: %i[new create destroy]
   resources :decks, only: %i[index show new create destroy]
+  resource :collection, only: :show
+  resources :collection_imports, only: %i[show create]
+  resources :collection_cards, only: %i[create update destroy]
+  resources :unresolved_entries, only: :update
   resources :pods, only: %i[index show new create destroy] do
     resource :share, only: %i[create destroy], controller: "pod_shares"
   end

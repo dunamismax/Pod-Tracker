@@ -11,11 +11,12 @@
     <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
       <h2 class="text-lg font-medium text-white">Deck intake</h2>
       <p class="mt-2 text-sm leading-6 text-zinc-400">
-        Import Commander decks, compare pods, and start a game-night session when players arrive.
+        Import Commander decks, track owned cards, compare pods, and start a game-night session when players arrive.
       </p>
       <div class="mt-4 flex flex-wrap gap-3">
         <%= link_to "Import a deck", new_deck_path, class: "rounded-md bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
         <%= link_to "View your decks", decks_path, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
+        <%= link_to "Manage collection", collection_path, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
         <%= link_to "Build a pod", new_pod_path, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
         <%= link_to "Start a session", new_game_night_path, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
       </div>

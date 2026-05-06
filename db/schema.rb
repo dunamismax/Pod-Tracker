@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_05_121000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_06_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -222,6 +222,39 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_121000) do
     t.index ["status"], name: "index_codex_login_attempts_on_status"
     t.index ["user_id", "created_at"], name: "index_codex_login_attempts_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_codex_login_attempts_on_user_id"
+  end
+
+  create_table "collection_cards", force: :cascade do |t|
+    t.bigint "card_printing_id"
+    t.datetime "created_at", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.string "name", null: false
+    t.string "normalized_name", null: false
+    t.bigint "oracle_card_id"
+    t.integer "quantity", default: 1, null: false
+    t.string "source_type", default: "manual", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["card_printing_id"], name: "index_collection_cards_on_card_printing_id"
+    t.index ["normalized_name"], name: "index_collection_cards_on_normalized_name"
+    t.index ["oracle_card_id"], name: "index_collection_cards_on_oracle_card_id"
+    t.index ["user_id", "normalized_name"], name: "index_collection_cards_on_user_id_and_normalized_name", unique: true
+    t.index ["user_id"], name: "index_collection_cards_on_user_id"
+  end
+
+  create_table "collection_imports", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "imported_count", default: 0, null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.string "original_filename"
+    t.string "source_type", null: false
+    t.string "status", default: "pending", null: false
+    t.integer "unresolved_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["status"], name: "index_collection_imports_on_status"
+    t.index ["user_id", "created_at"], name: "index_collection_imports_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_collection_imports_on_user_id"
   end
 
   create_table "commanders", force: :cascade do |t|
@@ -580,6 +613,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_121000) do
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
+  create_table "unresolved_entries", force: :cascade do |t|
+    t.bigint "collection_import_id", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.string "name"
+    t.string "normalized_name"
+    t.integer "quantity", default: 1, null: false
+    t.text "raw_line", null: false
+    t.string "reason", null: false
+    t.string "status", default: "open", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["collection_import_id"], name: "index_unresolved_entries_on_collection_import_id"
+    t.index ["normalized_name"], name: "index_unresolved_entries_on_normalized_name"
+    t.index ["user_id", "status"], name: "index_unresolved_entries_on_user_id_and_status"
+    t.index ["user_id"], name: "index_unresolved_entries_on_user_id"
+  end
+
   create_table "user_provider_links", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "handle", null: false
@@ -617,6 +668,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_121000) do
   add_foreign_key "card_tag_assignments", "oracle_cards"
   add_foreign_key "codex_accounts", "users"
   add_foreign_key "codex_login_attempts", "users"
+  add_foreign_key "collection_cards", "card_printings"
+  add_foreign_key "collection_cards", "oracle_cards"
+  add_foreign_key "collection_cards", "users"
+  add_foreign_key "collection_imports", "users"
   add_foreign_key "commanders", "card_printings"
   add_foreign_key "commanders", "decks"
   add_foreign_key "commanders", "oracle_cards"
@@ -652,5 +707,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_05_121000) do
   add_foreign_key "salt_social_friction_evidences", "oracle_cards"
   add_foreign_key "scorecards", "analysis_runs"
   add_foreign_key "sessions", "users"
+  add_foreign_key "unresolved_entries", "collection_imports"
+  add_foreign_key "unresolved_entries", "users"
   add_foreign_key "user_provider_links", "users"
 end

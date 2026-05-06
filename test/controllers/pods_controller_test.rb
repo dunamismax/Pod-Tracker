@@ -84,5 +84,4 @@ class PodsControllerTest < ActionDispatch::IntegrationTest
       Decks::Analyzer.run(deck)
       deck
     end
-
 end

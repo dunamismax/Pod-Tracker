@@ -156,5 +156,4 @@ class AccountCodexLoginsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil event
     assert_equal "chatgpt_browser", event.metadata["auth_mode"]
   end
-
 end

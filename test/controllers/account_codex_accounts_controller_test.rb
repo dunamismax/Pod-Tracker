@@ -115,5 +115,4 @@ class AccountCodexAccountsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "team", account.plan_type
     assert_equal({ "primaryUsedPercent" => 12 }, account.rate_limit_snapshot)
   end
-
 end

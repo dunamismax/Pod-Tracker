@@ -9,6 +9,9 @@ class User < ApplicationRecord
   has_many :pods, dependent: :destroy
   has_many :players, dependent: :destroy
   has_many :game_nights, dependent: :destroy
+  has_many :collection_cards, dependent: :destroy
+  has_many :collection_imports, dependent: :destroy
+  has_many :unresolved_entries, dependent: :destroy
   has_many :audit_events, dependent: :nullify
   has_one :codex_account, dependent: :destroy
   has_many :codex_login_attempts, dependent: :destroy

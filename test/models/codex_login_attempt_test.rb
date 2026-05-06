@@ -56,5 +56,4 @@ class CodexLoginAttemptTest < ActiveSupport::TestCase
     attempt.update!(status: "expired", expires_at: 5.minutes.from_now)
     assert attempt.expired?
   end
-
 end

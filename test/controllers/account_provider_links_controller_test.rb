@@ -78,5 +78,4 @@ class AccountProviderLinksControllerTest < ActionDispatch::IntegrationTest
     end
     assert_response :not_found
   end
-
 end

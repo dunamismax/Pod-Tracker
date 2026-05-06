@@ -12,6 +12,7 @@ class DecksController < ApplicationController
     @analysis_run = @deck.latest_deterministic_run
     @scorecard = @analysis_run&.scorecard
     @legality = @analysis_run&.deterministic_snapshot&.dig("legality")
+    @ownership = Collections::Ownership.for_deck(user: current_user, deck: @deck)
   end
 
   def new

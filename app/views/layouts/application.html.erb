@@ -79,6 +79,7 @@
         <nav class="hidden items-center gap-5 text-sm text-zinc-300 sm:flex">
           <% if authenticated? %>
             <%= link_to "Decks", decks_path, class: "hover:text-white" %>
+            <%= link_to "Collection", collection_path, class: "hover:text-white" %>
             <%= link_to "Pods", pods_path, class: "hover:text-white" %>
             <%= link_to "Sessions", game_nights_path, class: "hover:text-white" %>
             <%= link_to "Site", root_path, class: "hover:text-white" %>

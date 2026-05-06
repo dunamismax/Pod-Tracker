@@ -27,7 +27,7 @@ You can read the bracket guide and reference pages without an account:
 - [`/brackets/game-changers`](https://ideal-magic.com/brackets/game-changers) — the canonical Game Changers list, grouped by play pattern.
 - [`/brackets/pregame-template`](https://ideal-magic.com/brackets/pregame-template) — the Rule 0 template with worked examples.
 
-Importing decks, building pods, and running analysis still require an account.
+Importing decks, tracking your collection, building pods, and running analysis still require an account.
 
 ## Why It's Different
 
@@ -60,7 +60,7 @@ Full rubric: [docs/analysis-rubric.md](docs/analysis-rubric.md).
 
 ## Status
 
-Ideal Magic is in active build and runs live at [ideal-magic.com](https://ideal-magic.com) so the product can be iterated against the real domain. The Rails foundation, card corpus pipeline, Commander legality engine, account system, deck import, deterministic scoring, pods, game-night check-in, pod seating, result recording, and the self-hosted deployment shape are in place. AI evaluation, the matchup journal, meta analytics, collection ownership, and the PWA shell are still being built.
+Ideal Magic is in active build and runs live at [ideal-magic.com](https://ideal-magic.com) so the product can be iterated against the real domain. The Rails foundation, card corpus pipeline, Commander legality engine, account system, deck import, deterministic scoring, collection import and deck gaps, pods, game-night check-in, pod seating, result recording, and the self-hosted deployment shape are in place. AI evaluation, the matchup journal, meta analytics, collection demand pressure, recommendation ownership labels, and the PWA shell are still being built.
 
 Build sequencing and current repo truth live in [BUILD.md](BUILD.md). Operational runbook for the live deployment lives in [docs/deployment.md](docs/deployment.md).
 

@@ -65,5 +65,4 @@ class CodexAccountTest < ActiveSupport::TestCase
     refute_includes payload.keys, :encrypted_credential_payload
     refute_includes payload.values.compact.map(&:to_s).join, "secret-token"
   end
-
 end
