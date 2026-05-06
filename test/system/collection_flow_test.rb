@@ -7,6 +7,7 @@ class CollectionFlowTest < ApplicationSystemTestCase
     create_oracle_card("Sol Ring")
     create_oracle_card("Command Tower")
     deck = create_deck_for(user)
+    second_deck = create_deck_for(user, name: "Tower Backup")
 
     sign_in_through_ui(user)
     visit collection_path
@@ -15,6 +16,12 @@ class CollectionFlowTest < ApplicationSystemTestCase
 
     assert_text "Collection imported."
     assert_text "1 cards imported"
+
+    visit collection_path
+    assert_text "Demand pressure"
+    assert_text "Command Tower"
+    assert_text "across 2 decks"
+    assert_text second_deck.name
 
     visit deck_path(deck)
     assert_text "Collection fit"
@@ -41,9 +48,9 @@ class CollectionFlowTest < ApplicationSystemTestCase
       )
     end
 
-    def create_deck_for(user)
+    def create_deck_for(user, name: "Atraxa Brew")
       deck = user.decks.create!(
-        name: "Atraxa Brew",
+        name: name,
         format: "commander",
         status: "imported",
         visibility: "private",

@@ -4,7 +4,7 @@
   legality ||= nil
 
   evidence = scorecard.evidence.is_a?(Hash) ? scorecard.evidence : {}
-  recs = Array(scorecard.improvement_suggestions)
+  recs = local_assigns.fetch(:recommendations, Array(scorecard.improvement_suggestions))
   bracket = scorecard.bracket_payload.is_a?(Hash) ? scorecard.bracket_payload : {}
 
   score_specs = [
@@ -210,9 +210,15 @@
       <h3 class="text-sm font-medium text-white">Suggestions</h3>
       <ul class="mt-2 space-y-2 text-sm text-zinc-200">
         <% recs.each do |rec| %>
+          <% ownership = rec["ownership"] || {} %>
           <li class="flex flex-col">
             <span class="font-medium"><%= rec["title"] %></span>
             <span class="text-xs text-zinc-400"><%= rec["detail"] %></span>
+            <% if ownership.any? %>
+              <span class="mt-1 text-xs <%= ownership["status"] == "owned_options" ? "text-emerald-300" : "text-amber-300" %>">
+                <%= ownership["label"] %> · <%= ownership["detail"] %>
+              </span>
+            <% end %>
           </li>
         <% end %>
       </ul>

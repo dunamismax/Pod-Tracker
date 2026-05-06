@@ -56,6 +56,50 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
     assert_select "ul", /this line could not be parsed/
   end
 
+  test "shows recommendation ownership labels" do
+    sign_in_as(@user)
+    deck = create_deck_for(@user)
+    ramp_tag = CardTag.find_or_create_by!(slug: "ramp") do |tag|
+      tag.category = "role"
+      tag.label = "Ramp"
+    end
+    oracle_card = OracleCard.create!(
+      name: "Arcane Signet",
+      normalized_name: ApplicationRecord.normalize_card_name("Arcane Signet"),
+      scryfall_oracle_id: SecureRandom.uuid
+    )
+    CardTagAssignment.find_or_create_by!(card_tag: ramp_tag, card_name: "Arcane Signet") do |assignment|
+      assignment.oracle_card = oracle_card
+    end
+    @user.collection_cards.create!(name: "Arcane Signet", oracle_card: oracle_card, quantity: 1)
+    analysis_run = deck.analysis_runs.create!(
+      user: @user,
+      kind: "deterministic",
+      status: "succeeded",
+      rubric_version: Decks::Scorer::RUBRIC_VERSION,
+      queued_at: Time.current,
+      completed_at: Time.current
+    )
+    analysis_run.create_scorecard!(
+      power_score: 3,
+      speed_score: 3,
+      interaction_score: 3,
+      consistency_score: 3,
+      salt_score: 0,
+      social_friction_score: 0,
+      confidence: 1.0,
+      improvement_suggestions: [
+        { "category" => "ramp", "title" => "Add ramp", "detail" => "Found 4 ramp pieces." }
+      ]
+    )
+
+    get deck_path(deck)
+
+    assert_response :success
+    assert_select "span", /Owned options available/
+    assert_select "span", /Arcane Signet/
+  end
+
   test "destroys a deck and records an audit event" do
     sign_in_as(@user)
     deck = create_deck_for(@user)
