@@ -8,6 +8,7 @@ class Pod < ApplicationRecord
   has_many :pod_slots, -> { order(:position) }, dependent: :destroy
   has_many :decks, through: :pod_slots
   has_many :pod_analysis_runs, dependent: :destroy
+  has_many :matchup_notes, dependent: :nullify
   has_many :audit_events, as: :auditable, dependent: :nullify
   has_many :guest_decks,
            class_name: "Deck",

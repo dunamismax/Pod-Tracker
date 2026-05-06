@@ -9,6 +9,7 @@ class Deck < ApplicationRecord
   has_many :commanders, dependent: :destroy
   has_many :provider_links, dependent: :destroy
   has_many :analysis_runs, dependent: :destroy
+  has_many :matchup_notes, dependent: :destroy
   has_many :audit_events, as: :auditable, dependent: :nullify
 
   validates :name, presence: true

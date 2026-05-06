@@ -14,6 +14,12 @@ class GameNightsController < ApplicationController
     @seating_rows = seating_rows
     @pod_seats_by_number = @game_night.pod_seats_by_number
     @pod_results_by_number = @game_night.pod_results_by_number
+    @prior_notes_by_pod = Matchups::SessionContext.for_seating(
+      user: current_user,
+      game_night: @game_night,
+      seating_rows: @seating_rows,
+      decks_by_player_id: @decks_by_player_id
+    )
   end
 
   def seat_pods

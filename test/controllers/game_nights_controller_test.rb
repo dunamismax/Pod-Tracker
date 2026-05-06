@@ -79,6 +79,30 @@ class GameNightsControllerTest < ActionDispatch::IntegrationTest
     assert_select "p", /Combat damage/
   end
 
+  test "show renders prior matchup notes for seated pod context" do
+    sign_in_as(@user)
+    game_night = @user.game_nights.create!(name: "Friday Commander", played_on: Date.new(2026, 5, 5), status: "draft")
+    player_a = @user.players.create!(name: "Mara")
+    player_b = @user.players.create!(name: "Stephen")
+    commander = @deck_a.commanders.create!(name: "Krenko, Mob Boss", position: 1)
+    game_night.game_night_players.create!(player: player_a, position: 1)
+    game_night.game_night_players.create!(player: player_b, position: 2)
+    game_night.game_night_decks.create!(player: player_a, deck: @deck_a, position: 1)
+    game_night.game_night_decks.create!(player: player_b, deck: @deck_b, position: 2)
+    @user.matchup_notes.create!(
+      deck: @deck_a,
+      commander: commander,
+      body: "Krenko folds when the first token wave gets wiped.",
+      happened_at: 1.day.ago
+    )
+
+    get game_night_path(game_night)
+
+    assert_response :success
+    assert_select "h3", "Prior matchup context"
+    assert_select "p", /Krenko folds/
+  end
+
   private
     def create_analysis_for(deck, bracket:, power_score:, speed_score:)
       run = deck.analysis_runs.create!(

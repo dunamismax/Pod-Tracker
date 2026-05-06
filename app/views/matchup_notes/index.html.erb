@@ -1,0 +1,96 @@
+<% content_for :title, "Matchup journal" %>
+
+<section class="space-y-6">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-white">Matchup journal</h1>
+      <p class="mt-1 text-sm text-zinc-400">Search matchup notes by deck, commander, opponent, pod, session, or tag.</p>
+    </div>
+    <%= link_to "Add note", new_matchup_note_path, class: "rounded-md bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
+  </div>
+
+  <%= form_with url: matchup_notes_path, method: :get, local: true, class: "rounded-lg border border-zinc-800 bg-zinc-900 p-4" do %>
+    <div class="grid gap-3 md:grid-cols-3">
+      <div>
+        <label for="q" class="block text-xs font-medium text-zinc-400">Search text</label>
+        <%= text_field_tag :q, @filters[:q], id: "q", autocomplete: "off", class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+      </div>
+      <div>
+        <label for="tag" class="block text-xs font-medium text-zinc-400">Tag</label>
+        <%= text_field_tag :tag, @filters[:tag], id: "tag", autocomplete: "off", class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+      </div>
+      <div>
+        <label for="deck_id" class="block text-xs font-medium text-zinc-400">Deck</label>
+        <%= select_tag :deck_id,
+                       options_from_collection_for_select(@decks, :id, :name, @filters[:deck_id]),
+                       include_blank: "Any deck",
+                       class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+      </div>
+      <div>
+        <label for="commander_id" class="block text-xs font-medium text-zinc-400">Commander</label>
+        <%= select_tag :commander_id,
+                       options_for_select(@commanders.map { |commander| [ "#{commander.deck.name} - #{commander.name}", commander.id ] }, @filters[:commander_id]),
+                       include_blank: "Any commander",
+                       class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+      </div>
+      <div>
+        <label for="opponent_id" class="block text-xs font-medium text-zinc-400">Opponent</label>
+        <%= select_tag :opponent_id,
+                       options_from_collection_for_select(@players, :id, :name, @filters[:opponent_id]),
+                       include_blank: "Any opponent",
+                       class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+      </div>
+      <div>
+        <label for="game_night_id" class="block text-xs font-medium text-zinc-400">Session</label>
+        <%= select_tag :game_night_id,
+                       options_from_collection_for_select(@game_nights, :id, :name, @filters[:game_night_id]),
+                       include_blank: "Any session",
+                       class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+      </div>
+      <div>
+        <label for="pod_id" class="block text-xs font-medium text-zinc-400">Saved pod</label>
+        <%= select_tag :pod_id,
+                       options_from_collection_for_select(@pods, :id, :name, @filters[:pod_id]),
+                       include_blank: "Any saved pod",
+                       class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+      </div>
+    </div>
+    <div class="mt-3 flex flex-wrap gap-3">
+      <%= submit_tag "Search notes", class: "rounded-md bg-zinc-100 px-3.5 py-2 text-sm font-medium text-zinc-950 hover:bg-white" %>
+      <%= link_to "Clear", matchup_notes_path, class: "rounded-md bg-zinc-800 px-3.5 py-2 text-sm font-medium text-white hover:bg-zinc-700" %>
+    </div>
+  <% end %>
+
+  <% if @matchup_notes.empty? %>
+    <div class="rounded-lg border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center">
+      <p class="text-sm text-zinc-400">No matchup notes match those filters.</p>
+    </div>
+  <% else %>
+    <ul class="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+      <% @matchup_notes.each do |note| %>
+        <li class="px-5 py-4">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="min-w-0">
+              <%= link_to note.deck.name, matchup_note_path(note), class: "text-base font-medium text-emerald-300 hover:text-emerald-200" %>
+              <p class="mt-1 text-xs text-zinc-500">
+                <%= note.happened_at.to_fs(:long) %>
+                <% if note.commander %> · <%= note.commander.name %><% end %>
+                <% if note.opponent %> · vs <%= note.opponent.name %><% end %>
+                <% if note.game_night %> · <%= note.game_night.name %><% end %>
+              </p>
+              <p class="mt-2 line-clamp-2 text-sm leading-6 text-zinc-300"><%= note.body %></p>
+              <% if note.tags.any? %>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  <% note.tags.each do |tag| %>
+                    <%= link_to tag, matchup_notes_path(tag: tag), class: "rounded-md bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700" %>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+            <span class="shrink-0 text-xs uppercase tracking-wide text-zinc-500"><%= time_ago_in_words(note.updated_at) %> ago</span>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+</section>

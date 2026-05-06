@@ -17,6 +17,7 @@ Rails.application.routes.draw do
   resources :collection_imports, only: %i[show create]
   resources :collection_cards, only: %i[create update destroy]
   resources :unresolved_entries, only: :update
+  resources :matchup_notes
   resources :pods, only: %i[index show new create destroy] do
     resource :share, only: %i[create destroy], controller: "pod_shares"
   end

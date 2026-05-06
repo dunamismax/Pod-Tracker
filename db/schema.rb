@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_06_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_06_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -431,6 +431,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_120000) do
     t.index ["source", "format", "effective_on"], name: "index_legality_snapshots_on_source_and_format_and_effective_on", unique: true
   end
 
+  create_table "matchup_notes", force: :cascade do |t|
+    t.text "body", null: false
+    t.bigint "commander_id"
+    t.datetime "created_at", null: false
+    t.bigint "deck_id", null: false
+    t.bigint "game_night_id"
+    t.integer "game_night_pod_number"
+    t.datetime "happened_at", null: false
+    t.bigint "opponent_id"
+    t.bigint "pod_id"
+    t.string "tags", default: [], null: false, array: true
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["commander_id"], name: "index_matchup_notes_on_commander_id"
+    t.index ["deck_id"], name: "index_matchup_notes_on_deck_id"
+    t.index ["game_night_id"], name: "index_matchup_notes_on_game_night_id"
+    t.index ["opponent_id"], name: "index_matchup_notes_on_opponent_id"
+    t.index ["pod_id"], name: "index_matchup_notes_on_pod_id"
+    t.index ["tags"], name: "index_matchup_notes_on_tags", using: :gin
+    t.index ["user_id", "commander_id"], name: "index_matchup_notes_on_user_id_and_commander_id"
+    t.index ["user_id", "deck_id"], name: "index_matchup_notes_on_user_id_and_deck_id"
+    t.index ["user_id", "game_night_id"], name: "index_matchup_notes_on_user_id_and_game_night_id"
+    t.index ["user_id", "happened_at"], name: "index_matchup_notes_on_user_id_and_happened_at"
+    t.index ["user_id", "opponent_id"], name: "index_matchup_notes_on_user_id_and_opponent_id"
+    t.index ["user_id"], name: "index_matchup_notes_on_user_id"
+  end
+
   create_table "oracle_cards", force: :cascade do |t|
     t.string "color_identity", default: [], null: false, array: true
     t.string "colors", default: [], null: false, array: true
@@ -692,6 +719,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_120000) do
   add_foreign_key "game_night_pod_seats", "game_nights"
   add_foreign_key "game_night_pod_seats", "players"
   add_foreign_key "game_nights", "users"
+  add_foreign_key "matchup_notes", "commanders"
+  add_foreign_key "matchup_notes", "decks"
+  add_foreign_key "matchup_notes", "game_nights"
+  add_foreign_key "matchup_notes", "players", column: "opponent_id"
+  add_foreign_key "matchup_notes", "pods"
+  add_foreign_key "matchup_notes", "users"
   add_foreign_key "players", "users"
   add_foreign_key "pod_analysis_runs", "pods"
   add_foreign_key "pod_analysis_runs", "users"

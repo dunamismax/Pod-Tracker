@@ -95,6 +95,38 @@
       <%= submit_tag @game_night.game_night_pod_seats.any? ? "Update pods" : "Seat pods",
                      class: "rounded-md bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
     <% end %>
+
+    <% if @prior_notes_by_pod.values.any?(&:any?) %>
+      <div class="border-t border-zinc-800 px-5 py-5">
+        <h3 class="text-sm font-medium text-white">Prior matchup context</h3>
+        <p class="mt-1 text-sm text-zinc-500">Recent notes matching the seated decks, commanders, or opponents.</p>
+
+        <div class="mt-4 space-y-3">
+          <% @prior_notes_by_pod.each do |pod_number, notes| %>
+            <% next if notes.empty? %>
+            <section class="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+              <h4 class="text-xs font-medium uppercase tracking-wide text-zinc-500">Pod <%= pod_number %></h4>
+              <ul class="mt-3 space-y-3">
+                <% notes.each do |note| %>
+                  <li>
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                      <%= link_to note.deck.name, matchup_note_path(note), class: "text-sm font-medium text-emerald-300 hover:text-emerald-200" %>
+                      <span class="text-xs text-zinc-500"><%= note.happened_at.to_date.to_fs(:medium) %></span>
+                    </div>
+                    <p class="mt-1 text-xs text-zinc-500">
+                      <% if note.commander %><%= note.commander.name %><% end %>
+                      <% if note.opponent %><%= note.commander ? " · " : "" %>vs <%= note.opponent.name %><% end %>
+                      <% if note.tags.any? %><%= (note.commander || note.opponent) ? " · " : "" %><%= note.tags.join(", ") %><% end %>
+                    </p>
+                    <p class="mt-1 line-clamp-2 text-sm leading-6 text-zinc-300"><%= note.body %></p>
+                  </li>
+                <% end %>
+              </ul>
+            </section>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
   </div>
 
   <% if @pod_seats_by_number.any? %>
@@ -155,6 +187,12 @@
                 <% if result.notes.present? %><span class="block whitespace-pre-line"><%= result.notes %></span><% end %>
               </p>
             <% end %>
+
+            <div>
+              <%= link_to "Add matchup note for pod #{pod_number}",
+                          new_matchup_note_path(game_night_id: @game_night.id, game_night_pod_number: pod_number, deck_id: seats.first&.deck_id),
+                          class: "text-sm font-medium text-emerald-300 hover:text-emerald-200" %>
+            </div>
           </section>
         <% end %>
       </div>

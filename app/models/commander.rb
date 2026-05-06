@@ -2,6 +2,7 @@ class Commander < ApplicationRecord
   belongs_to :deck
   belongs_to :oracle_card, optional: true
   belongs_to :card_printing, optional: true
+  has_many :matchup_notes, dependent: :nullify
 
   validates :name, :normalized_name, presence: true
   validates :position, numericality: { only_integer: true, greater_than: 0 }

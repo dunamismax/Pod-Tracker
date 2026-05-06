@@ -7,6 +7,7 @@ class GameNight < ApplicationRecord
   has_many :game_night_decks, -> { order(:position) }, dependent: :destroy
   has_many :game_night_pod_seats, -> { order(:pod_number, :seat_number) }, dependent: :destroy
   has_many :game_night_pod_results, -> { order(:pod_number) }, dependent: :destroy
+  has_many :matchup_notes, dependent: :nullify
   has_many :decks, through: :game_night_decks
   has_many :audit_events, as: :auditable, dependent: :nullify
 
