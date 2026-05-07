@@ -3,16 +3,19 @@ require "test_helper"
 class SeededUsersTest < ActiveSupport::TestCase
   ADMIN_EMAIL = "stephenvsawyer@gmail.com".freeze
   DEMO_EMAIL = "demo@demo.com".freeze
+  BETA_EMAIL = "beta@beta.com".freeze
 
   setup do
-    User.where(email_address: [ ADMIN_EMAIL, DEMO_EMAIL ]).destroy_all
+    User.where(email_address: [ ADMIN_EMAIL, DEMO_EMAIL, BETA_EMAIL ]).destroy_all
     @prior_admin_password = ENV["IDEAL_MAGIC_ADMIN_PASSWORD"]
     @prior_demo_password = ENV["IDEAL_MAGIC_DEMO_PASSWORD"]
+    @prior_beta_password = ENV["IDEAL_MAGIC_BETA_PASSWORD"]
   end
 
   teardown do
     ENV["IDEAL_MAGIC_ADMIN_PASSWORD"] = @prior_admin_password
     ENV["IDEAL_MAGIC_DEMO_PASSWORD"] = @prior_demo_password
+    ENV["IDEAL_MAGIC_BETA_PASSWORD"] = @prior_beta_password
   end
 
   test "seed creates a verified demo user with the default password when env var is unset" do
@@ -27,6 +30,19 @@ class SeededUsersTest < ActiveSupport::TestCase
     assert_equal "imperial", demo.preferred_units
     assert demo.authenticate("demo1234"), "demo user should authenticate with default password"
     refute User.exists?(email_address: ADMIN_EMAIL), "admin user should be skipped without env var"
+  end
+
+  test "seed creates a verified beta user with the default password when env var is unset" do
+    ENV.delete("IDEAL_MAGIC_BETA_PASSWORD")
+    ENV.delete("IDEAL_MAGIC_ADMIN_PASSWORD")
+
+    load_user_seed
+
+    beta = User.find_by(email_address: BETA_EMAIL)
+    assert beta, "beta user should be created"
+    assert beta.email_verified?
+    assert_equal "imperial", beta.preferred_units
+    assert beta.authenticate("beta1234"), "beta user should authenticate with default password"
   end
 
   test "seed creates the admin user when IDEAL_MAGIC_ADMIN_PASSWORD is set" do

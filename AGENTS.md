@@ -260,12 +260,13 @@ Deployment-shape rules:
 
 ## Seeded Accounts
 
-`bin/rails db:seed` ensures two baked-in users exist:
+`bin/rails db:seed` ensures three baked-in users exist:
 
 - **Admin (Stephen):** `stephenvsawyer@gmail.com`. Password is read from `IDEAL_MAGIC_ADMIN_PASSWORD`. The seed never bakes a default — it skips creating the admin if the env var is unset and the user does not already exist. The env var lives in `/etc/ideal-magic-web/env` in production. Do not commit it.
 - **Demo:** `demo@demo.com` / `demo1234` (override with `IDEAL_MAGIC_DEMO_PASSWORD`). Credentials are intentionally public so anyone can drive the live demo.
+- **Beta:** `beta@beta.com` / `beta1234` (override with `IDEAL_MAGIC_BETA_PASSWORD`). Shared sign-in for beta testers. Like the demo account, beta testers can connect their own ChatGPT/Codex via the normal device-code flow and use the full system.
 
-Both accounts are created with `email_verified_at` set so they bypass the verification gate. Re-running the seed updates passwords if the env var changed but does not destroy decks or audit history.
+All three accounts are created with `email_verified_at` set so they bypass the verification gate. Re-running the seed updates passwords if the env var changed but does not destroy decks or audit history.
 
 To wipe the demo account back to factory defaults (decks, analyses, codex links, provider links, audit events), run on the VM:
 
