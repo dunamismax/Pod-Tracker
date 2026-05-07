@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_07_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_07_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -313,6 +313,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_120000) do
     t.jsonb "import_metadata", default: {}, null: false
     t.datetime "last_imported_at"
     t.string "name", null: false
+    t.datetime "share_revoked_at"
+    t.string "share_token"
+    t.datetime "shared_at"
     t.string "source_type"
     t.string "status", default: "draft", null: false
     t.datetime "updated_at", null: false
@@ -321,6 +324,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_120000) do
     t.index ["color_identity"], name: "index_decks_on_color_identity", using: :gin
     t.index ["format"], name: "index_decks_on_format"
     t.index ["guest_for_pod_id"], name: "index_decks_on_guest_for_pod_id"
+    t.index ["share_token"], name: "index_decks_on_share_token", unique: true, where: "(share_token IS NOT NULL)"
     t.index ["status"], name: "index_decks_on_status"
     t.index ["user_id", "name"], name: "index_decks_on_user_id_and_name"
     t.index ["user_id", "updated_at"], name: "index_decks_on_user_id_and_updated_at"

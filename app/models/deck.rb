@@ -17,8 +17,31 @@ class Deck < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validates :visibility, inclusion: { in: VISIBILITIES }
 
+  scope :shared, -> { where.not(share_token: nil).where(share_revoked_at: nil) }
+
   def guest?
     guest_for_pod_id.present?
+  end
+
+  def shared?
+    share_token.present? && share_revoked_at.nil?
+  end
+
+  def issue_share_token!
+    return share_token if shared?
+
+    update!(
+      share_token: SecureRandom.urlsafe_base64(16),
+      shared_at: Time.current,
+      share_revoked_at: nil
+    )
+    share_token
+  end
+
+  def revoke_share!
+    return unless share_token.present?
+
+    update!(share_revoked_at: Time.current)
   end
 
   def latest_deterministic_run

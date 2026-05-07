@@ -16,6 +16,7 @@ Rails.application.routes.draw do
     resource :ai_evaluation, only: :create, controller: "deck_ai_evaluations"
     resource :export, only: :show, controller: "deck_exports"
     resource :analysis_export, only: :show, controller: "deck_analysis_exports", path: "analysis"
+    resource :share, only: %i[create destroy], controller: "deck_shares"
   end
   resource :collection, only: :show
   resources :collection_imports, only: %i[show create]
@@ -31,6 +32,9 @@ Rails.application.routes.draw do
     patch :pod_results, on: :member
   end
   get "p/:token", to: "public_pods#show", as: :public_pod
+  get "d/:token", to: "public_decks#show", as: :public_deck
+  get "d/:token/export", to: "public_decks#export", as: :public_deck_export, defaults: { format: :text }
+  get "d/:token/analysis", to: "public_decks#analysis", as: :public_deck_analysis, defaults: { format: :markdown }
   resources :passwords, param: :token
 
   get "email_verifications/:token", to: "email_verifications#show", as: :email_verification

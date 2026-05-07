@@ -1,0 +1,74 @@
+<% content_for :title, "#{@deck.name} (shared deck)" %>
+
+<section class="space-y-6">
+  <div>
+    <p class="text-xs uppercase tracking-wide text-emerald-300">Shared Commander deck</p>
+    <h1 class="mt-1 text-2xl font-semibold text-white print:text-zinc-900"><%= @deck.name %></h1>
+    <p class="mt-1 text-sm text-zinc-400 print:text-zinc-700">
+      <%= @deck.commander_names.join(", ").presence || "No commander recorded" %>
+      · <%= pluralize(@deck.deck_cards.sum(:quantity), "card") %>
+      <% if @analysis_run&.completed_at %>
+        · Analyzed <%= time_ago_in_words(@analysis_run.completed_at) %> ago
+      <% end %>
+    </p>
+    <p class="mt-2 text-xs text-zinc-500">
+      Read-only. Decklist, deterministic analysis, and Commander legality only — no playgroup notes, results, or collection data.
+    </p>
+  </div>
+
+  <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 print:hidden">
+    <div class="flex flex-wrap items-baseline justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-medium text-white">Download</h2>
+        <p class="mt-1 text-xs text-zinc-500">
+          Decklist downloads in plain text, CSV, or JSON. Analysis downloads as Markdown or JSON.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="text-zinc-500 self-center">Decklist:</span>
+        <%= link_to "Text", public_deck_export_path(@deck.share_token, format: :text), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+        <%= link_to "CSV", public_deck_export_path(@deck.share_token, format: :csv), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+        <%= link_to "JSON", public_deck_export_path(@deck.share_token, format: :json), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+        <% if @scorecard.present? %>
+          <span class="ml-2 text-zinc-500 self-center">Analysis:</span>
+          <%= link_to "Markdown", public_deck_analysis_path(@deck.share_token, format: :markdown), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+          <%= link_to "JSON", public_deck_analysis_path(@deck.share_token, format: :json), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <% if @scorecard.present? %>
+    <%= render "decks/analysis", scorecard: @scorecard, run: @analysis_run, legality: @legality, recommendations: @recommendations %>
+  <% else %>
+    <div class="rounded-md border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-300">
+      Deterministic analysis has not run for this deck yet.
+    </div>
+  <% end %>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <% if @deck.commanders.any? %>
+      <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+        <h2 class="text-lg font-medium text-white">Commander</h2>
+        <ul class="mt-3 space-y-1 text-sm text-zinc-200">
+          <% @deck.commanders.order(:position).each do |commander| %>
+            <li><%= commander.name %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <% DeckCard::BOARDS.each do |board| %>
+      <% cards = @deck.deck_cards.where(board: board).order(:position, :name) %>
+      <% next if cards.empty? %>
+      <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+        <h2 class="text-lg font-medium text-white"><%= board.humanize %> · <%= cards.sum(&:quantity) %> cards</h2>
+        <ul class="mt-3 grid gap-1 text-sm text-zinc-200 sm:grid-cols-2">
+          <% cards.each do |card| %>
+            <li><span class="text-zinc-500"><%= card.quantity %>×</span> <%= card.name %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+  </div>
+</section>

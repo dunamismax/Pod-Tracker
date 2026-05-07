@@ -15,9 +15,26 @@
     </div>
     <div class="flex flex-wrap gap-3">
       <%= link_to "All decks", decks_path, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
+      <% if @deck.shared? %>
+        <%= button_to "Revoke share link", deck_share_path(@deck), method: :delete, form: { data: { turbo_confirm: "Revoke this deck's public link?" } }, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
+      <% else %>
+        <%= button_to "Create share link", deck_share_path(@deck), method: :post, class: "rounded-md bg-zinc-800 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700" %>
+      <% end %>
       <%= button_to "Remove deck", deck_path(@deck), method: :delete, form: { data: { turbo_confirm: "Remove this deck?" } }, class: "rounded-md bg-red-700 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-red-600" %>
     </div>
   </div>
+
+  <% if @deck.shared? %>
+    <div class="rounded-md border border-emerald-800 bg-emerald-950/30 p-4 text-sm text-emerald-200">
+      <p class="font-medium">Public share link</p>
+      <p class="mt-1 break-all font-mono text-xs">
+        <%= public_deck_url(@deck.share_token) %>
+      </p>
+      <p class="mt-1 text-xs text-emerald-200/80">
+        Anyone with the link can read the decklist and deterministic analysis. Playgroup notes, results, AI evaluations, and collection data stay private. Revoke the link anytime.
+      </p>
+    </div>
+  <% end %>
 
   <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
     <div class="flex flex-wrap items-baseline justify-between gap-3">

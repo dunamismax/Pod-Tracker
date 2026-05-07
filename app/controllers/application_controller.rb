@@ -15,7 +15,7 @@ class ApplicationController < ActionController::Base
     return @mobile_nav_section if defined?(@mobile_nav_section) && @mobile_nav_section
 
     case controller_path
-    when "decks", "deck_ai_evaluations" then "decks"
+    when "decks", "deck_ai_evaluations", "deck_shares", "public_decks" then "decks"
     when "pods", "pod_ai_evaluations", "pod_shares", "public_pods" then "pods"
     when "game_nights" then "sessions"
     when "matchup_notes" then "journal"
