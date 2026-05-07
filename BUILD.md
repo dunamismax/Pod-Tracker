@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-06 (Slice 6 - meta trends opened)
+Last updated: 2026-05-07 (Slice 7 - Codex App Server transport opened)
 
 ## How agents work this file
 
@@ -41,7 +41,7 @@ These don't move:
 ## What's live now
 
 - **Auth & accounts:** signup, sign-in, password reset, email verification, account settings (display name, timezone, units), account deletion, JSON account export, audit events.
-- **Codex account-auth:** encrypted credential storage, browser/device-code login UX, refresh-status, remote sign-out, per-user/global quota policy with rate-limit display. Transport boundary ships with a fail-closed `NullTransport` — no real Codex calls happen yet.
+- **Codex account-auth:** encrypted credential storage, browser/device-code login UX, refresh-status, remote sign-out, per-user/global quota policy with rate-limit display. The live Codex App Server JSON-RPC transport is wired behind `CODEX_APP_SERVER_ENABLED`; default remains fail-closed with `NullTransport`, and AI evaluation is not wired up yet.
 - **Provider link placeholders** for Archidekt and Moxfield public profile URLs (no third-party password collection).
 - **Card corpus:** Scryfall bulk-data ingestion, Commander rules/banlist snapshot, internal tag taxonomy with curated salt/social-friction overrides, deterministic legality checker, daily Solid Queue refresh job.
 - **Deck import:** pasted text, uploaded text file, public Archidekt URL, public Moxfield URL. Imports surface unparsed lines, source attribution, audit events.
@@ -187,7 +187,7 @@ The site no longer redirects every visitor to `/session/new`. Public surface liv
 
 The v1 differentiator. Build it on top of deterministic analysis, not as a replacement.
 
-- [ ] Implement a real Codex App Server JSON-RPC transport against the documented account-auth surface. Replace `NullTransport` with the live client behind a feature flag.
+- [x] Implement a real Codex App Server JSON-RPC transport against the documented account-auth surface. Replace `NullTransport` with the live client behind a feature flag. (`CODEX_APP_SERVER_ENABLED=true` enables the stdio transport using `CODEX_APP_SERVER_COMMAND`, defaulting to `codex app-server`; the client normalizes documented `account/login/start`, `account/read`, `account/rateLimits/read`, `account/login/cancel`, and `account/logout` calls.)
 - [ ] JSON schema for AI scorecards: power/speed/interaction/consistency/salt/social-friction adjustments, friction drivers, Rule 0 talking points. Cite deterministic facts; mark uncertainty.
 - [ ] Single-deck prompt v1: pass the deterministic feature vector, decklist, commander, combo candidates, salt/friction evidence, and rubric. Ask for adjustments + explanations, not raw scores.
 - [ ] Pod prompt v1: same shape, pod-aware.
@@ -220,6 +220,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-07 — Slice 7 opened: Codex account-auth now has a feature-flagged stdio JSON-RPC transport for the documented App Server `account/*` methods, keeps `NullTransport` as the default fail-closed path, normalizes account/rate-limit responses into existing account records, and has focused service/controller coverage.
 - 2026-05-06 — Slice 6 meta trends: completed game-night results now drive post-game note prompts for wins/losses/draws/short games/dead draws/missing collection cards, deck table-performance summaries, revision-level result history from seat snapshots, commander meta tables with confidence/trend labels, and focused service/controller coverage.
 - 2026-05-06 — Slice 6 opened: matchup notes now store deck-linked table memory with optional commander, opponent, saved pod, session pod number, normalized tags, account-scoped CRUD/search, journal navigation, and session seating context that surfaces recent notes matching the seated decks, commanders, or opponents.
 - 2026-05-06 — Slice 5 closed: collection pages now rank shared missing-card demand pressure across decks, and deck tuning suggestions are labeled with matching owned options versus likely borrow/trade/buy gaps; focused service/controller/system tests cover the flow.

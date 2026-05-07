@@ -23,7 +23,7 @@ internet → Caddy (host) → 127.0.0.1:8083 (Puma in ideal-magic-web.service) �
 | `db` | `postgresql.service` | Host package, default cluster on `localhost:5432`. |
 | `tls/edge` | `caddy.service` | Reverse-proxies the apex hostname; redirects `www`. |
 
-`codex` (the Codex App Server runtime) is not deployed yet. When it is, it should be added as another systemd unit on the same VM, not folded into the web unit.
+Rails can talk to Codex App Server over the feature-flagged stdio JSON-RPC transport, but production keeps that flag off until AI evaluation ships. If Codex needs a long-lived runtime for production login/evaluation flows, add it as another systemd unit on the same VM, not folded into the web unit.
 
 ## Paths
 
@@ -55,7 +55,10 @@ Production env vars live in `/etc/ideal-magic-web/env` and are loaded by the sys
 | `RAILS_MAX_THREADS` | recommended | Puma threads per worker. Currently `5`. Keep `database.yml` `max_connections` ≥ this. |
 | `SOLID_QUEUE_IN_PUMA` | recommended | `true` until jobs need a separate process. |
 | `APP_HOST` | yes | `ideal-magic.com`. Used for mailer URLs and similar. |
-| `CODEX_HOME` / `CODEX_APP_SERVER_COMMAND` | future | Set when the Codex evaluation pipeline ships (Phase 6). |
+| `CODEX_APP_SERVER_ENABLED` | optional | `false` by default. Set to `true` only when the Codex App Server runtime is intentionally enabled. |
+| `CODEX_HOME` | optional | Codex credential/cache home. Do not point this at a git-tracked path. |
+| `CODEX_APP_SERVER_COMMAND` | optional | Command used by the stdio transport when enabled. Defaults to `codex app-server`. |
+| `CODEX_APP_SERVER_REQUEST_TIMEOUT_SECONDS` | optional | JSON-RPC request timeout. Defaults to `20`. |
 
 Never commit `/etc/ideal-magic-web/env`, `config/master.key`, or rotated database passwords. Update `.env.example` with placeholder names when a new variable is added so local development stays in sync.
 

@@ -1,4 +1,6 @@
 require "test_helper"
+require "rbconfig"
+require "tempfile"
 
 module Codex
   class AppServerClientTest < ActiveSupport::TestCase
@@ -22,9 +24,9 @@ module Codex
       end
     end
 
-    test "start_chatgpt_browser_login forwards to loginChatGpt with protocolVersion" do
+    test "start_chatgpt_browser_login forwards to documented account login method" do
       transport = FakeTransport.new(scripted: {
-        "loginChatGpt" => { "loginId" => "abc", "loginUrl" => "https://chatgpt.com/login/abc" }
+        "account/login/start" => { "loginId" => "abc", "authUrl" => "https://chatgpt.com/login/abc" }
       })
       client = AppServerClient.new(transport: transport)
       result = client.start_chatgpt_browser_login(client_label: "ideal-magic")
@@ -32,72 +34,107 @@ module Codex
       assert_equal "abc", result["loginId"]
       assert_equal "https://chatgpt.com/login/abc", result["loginUrl"]
       method, params = transport.calls.first
-      assert_equal "loginChatGpt", method
-      assert_equal "1", params["protocolVersion"]
-      assert_equal "ideal-magic", params["clientLabel"]
+      assert_equal "account/login/start", method
+      assert_equal "chatgpt", params["type"]
+      assert_equal "ideal-magic", params["serviceName"]
     end
 
-    test "start_chatgpt_device_login uses loginChatGptDeviceCode" do
+    test "start_chatgpt_device_login uses documented device-code login type" do
       transport = FakeTransport.new(scripted: {
-        "loginChatGptDeviceCode" => {
+        "account/login/start" => {
           "loginId" => "dev-1",
           "userCode" => "WXYZ-1234",
-          "verificationUri" => "https://chatgpt.com/device"
+          "verificationUrl" => "https://auth.openai.com/codex/device"
         }
       })
       client = AppServerClient.new(transport: transport)
       result = client.start_chatgpt_device_login
 
       assert_equal "WXYZ-1234", result["userCode"]
-      assert_equal "loginChatGptDeviceCode", transport.calls.first.first
+      assert_equal "https://auth.openai.com/codex/device", result["verificationUri"]
+      assert_equal "account/login/start", transport.calls.first.first
+      assert_equal "chatgptDeviceCode", transport.calls.first.last["type"]
     end
 
-    test "poll_chatgpt_login passes loginId" do
+    test "poll_chatgpt_login returns awaiting_user while account is not connected" do
       transport = FakeTransport.new(scripted: {
-        "getLoginChatGptStatus" => { "state" => "awaiting_user" }
+        "account/read" => { "account" => nil, "requiresOpenaiAuth" => true },
+        "account/rateLimits/read" => {}
       })
       client = AppServerClient.new(transport: transport)
-      client.poll_chatgpt_login(login_id: "abc")
-      _, params = transport.calls.first
-      assert_equal "abc", params["loginId"]
+      result = client.poll_chatgpt_login(login_id: "abc")
+
+      assert_equal "awaiting_user", result["state"]
+      assert_equal "abc", result["loginId"]
+      assert_equal true, transport.calls.first.last["refreshToken"]
+    end
+
+    test "poll_chatgpt_login normalizes connected account metadata" do
+      transport = FakeTransport.new(scripted: {
+        "account/read" => {
+          "account" => { "type" => "chatgpt", "email" => "demo@example.com", "planType" => "plus" },
+          "requiresOpenaiAuth" => true
+        },
+        "account/rateLimits/read" => {
+          "rateLimits" => { "limitId" => "codex", "primary" => { "usedPercent" => 10 } }
+        }
+      })
+      client = AppServerClient.new(transport: transport)
+      result = client.poll_chatgpt_login(login_id: "abc")
+
+      assert_equal "completed", result["state"]
+      assert_equal "chatgpt_browser", result["authMode"]
+      assert_equal "demo@example.com", result["displayedEmail"]
+      assert_equal "plus", result["planType"]
+      assert_equal "codex_app_server", JSON.parse(result["credential"])["storage"]
     end
 
     test "cancel_chatgpt_login passes loginId" do
       transport = FakeTransport.new(scripted: {
-        "cancelLoginChatGpt" => { "ok" => true }
+        "account/login/cancel" => {}
       })
       client = AppServerClient.new(transport: transport)
       client.cancel_chatgpt_login(login_id: "abc")
-      assert_equal "cancelLoginChatGpt", transport.calls.first.first
+      assert_equal "account/login/cancel", transport.calls.first.first
       assert_equal "abc", transport.calls.first.last["loginId"]
     end
 
-    test "logout_chatgpt routes to logoutChatGpt" do
-      transport = FakeTransport.new(scripted: { "logoutChatGpt" => {} })
+    test "logout_chatgpt routes to account logout" do
+      transport = FakeTransport.new(scripted: { "account/logout" => {} })
       client = AppServerClient.new(transport: transport)
       client.logout_chatgpt
-      assert_equal "logoutChatGpt", transport.calls.first.first
+      assert_equal "account/logout", transport.calls.first.first
     end
 
-    test "get_auth_status routes to getAuthStatus" do
+    test "get_auth_status normalizes account read and rate limit responses" do
       transport = FakeTransport.new(scripted: {
-        "getAuthStatus" => { "authMode" => "chatgpt_browser", "displayedEmail" => "demo@example.com" }
+        "account/read" => {
+          "account" => { "type" => "chatgpt", "email" => "demo@example.com", "planType" => "team" },
+          "requiresOpenaiAuth" => true
+        },
+        "account/rateLimits/read" => {
+          "rateLimitsByLimitId" => {
+            "codex" => { "limitId" => "codex", "primary" => { "usedPercent" => 5 } }
+          }
+        }
       })
       client = AppServerClient.new(transport: transport)
       result = client.get_auth_status
       assert_equal "demo@example.com", result["displayedEmail"]
+      assert_equal "team", result["planType"]
+      assert_equal({ "codex" => { "limitId" => "codex", "primary" => { "usedPercent" => 5 } } }, result["rateLimit"])
     end
 
     test "raises RpcError when transport returns a non-Hash result" do
-      transport = FakeTransport.new(scripted: { "getAuthStatus" => "nope" })
+      transport = FakeTransport.new(scripted: { "account/read" => "nope" })
       client = AppServerClient.new(transport: transport)
       assert_raises(AppServerClient::RpcError) { client.get_auth_status }
     end
 
     test "wraps unknown transport errors as TransportError" do
       transport = FakeTransport.new(
-        scripted: { "loginChatGpt" => nil },
-        raise_on: { "loginChatGpt" => RuntimeError.new("boom") }
+        scripted: { "account/login/start" => nil },
+        raise_on: { "account/login/start" => RuntimeError.new("boom") }
       )
       client = AppServerClient.new(transport: transport)
       error = assert_raises(AppServerClient::TransportError) { client.start_chatgpt_browser_login }
@@ -107,8 +144,8 @@ module Codex
     test "preserves explicit RpcError raised by transport" do
       rpc = AppServerClient::RpcError.new("server says no", code: -32000)
       transport = FakeTransport.new(
-        scripted: { "loginChatGpt" => nil },
-        raise_on: { "loginChatGpt" => rpc }
+        scripted: { "account/login/start" => nil },
+        raise_on: { "account/login/start" => rpc }
       )
       client = AppServerClient.new(transport: transport)
       raised = assert_raises(AppServerClient::RpcError) { client.start_chatgpt_browser_login }
@@ -118,6 +155,44 @@ module Codex
     test "default NullTransport raises TransportError so dev cannot accidentally call OpenAI" do
       client = AppServerClient.new
       assert_raises(AppServerClient::TransportError) { client.get_auth_status }
+    end
+
+    test "from_environment keeps NullTransport unless feature flag is enabled" do
+      client = AppServerClient.from_environment(env: {})
+      assert_raises(AppServerClient::TransportError) { client.get_auth_status }
+    end
+
+    test "stdio transport initializes the app server protocol before requests" do
+      script = Tempfile.new([ "fake-codex-app-server", ".rb" ])
+      script.write(<<~RUBY)
+        require "json"
+
+        initialize_request = JSON.parse(STDIN.gets)
+        puts JSON.generate("id" => initialize_request.fetch("id"), "result" => { "server" => "ready" })
+        STDOUT.flush
+
+        initialized = JSON.parse(STDIN.gets)
+        raise "expected initialized notification" unless initialized["method"] == "initialized"
+
+        request = JSON.parse(STDIN.gets)
+        puts JSON.generate("id" => request.fetch("id"), "result" => {
+          "method" => request.fetch("method"),
+          "params" => request.fetch("params")
+        })
+        STDOUT.flush
+      RUBY
+      script.close
+
+      transport = AppServerClient::StdioTransport.new(
+        command: [ RbConfig.ruby, script.path ],
+        request_timeout: 2
+      )
+      result = transport.request("account/read", "refreshToken" => true)
+
+      assert_equal "account/read", result["method"]
+      assert_equal true, result["params"]["refreshToken"]
+    ensure
+      script&.unlink
     end
   end
 end

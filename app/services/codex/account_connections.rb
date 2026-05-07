@@ -18,7 +18,10 @@ module Codex
       attr_writer :client_factory
 
       def client_factory
-        @client_factory ||= -> { AppServerClient.new }
+        @client_factory ||= begin
+          client = AppServerClient.from_environment
+          -> { client }
+        end
       end
 
       def for(user, clock: -> { Time.current }, client_label: DEFAULT_CLIENT_LABEL)
