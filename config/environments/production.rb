@@ -76,6 +76,18 @@ Rails.application.configure do
   # Do not dump schema after migrations.
   config.active_record.dump_schema_after_migration = false
 
+  # Encrypted attributes, including Codex account metadata, need explicit
+  # production keys. Values live in /etc/ideal-magic-web/env, not in git.
+  if ENV["ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY"].present?
+    config.active_record.encryption.primary_key = ENV["ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY"]
+  end
+  if ENV["ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY"].present?
+    config.active_record.encryption.deterministic_key = ENV["ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY"]
+  end
+  if ENV["ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT"].present?
+    config.active_record.encryption.key_derivation_salt = ENV["ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT"]
+  end
+
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 

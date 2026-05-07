@@ -45,6 +45,9 @@ Production env vars live in `/etc/ideal-magic-web/env` and are loaded by the sys
 | --- | --- | --- |
 | `RAILS_ENV` | yes | Always `production` in this file. |
 | `SECRET_KEY_BASE` | yes | 64-byte hex generated with `bin/rails secret`. |
+| `ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` | yes | Secret key for Rails encrypted attributes such as Codex account metadata. Generate with `bin/rails db:encryption:init` or an equivalent high-entropy secret source. |
+| `ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY` | yes | Secret deterministic key for Rails encrypted attributes. |
+| `ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT` | yes | Secret salt for Rails encrypted attributes. |
 | `IDEAL_MAGIC_DATABASE_PASSWORD` | yes | Password for the `ideal_magic` PostgreSQL role. |
 | `IDEAL_MAGIC_DATABASE_HOST` | yes | Defaults to `localhost`. PG on the VM uses peer auth on the default socket, so TCP is required for the role. |
 | `PORT` | yes | `8083`. Must match the Caddy upstream and the `ExecStart` flag. |
