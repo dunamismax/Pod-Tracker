@@ -1,0 +1,137 @@
+<%
+  run ||= nil
+  enqueue_path ||= nil
+  title ||= "AI evaluation"
+  target_label ||= "analysis"
+  payload = run&.ai_payload || {}
+  adjustments = payload["adjustments"].is_a?(Hash) ? payload["adjustments"] : {}
+  drivers = Array(payload["friction_drivers"])
+  talking_points = Array(payload["rule_zero_talking_points"])
+  recommendations = Array(payload["recommendations"])
+  axes = {
+    "power" => "Power",
+    "speed" => "Speed",
+    "interaction" => "Interaction",
+    "consistency" => "Consistency",
+    "salt" => "Salt",
+    "social_friction" => "Social friction"
+  }
+%>
+
+<section class="rounded-lg border border-blue-900/70 bg-blue-950/20 p-5" data-testid="ai-evaluation">
+  <header class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-blue-300">Codex augmentation</p>
+      <h2 class="mt-1 text-lg font-medium text-white"><%= title %></h2>
+      <p class="mt-1 text-sm text-zinc-400">
+        Deterministic scoring stays authoritative. Codex adds cited adjustments, uncertainty, and Rule 0 language.
+      </p>
+    </div>
+
+    <% if enqueue_path.present? && (run.nil? || %w[succeeded failed canceled].include?(run.status)) %>
+      <%= button_to "Run AI evaluation", enqueue_path, method: :post, class: "rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-blue-500" %>
+    <% end %>
+  </header>
+
+  <% if run.nil? %>
+    <p class="mt-4 text-sm text-zinc-400">No AI evaluation has been queued for this <%= target_label %> yet.</p>
+  <% elsif run.active? %>
+    <div class="mt-4 rounded-md border border-blue-800 bg-blue-950/40 p-4 text-sm text-blue-100">
+      <p class="font-medium">AI evaluation is <%= run.status %>.</p>
+      <p class="mt-1 text-xs text-blue-100/80">
+        Queued <%= time_ago_in_words(run.queued_at) %> ago
+        <% if run.started_at.present? %>
+          · started <%= time_ago_in_words(run.started_at) %> ago
+        <% end %>
+      </p>
+    </div>
+  <% elsif run.status == "failed" %>
+    <div class="mt-4 rounded-md border border-rose-800 bg-rose-950/30 p-4 text-sm text-rose-100">
+      <p class="font-medium">AI evaluation failed.</p>
+      <p class="mt-1 text-xs text-rose-100/80"><%= run.error_message.presence || run.error_code %></p>
+    </div>
+  <% elsif run.status == "succeeded" %>
+    <div class="mt-4 flex flex-wrap gap-2 text-xs">
+      <span class="rounded-md bg-zinc-900 px-2.5 py-1 text-zinc-300">Prompt <%= run.prompt_version || "unknown" %></span>
+      <span class="rounded-md bg-zinc-900 px-2.5 py-1 text-zinc-300">Model <%= run.ai_model || "unknown" %></span>
+      <% if run.latency_ms.present? %>
+        <span class="rounded-md bg-zinc-900 px-2.5 py-1 text-zinc-300"><%= number_with_delimiter(run.latency_ms) %> ms</span>
+      <% end %>
+      <% if run.stale? %>
+        <span class="rounded-md bg-amber-950 px-2.5 py-1 text-amber-200">Stale after deterministic changes</span>
+      <% end %>
+    </div>
+
+    <% if payload["summary"].present? %>
+      <p class="mt-4 text-sm text-zinc-200"><%= payload["summary"] %></p>
+    <% end %>
+
+    <% if adjustments.any? %>
+      <div class="mt-5">
+        <h3 class="text-sm font-medium text-white">Cited score adjustments</h3>
+        <ul class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <% axes.each do |axis, label| %>
+            <% item = adjustments[axis] || {} %>
+            <li class="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+              <div class="flex items-baseline justify-between gap-2">
+                <p class="text-xs uppercase tracking-wide text-zinc-500"><%= label %></p>
+                <p class="font-mono text-sm <%= item["delta"].to_i.positive? ? 'text-emerald-300' : item["delta"].to_i.negative? ? 'text-amber-300' : 'text-zinc-300' %>">
+                  <%= item["delta"].to_i.positive? ? "+" : "" %><%= item["delta"] || 0 %>
+                </p>
+              </div>
+              <p class="mt-2 text-xs text-zinc-300"><%= item["rationale"] %></p>
+              <p class="mt-2 font-mono text-[11px] text-zinc-600"><%= Array(item["deterministic_fact_refs"]).join(", ") %></p>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <% if drivers.any? || talking_points.any? %>
+      <div class="mt-5 grid gap-4 lg:grid-cols-2">
+        <% if drivers.any? %>
+          <div>
+            <h3 class="text-sm font-medium text-white">Friction drivers</h3>
+            <ul class="mt-2 space-y-2 text-sm">
+              <% drivers.each do |driver| %>
+                <li class="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+                  <p class="font-medium text-zinc-100"><%= driver["label"] %> <span class="text-xs text-zinc-500">· <%= driver["severity"] %></span></p>
+                  <p class="mt-1 text-xs text-zinc-400"><%= driver["explanation"] %></p>
+                </li>
+              <% end %>
+            </ul>
+          </div>
+        <% end %>
+
+        <% if talking_points.any? %>
+          <div>
+            <h3 class="text-sm font-medium text-white">Rule 0 talking points</h3>
+            <ul class="mt-2 space-y-2 text-sm">
+              <% talking_points.each do |point| %>
+                <li class="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+                  <p class="font-medium text-zinc-100"><%= point["topic"] %></p>
+                  <p class="mt-1 text-xs text-zinc-400"><%= point["prompt"] %></p>
+                </li>
+              <% end %>
+            </ul>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if recommendations.any? %>
+      <div class="mt-5">
+        <h3 class="text-sm font-medium text-white">AI recommendations</h3>
+        <ul class="mt-2 space-y-2 text-sm">
+          <% recommendations.each do |rec| %>
+            <li class="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+              <p class="font-medium text-zinc-100"><%= rec["title"] %></p>
+              <p class="mt-1 text-xs text-zinc-400"><%= rec["detail"] %></p>
+              <p class="mt-1 text-xs text-blue-300"><%= rec["owned_collection_relevance"].to_s.humanize %></p>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+  <% end %>
+</section>

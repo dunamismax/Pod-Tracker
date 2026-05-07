@@ -45,4 +45,10 @@
       No pod analysis yet.
     </div>
   <% end %>
+
+  <%= render "codex/ai_evaluation",
+      run: @ai_run,
+      enqueue_path: pod_ai_evaluation_path(@pod),
+      title: "AI pod evaluation",
+      target_label: "pod" %>
 </section>

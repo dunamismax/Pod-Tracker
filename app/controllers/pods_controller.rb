@@ -14,6 +14,7 @@ class PodsController < ApplicationController
     @brief = @latest_run&.rule_zero_brief || {}
     @warnings = Array(@latest_run&.warnings)
     @suggestions = Array(@latest_run&.suggestions)
+    @ai_run = @pod.latest_ai_run
   end
 
   def new

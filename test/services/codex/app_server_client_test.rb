@@ -22,6 +22,14 @@ module Codex
           raise "Unexpected JSON-RPC call: #{method}"
         end
       end
+
+      def request_and_stream(method, params = {}, until_method:)
+        @calls << [ method, params.merge("untilMethod" => until_method) ]
+        Array(@scripted.fetch("#{method}:notifications", [])).each { |message| yield message }
+        @scripted.fetch(method) do
+          raise "Unexpected streaming JSON-RPC call: #{method}"
+        end
+      end
     end
 
     test "start_chatgpt_browser_login forwards to documented account login method" do
@@ -123,6 +131,46 @@ module Codex
       assert_equal "demo@example.com", result["displayedEmail"]
       assert_equal "team", result["planType"]
       assert_equal({ "codex" => { "limitId" => "codex", "primary" => { "usedPercent" => 5 } } }, result["rateLimit"])
+    end
+
+    test "evaluate_scorecard starts a thread and captures the completed agent JSON" do
+      transport = FakeTransport.new(scripted: {
+        "thread/start" => { "thread" => { "id" => "thread-1" } },
+        "turn/start" => { "id" => "turn-1", "status" => "running" },
+        "turn/start:notifications" => [
+          {
+            "method" => "item/completed",
+            "params" => {
+              "item" => {
+                "type" => "agentMessage",
+                "text" => "{ \"schema_version\": \"ai-scorecard-v1\", \"summary\": \"ok\" }",
+                "phase" => "final_answer"
+              }
+            }
+          },
+          { "method" => "turn/completed", "params" => { "turnId" => "turn-1", "status" => "completed" } }
+        ],
+        "thread/unsubscribe" => {}
+      })
+      client = AppServerClient.new(transport: transport)
+      result = client.evaluate_scorecard(
+        {
+          "messages" => [
+            { "role" => "system", "content" => "Return JSON." },
+            { "role" => "user", "content" => "{}" }
+          ]
+        },
+        model: "gpt-test"
+      )
+
+      assert_equal "thread/start", transport.calls[0].first
+      assert_equal "turn/start", transport.calls[1].first
+      assert_equal "thread-1", transport.calls[1].last["threadId"]
+      assert_equal "turn/completed", transport.calls[1].last["untilMethod"]
+      assert_equal "gpt-test", transport.calls[1].last.dig("settings", "model")
+      assert_match(/SYSTEM:/, transport.calls[1].last.dig("input", 0, "text"))
+      assert_equal "{ \"schema_version\": \"ai-scorecard-v1\", \"summary\": \"ok\" }", result["text"]
+      assert_equal "thread/unsubscribe", transport.calls.last.first
     end
 
     test "raises RpcError when transport returns a non-Hash result" do

@@ -25,7 +25,10 @@ module Codex
       cancel_login:     "account/login/cancel",
       logout:           "account/logout",
       read_account:     "account/read",
-      read_rate_limits: "account/rateLimits/read"
+      read_rate_limits: "account/rateLimits/read",
+      start_thread:     "thread/start",
+      start_turn:       "turn/start",
+      unsubscribe:      "thread/unsubscribe"
     }.freeze
 
     CLIENT_INFO = {
@@ -58,12 +61,24 @@ module Codex
         @stderr_tail = []
       end
 
-      def request(method, params = {})
+      def request(method, params = {}, &notification_handler)
         @mutex.synchronize do
           with_timeout(method) do
             start_process!
             initialize_connection! unless @initialized
-            send_request(method, params)
+            send_request(method, params, &notification_handler)
+          end
+        end
+      end
+
+      def request_and_stream(method, params = {}, until_method:, &notification_handler)
+        @mutex.synchronize do
+          with_timeout(method) do
+            start_process!
+            initialize_connection! unless @initialized
+            response = send_request(method, params, &notification_handler)
+            stream_until(method, until_method, &notification_handler)
+            response
           end
         end
       end
@@ -102,21 +117,16 @@ module Codex
         @initialized = true
       end
 
-      def send_request(method, params)
+      def send_request(method, params, &notification_handler)
         id = next_id
         write_message("method" => method, "id" => id, "params" => params)
-        read_response(id, method)
+        read_response(id, method, &notification_handler)
       end
 
-      def read_response(expected_id, method)
+      def read_response(expected_id, method, &notification_handler)
         loop do
-          line = @stdout.gets
-          unless line
-            stop_process
-            raise TransportError, "Codex App Server closed stdout during #{method}.#{stderr_context}"
-          end
-
-          message = JSON.parse(line)
+          message = read_message(method)
+          notification_handler&.call(message) if message["id"] != expected_id
           next unless message["id"] == expected_id
 
           if (error = message["error"])
@@ -125,6 +135,24 @@ module Codex
 
           return message.fetch("result", {})
         end
+      end
+
+      def stream_until(method, until_method, &notification_handler)
+        loop do
+          message = read_message(method)
+          notification_handler&.call(message)
+          return if message["method"] == until_method
+        end
+      end
+
+      def read_message(method)
+        line = @stdout.gets
+        unless line
+          stop_process
+          raise TransportError, "Codex App Server closed stdout during #{method}.#{stderr_context}"
+        end
+
+        JSON.parse(line)
       rescue JSON::ParserError => e
         raise TransportError, "Codex App Server returned invalid JSON during #{method}: #{e.message}"
       end
@@ -180,6 +208,10 @@ module Codex
     class NullTransport
       def request(method, _params = {})
         raise TransportError, "Codex App Server transport is not configured (attempted #{method})."
+      end
+
+      def request_and_stream(method, _params = {}, until_method:)
+        raise TransportError, "Codex App Server transport is not configured (attempted #{method}, waiting for #{until_method})."
       end
     end
 
@@ -258,11 +290,69 @@ module Codex
       normalize_auth_status(account_result, rate_limit_result)
     end
 
+    def evaluate_scorecard(prompt, model: nil, client_label: "ideal-magic")
+      thread_id = nil
+      begin
+        thread_result = call(:start_thread, compact("serviceName" => client_label))
+        thread = normalize_thread(thread_result)
+        thread_id = thread.fetch("id")
+        notifications = []
+        final_items = []
+        agent_text = +""
+
+        turn_params = compact(
+          "threadId" => thread_id,
+          "input" => turn_input(prompt),
+          "settings" => compact("model" => model)
+        )
+        turn_result = call_stream(:start_turn, turn_params, until_method: "turn/completed") do |message|
+          notifications << message
+          if message["method"] == "item/agentMessage/delta"
+            agent_text << message.dig("params", "delta").to_s
+          elsif message["method"] == "item/completed"
+            item = message.dig("params", "item")
+            final_items << item if item.is_a?(Hash)
+          end
+        end
+
+        final_text = final_agent_text(final_items).presence || agent_text
+        {
+          "thread" => thread,
+          "turn" => turn_result,
+          "notifications" => notifications,
+          "items" => final_items,
+          "text" => final_text,
+          "model" => model
+        }
+      ensure
+        begin
+          call(:unsubscribe, "threadId" => thread_id) if thread_id.present?
+        rescue Error
+          nil
+        end
+      end
+    end
+
     private
 
     def call(operation, params = {})
       method = JSONRPC_METHODS.fetch(operation)
       result = @transport.request(method, params)
+      raise RpcError, "Codex App Server returned a non-Hash result for #{method}" unless result.is_a?(Hash)
+      result
+    rescue TransportError, RpcError, NotConnectedError
+      raise
+    rescue StandardError => e
+      raise TransportError, "Codex App Server transport error for #{operation}: #{e.class}: #{e.message}"
+    end
+
+    def call_stream(operation, params = {}, until_method:, &block)
+      method = JSONRPC_METHODS.fetch(operation)
+      unless @transport.respond_to?(:request_and_stream)
+        raise TransportError, "Codex App Server transport cannot stream #{method}."
+      end
+
+      result = @transport.request_and_stream(method, params, until_method: until_method, &block)
       raise RpcError, "Codex App Server returned a non-Hash result for #{method}" unless result.is_a?(Hash)
       result
     rescue TransportError, RpcError, NotConnectedError
@@ -322,6 +412,31 @@ module Codex
     def normalized_rate_limit(result)
       return {} unless result.is_a?(Hash)
       result["rateLimitsByLimitId"].presence || result["rateLimits"].presence || {}
+    end
+
+    def normalize_thread(result)
+      thread = result["thread"].is_a?(Hash) ? result["thread"] : result
+      raise RpcError, "Codex App Server thread/start response did not include a thread id." unless thread["id"].present?
+
+      thread
+    end
+
+    def turn_input(prompt)
+      content = Array(prompt.fetch("messages")).map do |message|
+        "#{message.fetch('role').to_s.upcase}:\n#{message.fetch('content')}"
+      end.join("\n\n")
+
+      [
+        {
+          "type" => "text",
+          "text" => content
+        }
+      ]
+    end
+
+    def final_agent_text(items)
+      item = items.reverse.find { |candidate| candidate["type"] == "agentMessage" && candidate["text"].present? }
+      item&.fetch("text", nil)
     end
   end
 end

@@ -1,6 +1,8 @@
 require "test_helper"
 
 class DecksControllerTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
+
   setup { @user = users(:one) }
 
   DECKLIST = <<~TXT.freeze
@@ -111,6 +113,25 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to decks_path
   end
 
+  test "queues an AI deck evaluation from the show page action" do
+    sign_in_as(@user)
+    connect_codex_account!
+    deck = create_deck_for(@user)
+    create_analysis_for(deck)
+    clear_enqueued_jobs
+
+    assert_difference -> { deck.analysis_runs.where(kind: "ai").count }, 1 do
+      assert_enqueued_with(job: CodexEvaluationJob) do
+        post deck_ai_evaluation_path(deck)
+      end
+    end
+
+    assert_redirected_to deck_path(deck)
+    assert_equal "queued", deck.latest_ai_run.status
+  ensure
+    clear_enqueued_jobs
+  end
+
   test "cannot view another user's deck" do
     sign_in_as(@user)
     other_deck = create_deck_for(users(:two))
@@ -135,5 +156,42 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
       deck.commanders.create!(name: "Atraxa, Praetors' Voice", position: 1)
       deck.deck_cards.create!(name: "Sol Ring", quantity: 1, board: "main", position: 1)
       deck
+    end
+
+    def create_analysis_for(deck)
+      run = deck.analysis_runs.create!(
+        user: deck.user,
+        kind: "deterministic",
+        status: "succeeded",
+        rubric_version: Decks::Scorer::RUBRIC_VERSION,
+        queued_at: Time.current,
+        completed_at: Time.current,
+        feature_vector: { "total_cards" => 2, "role_counts" => {}, "salt_counts" => {}, "friction_counts" => {} },
+        deterministic_snapshot: { "legality" => { "legal" => true } }
+      )
+      run.create_scorecard!(
+        power_score: 3,
+        speed_score: 3,
+        interaction_score: 3,
+        consistency_score: 3,
+        salt_score: 0,
+        social_friction_score: 0,
+        bracket: 2,
+        bracket_sub_band: "low",
+        bracket_payload: { "headline" => "Bracket 2", "game_changers" => [], "combo_pairs" => [] },
+        confidence: 1.0
+      )
+      run
+    end
+
+    def connect_codex_account!
+      @user.codex_account&.destroy
+      @user.create_codex_account!(
+        auth_mode: Codex::AccountConnections::BROWSER_AUTH_MODE,
+        status: "connected",
+        encrypted_credential_payload: "opaque",
+        rate_limit_snapshot: { "primary" => { "used" => 1, "limit" => 100 } },
+        connected_at: Time.current
+      )
     end
 end

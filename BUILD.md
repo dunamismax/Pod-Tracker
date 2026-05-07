@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-07 (Slice 7 - Codex evaluation prompt contracts)
+Last updated: 2026-05-07 (Slice 7 - Codex AI evaluation pipeline)
 
 ## How agents work this file
 
@@ -41,11 +41,11 @@ These don't move:
 ## What's live now
 
 - **Auth & accounts:** signup, sign-in, password reset, email verification, account settings (display name, timezone, units), account deletion, JSON account export, audit events.
-- **Codex account-auth:** encrypted credential storage, browser/device-code login UX, refresh-status, remote sign-out, per-user/global quota policy with rate-limit display. The live Codex App Server JSON-RPC transport is wired behind `CODEX_APP_SERVER_ENABLED`; default remains fail-closed with `NullTransport`. Versioned AI scorecard response schema, single-deck prompts, pod prompts, and recorded schema-validation fixtures are in place; queued/live evaluation and rendering are not wired up yet.
+- **Codex account-auth:** encrypted credential storage, browser/device-code login UX, refresh-status, remote sign-out, per-user/global quota policy with rate-limit display. The live Codex App Server JSON-RPC transport is wired behind `CODEX_APP_SERVER_ENABLED`; default remains fail-closed with `NullTransport`. Versioned AI scorecard response schema, single-deck prompts, pod prompts, queued AI evaluation jobs, replayable run snapshots, and AI-result rendering on deck/pod pages are in place.
 - **Provider link placeholders** for Archidekt and Moxfield public profile URLs (no third-party password collection).
 - **Card corpus:** Scryfall bulk-data ingestion, Commander rules/banlist snapshot, internal tag taxonomy with curated salt/social-friction overrides, deterministic legality checker, daily Solid Queue refresh job.
 - **Deck import:** pasted text, uploaded text file, public Archidekt URL, public Moxfield URL. Imports surface unparsed lines, source attribution, audit events.
-- **Deterministic deck analysis:** every import runs feature extraction, Commander legality, and a six-axis scorecard (Power, Speed, Interaction, Consistency, Salt, Social Friction). Deck show page renders per-score evidence drawers, legality result, and a tuning recommendation list. AI evaluation is not wired up yet.
+- **Deterministic deck analysis:** every import runs feature extraction, Commander legality, and a six-axis scorecard (Power, Speed, Interaction, Consistency, Salt, Social Friction). Deck show page renders per-score evidence drawers, legality result, tuning recommendations, and optional Codex AI augmentation beside the deterministic evidence.
 - **Collection:** signed-in users can import owned cards from pasted text, uploaded text, or simple CSV, manually add/edit/remove card quantities, review unresolved rows, see owned-vs-missing deck gaps on each deck page, review demand pressure across decks, and see whether tuning suggestions have matching owned options or likely need acquisition.
 - **Pods (2–4 decks):** build a pod from your own decks, optionally including one guest deck via pasted decklist or public Archidekt / Moxfield URL. Pods get per-axis spread/average/outliers, archenemy/pubstomp/durdle warnings, a Rule 0 brief (power band, tempo, combo/stax notes, salt/friction notes), and per-deck swap suggestions. Mobile-readable and printable show page. Opt-in revocable public share link. Guest decks live only with the pod and are removed when the pod is removed.
 - **Game-night sessions:** signed-in users can create a session at `/sessions`, save date/location/notes, create or reuse user-owned players, and check each player in with one owned deck of the night. Sessions suggest pod seating from the checked-in roster, allow manual pod/seat overrides, snapshot each seated deck's name, commanders, deck timestamp, card count, and deterministic analysis, record pod results, and render a session summary.
@@ -55,11 +55,11 @@ These don't move:
 
 ## Phase Status Summary
 
-Slice 7 is in progress. Account-auth transport, quota policy, response schema, and prompt construction are shipped; the remaining work is the execution job, persisted replay metadata beyond existing JSON columns, and UI rendering for AI explanations.
+Slice 7 is shipped. Account-auth transport, quota policy, response schema, prompt construction, queued execution, replay metadata, and deck/pod AI rendering are in place. Slice 8 PWA/table-side polish is next.
 
 ## Current Repo Truth
 
-Ideal Magic can now build deterministic-fact-cited Codex prompt payloads for both a single deck and a pod, and can validate recorded scorecard responses against the v1 schema without live calls. Nothing yet queues a live evaluation, stores a model response from Codex, or renders AI adjustments on deck/pod pages.
+Ideal Magic can now queue Codex-backed deck and pod AI evaluations from the show pages, gate them through the existing quota policy, persist prompt/input/output/model/latency/rate-limit replay metadata on `AnalysisRun`, and render validated AI summaries, cited adjustments, friction drivers, Rule 0 talking points, and recommendations beside deterministic evidence. The default transport still fails closed unless `CODEX_APP_SERVER_ENABLED=true` is configured.
 
 ## Slices
 
@@ -199,10 +199,10 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 - [x] JSON schema for AI scorecards: power/speed/interaction/consistency/salt/social-friction adjustments, friction drivers, Rule 0 talking points. Cite deterministic facts; mark uncertainty. (`Codex::ScorecardResponseSchema` + validator landed with required fact refs and uncertainty arrays.)
 - [x] Single-deck prompt v1: pass the deterministic feature vector, decklist, commander, combo candidates, salt/friction evidence, and rubric. Ask for adjustments + explanations, not raw scores. (`Codex::DeckEvaluationPrompt` builds versioned payloads with deterministic fact IDs.)
 - [x] Pod prompt v1: same shape, pod-aware. (`Codex::PodEvaluationPrompt` builds pod-context payloads from `PodAnalysisRun` snapshots.)
-- [ ] Background job that runs evaluation against a quota-checked Codex account; surfaces queued / running / failed / stale states on the deck and pod pages.
-- [ ] Replayable runs: store prompt version, model, inputs, outputs, latency, and rate-limit snapshot per `AnalysisRun`.
+- [x] Background job that runs evaluation against a quota-checked Codex account; surfaces queued / running / failed / stale states on the deck and pod pages. (`CodexEvaluationJob` + `Codex::EvaluationRunner` create queued AI `AnalysisRun` records for decks/pods, run them through the App Server client, and show the run state on deck/pod pages.)
+- [x] Replayable runs: store prompt version, model, inputs, outputs, latency, and rate-limit snapshot per `AnalysisRun`. (`analysis_runs.pod_id` + `prompt_version` landed; AI request/response JSON snapshots now hold target metadata, prompt input/messages, raw text, validated response, thread/turn metadata, and rate-limit snapshots.)
 - [x] Recorded-fixture tests for the prompt → response → schema validation path. No live calls in CI. (`test/fixtures/files/codex_scorecard_response_v1.json` validates against the schema and cites fact IDs provided by the deck prompt.)
-- [ ] AI explanations render alongside deterministic evidence; the deterministic numbers stay visible.
+- [x] AI explanations render alongside deterministic evidence; the deterministic numbers stay visible. (Deck and pod show pages now render Codex summaries, cited score adjustments, friction drivers, Rule 0 talking points, and recommendations after the deterministic analysis sections.)
 
 ### Slice 8 — PWA and table-side polish
 
@@ -228,6 +228,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-07 — Slice 7 closed: deck and pod pages can queue quota-checked Codex AI evaluations; `CodexEvaluationJob` runs the App Server turn, validates the scorecard response, stores replayable prompt/model/input/output/latency/rate-limit metadata on `AnalysisRun`, and renders summaries, cited adjustments, friction drivers, Rule 0 talking points, recommendations, and queued/running/failed/stale states beside deterministic evidence.
 - 2026-05-07 — Slice 7 prompt contracts: added the v1 Codex scorecard response schema + validator, single-deck and pod prompt builders that pass deterministic facts under citeable `fact.*` IDs, and recorded-fixture tests for prompt facts → response → schema validation without live calls.
 - 2026-05-07 — Slice 7 opened: Codex account-auth now has a feature-flagged stdio JSON-RPC transport for the documented App Server `account/*` methods, keeps `NullTransport` as the default fail-closed path, normalizes account/rate-limit responses into existing account records, and has focused service/controller coverage.
 - 2026-05-06 — Slice 6 meta trends: completed game-night results now drive post-game note prompts for wins/losses/draws/short games/dead draws/missing collection cards, deck table-performance summaries, revision-level result history from seat snapshots, commander meta tables with confidence/trend labels, and focused service/controller coverage.

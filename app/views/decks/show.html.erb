@@ -39,6 +39,12 @@
     </div>
   <% end %>
 
+  <%= render "codex/ai_evaluation",
+      run: @ai_run,
+      enqueue_path: deck_ai_evaluation_path(@deck),
+      title: "AI deck evaluation",
+      target_label: "deck" %>
+
   <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
     <div class="flex flex-wrap items-baseline justify-between gap-3">
       <div>

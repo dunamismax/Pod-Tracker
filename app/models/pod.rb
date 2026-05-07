@@ -8,6 +8,7 @@ class Pod < ApplicationRecord
   has_many :pod_slots, -> { order(:position) }, dependent: :destroy
   has_many :decks, through: :pod_slots
   has_many :pod_analysis_runs, dependent: :destroy
+  has_many :analysis_runs, dependent: :destroy
   has_many :matchup_notes, dependent: :nullify
   has_many :audit_events, as: :auditable, dependent: :nullify
   has_many :guest_decks,
@@ -24,6 +25,13 @@ class Pod < ApplicationRecord
 
   def latest_analysis_run
     pod_analysis_runs.order(created_at: :desc, id: :desc).first
+  end
+
+  def latest_ai_run
+    analysis_runs
+      .where(kind: "ai")
+      .recent_first
+      .first
   end
 
   def shared?

@@ -1,6 +1,8 @@
 require "test_helper"
 
 class PodsControllerTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
+
   setup do
     CommanderFormat::CardTagImporter.new.import!
     @user = users(:one)
@@ -76,6 +78,27 @@ class PodsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to pods_path
   end
 
+  test "queues an AI pod evaluation from the show page action" do
+    sign_in_as(@user)
+    connect_codex_account!
+    pod = Pod.create!(user: @user, name: "AI pod", format: "commander", status: "draft")
+    pod.pod_slots.create!(deck: @deck_a, position: 1)
+    pod.pod_slots.create!(deck: @deck_b, position: 2)
+    Pods::Analyzer.run(pod, user: @user)
+    clear_enqueued_jobs
+
+    assert_difference -> { pod.analysis_runs.where(kind: "ai").count }, 1 do
+      assert_enqueued_with(job: CodexEvaluationJob) do
+        post pod_ai_evaluation_path(pod)
+      end
+    end
+
+    assert_redirected_to pod_path(pod)
+    assert_equal "queued", pod.latest_ai_run.status
+  ensure
+    clear_enqueued_jobs
+  end
+
   private
 
     def build_deck(slug)
@@ -83,5 +106,16 @@ class PodsControllerTest < ActionDispatch::IntegrationTest
       deck.save!
       Decks::Analyzer.run(deck)
       deck
+    end
+
+    def connect_codex_account!
+      @user.codex_account&.destroy
+      @user.create_codex_account!(
+        auth_mode: Codex::AccountConnections::BROWSER_AUTH_MODE,
+        status: "connected",
+        encrypted_credential_payload: "opaque",
+        rate_limit_snapshot: { "primary" => { "used" => 1, "limit" => 100 } },
+        connected_at: Time.current
+      )
     end
 end

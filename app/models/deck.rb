@@ -29,6 +29,13 @@ class Deck < ApplicationRecord
       .first
   end
 
+  def latest_ai_run
+    analysis_runs
+      .where(kind: "ai")
+      .recent_first
+      .first
+  end
+
   def recompute_deterministic_analysis!
     Decks::Analyzer.run(self)
   end

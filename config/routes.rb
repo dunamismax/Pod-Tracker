@@ -12,13 +12,16 @@ Rails.application.routes.draw do
     post :poll, on: :member
   end
   resources :account_provider_links, only: %i[new create destroy]
-  resources :decks, only: %i[index show new create destroy]
+  resources :decks, only: %i[index show new create destroy] do
+    resource :ai_evaluation, only: :create, controller: "deck_ai_evaluations"
+  end
   resource :collection, only: :show
   resources :collection_imports, only: %i[show create]
   resources :collection_cards, only: %i[create update destroy]
   resources :unresolved_entries, only: :update
   resources :matchup_notes
   resources :pods, only: %i[index show new create destroy] do
+    resource :ai_evaluation, only: :create, controller: "pod_ai_evaluations"
     resource :share, only: %i[create destroy], controller: "pod_shares"
   end
   resources :game_nights, path: "sessions", only: %i[index show new create destroy] do

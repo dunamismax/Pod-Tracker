@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_06_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_07_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -31,7 +31,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_170000) do
     t.jsonb "feature_vector", default: {}, null: false
     t.string "kind", default: "deterministic", null: false
     t.integer "latency_ms"
+    t.bigint "pod_id"
     t.integer "prompt_tokens"
+    t.string "prompt_version"
     t.datetime "queued_at", null: false
     t.string "rubric_version", null: false
     t.datetime "started_at"
@@ -42,6 +44,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_170000) do
     t.index ["deck_id"], name: "index_analysis_runs_on_deck_id"
     t.index ["kind"], name: "index_analysis_runs_on_kind"
     t.index ["latency_ms"], name: "index_analysis_runs_on_latency_ms"
+    t.index ["pod_id", "created_at"], name: "index_analysis_runs_on_pod_id_and_created_at"
+    t.index ["pod_id"], name: "index_analysis_runs_on_pod_id"
+    t.index ["prompt_version"], name: "index_analysis_runs_on_prompt_version"
     t.index ["rubric_version"], name: "index_analysis_runs_on_rubric_version"
     t.index ["status"], name: "index_analysis_runs_on_status"
     t.index ["user_id", "created_at"], name: "index_analysis_runs_on_user_id_and_created_at"
@@ -687,6 +692,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_06_170000) do
   end
 
   add_foreign_key "analysis_runs", "decks"
+  add_foreign_key "analysis_runs", "pods"
   add_foreign_key "analysis_runs", "users"
   add_foreign_key "audit_events", "users"
   add_foreign_key "card_printings", "card_sets"
