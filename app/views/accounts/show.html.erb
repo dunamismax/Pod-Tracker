@@ -89,21 +89,29 @@
 
   <h2 class="font-bold text-2xl mt-10">AI evaluation availability</h2>
   <p class="my-3 text-sm text-zinc-400">
-    Daily caps protect both your account and the shared Codex rate-limit budget. Expected analysis runtimes are estimates from the deterministic plus AI pipeline, not promises.
+    The only enforced ceiling is the upstream Codex rate limit on the linked ChatGPT account. Expected analysis runtimes are estimates from the deterministic plus AI pipeline, not promises.
   </p>
   <% if @analysis_quota %>
     <dl class="my-4 space-y-3 text-sm">
       <div class="flex justify-between gap-4">
         <dt class="text-zinc-400">Your daily AI analyses</dt>
         <dd class="font-medium text-zinc-100">
-          <%= @analysis_quota.user_used %> of <%= @analysis_quota.user_limit %> used
-          (<%= @analysis_quota.user_remaining %> remaining)
+          <% if @analysis_quota.user_limit.to_i.positive? %>
+            <%= @analysis_quota.user_used %> of <%= @analysis_quota.user_limit %> used
+            (<%= @analysis_quota.user_remaining %> remaining)
+          <% else %>
+            <%= @analysis_quota.user_used %> run<%= "s" if @analysis_quota.user_used != 1 %> in the last 24h · no daily cap
+          <% end %>
         </dd>
       </div>
       <div class="flex justify-between gap-4">
         <dt class="text-zinc-400">Site-wide daily AI analyses</dt>
         <dd class="font-medium text-zinc-100">
-          <%= @analysis_quota.global_used %> of <%= @analysis_quota.global_limit %> used
+          <% if @analysis_quota.global_limit.to_i.positive? %>
+            <%= @analysis_quota.global_used %> of <%= @analysis_quota.global_limit %> used
+          <% else %>
+            <%= @analysis_quota.global_used %> run<%= "s" if @analysis_quota.global_used != 1 %> in the last 24h · no daily cap
+          <% end %>
         </dd>
       </div>
       <div class="flex justify-between gap-4">

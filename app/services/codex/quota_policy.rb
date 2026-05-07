@@ -61,15 +61,15 @@ module Codex
 
       user_limit = per_user_per_day
       global_limit = global_per_day
-      user_remaining = clamp_nonneg(user_limit - user_used)
-      global_remaining = clamp_nonneg(global_limit - global_used)
+      user_remaining = remaining_for(user_limit, user_used)
+      global_remaining = remaining_for(global_limit, global_used)
 
       account = @user.respond_to?(:codex_account) ? @user.codex_account : nil
       rate_limit_status, rate_limit_summary, rate_limit_resets_at = inspect_rate_limit(account)
 
       reasons = []
-      reasons << :user_quota_exhausted if user_remaining <= 0
-      reasons << :global_quota_exhausted if global_remaining <= 0
+      reasons << :user_quota_exhausted if quota_enforced?(user_limit) && user_remaining <= 0
+      reasons << :global_quota_exhausted if quota_enforced?(global_limit) && global_remaining <= 0
       reasons << :codex_account_disconnected unless account&.connected?
       reasons << :codex_rate_limit_blocked if rate_limit_status == :blocked
       reasons << :codex_credentials_expired if account&.connected? && credential_expired?(account, now)
@@ -94,8 +94,10 @@ module Codex
 
     private
 
+    # A non-positive cap means "unlimited" — the gate skips the check and the
+    # UI surfaces "no daily cap" instead of a misleading remaining count.
     def per_user_per_day
-      Integer(@config[:per_user_per_day] || 25)
+      Integer(@config[:per_user_per_day] || 0)
     end
 
     def per_user_per_day_safe
@@ -103,7 +105,16 @@ module Codex
     end
 
     def global_per_day
-      Integer(@config[:global_per_day] || 500)
+      Integer(@config[:global_per_day] || 0)
+    end
+
+    def quota_enforced?(limit)
+      limit.is_a?(Integer) && limit.positive?
+    end
+
+    def remaining_for(limit, used)
+      return nil unless quota_enforced?(limit)
+      clamp_nonneg(limit - used)
     end
 
     def window

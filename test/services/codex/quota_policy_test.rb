@@ -115,6 +115,24 @@ module Codex
       assert decision.rate_limit_resets_at, "should surface the resets_at timestamp"
     end
 
+    test "treats a non-positive per_user_per_day as unlimited and skips the user gate" do
+      connect_codex!
+      30.times do
+        @user.analysis_runs.create!(kind: "ai", rubric_version: "v", queued_at: @clock_time - 30.minutes, status: "succeeded")
+      end
+
+      decision = QuotaPolicy.new(@user, clock: @clock, config: { per_user_per_day: 0, global_per_day: 0, window: 24.hours, expected_runtime_seconds: 30 }).check
+
+      assert decision.allowed?, "expected unlimited config to allow regardless of run count"
+      refute_includes decision.reasons, :user_quota_exhausted
+      refute_includes decision.reasons, :global_quota_exhausted
+      assert_equal 0, decision.user_limit
+      assert_nil decision.user_remaining, "remaining should be nil when the cap is unlimited"
+      assert_equal 0, decision.global_limit
+      assert_nil decision.global_remaining
+      assert_equal 30, decision.user_used, "we still report run counts even when uncapped"
+    end
+
     test "marks rate-limit ok when the real-shape snapshot has plenty of headroom" do
       connect_codex!(rate_limit: {
         "codex" => {
