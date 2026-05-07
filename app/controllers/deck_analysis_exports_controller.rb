@@ -2,7 +2,7 @@ class DeckAnalysisExportsController < ApplicationController
   before_action :load_deck
 
   def show
-    exporter = Decks::AnalysisExporter.new(@deck)
+    exporter = Decks::AnalysisExporter.new(@deck, ai_run: @deck.latest_ai_run)
 
     respond_to do |format|
       format.markdown { send_data exporter.to_markdown, type: "text/markdown", disposition: "attachment", filename: exporter.filename("md") }

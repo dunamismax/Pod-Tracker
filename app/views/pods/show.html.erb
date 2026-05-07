@@ -27,13 +27,23 @@
   </div>
 
   <% if @pod.shared? %>
-    <div class="rounded-md border border-emerald-800 bg-emerald-950/30 p-4 text-sm text-emerald-200 print:hidden">
-      <p class="font-medium">Public share link</p>
+    <div class="rounded-md border border-emerald-800 bg-emerald-950/30 p-4 text-sm text-emerald-200 print:hidden"
+         data-controller="copy-link"
+         data-copy-link-url-value="<%= public_pod_url(@pod.share_token) %>">
+      <div class="flex flex-wrap items-baseline justify-between gap-3">
+        <p class="font-medium">Public share link</p>
+        <button type="button"
+                data-action="copy-link#copy"
+                data-copy-link-target="button"
+                class="rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-500">
+          Copy link
+        </button>
+      </div>
       <p class="mt-1 break-all font-mono text-xs">
         <%= public_pod_url(@pod.share_token) %>
       </p>
       <p class="mt-1 text-xs text-emerald-200/80">
-        Anyone with the link can read the pod analysis. Revoke it anytime.
+        Anyone with the link can read the pod analysis and Rule 0 brief. Revoke it anytime.
       </p>
     </div>
   <% end %>

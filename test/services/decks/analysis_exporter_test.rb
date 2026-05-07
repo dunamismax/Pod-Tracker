@@ -58,7 +58,7 @@ module Decks
     end
 
     test "to_h returns analysis payload with bracket and scores" do
-      payload = AnalysisExporter.new(@deck, run: @run, generated_at: Time.utc(2026, 5, 7)).to_h
+      payload = AnalysisExporter.new(@deck, run: @run, ai_run: nil, generated_at: Time.utc(2026, 5, 7)).to_h
 
       assert_equal AnalysisExporter::SCHEMA_VERSION, payload[:schema_version]
       assert_equal "Najeela 5C", payload[:deck][:name]
@@ -67,6 +67,7 @@ module Decks
       assert_equal 7, payload[:analysis][:scores][:power_score]
       assert_equal "Add removal", payload[:analysis][:improvement_suggestions].first["title"]
       assert payload[:analysis][:legality]["legal"]
+      assert_nil payload[:ai_evaluation]
     end
 
     test "to_h returns analysis: nil when no run is present" do
@@ -80,20 +81,68 @@ module Decks
 
       payload = AnalysisExporter.new(empty_deck).to_h
       assert_nil payload[:analysis]
+      assert_nil payload[:ai_evaluation]
     end
 
-    test "to_markdown renders bracket headline, scores, and suggestions" do
-      md = AnalysisExporter.new(@deck, run: @run, generated_at: Time.utc(2026, 5, 7)).to_markdown
+    test "to_h includes the AI evaluation payload when a successful AI run exists" do
+      ai_payload = JSON.parse(file_fixture("codex_deck_evaluation_response_v2.json").read)
+      ai_run = @deck.analysis_runs.create!(
+        user: @user,
+        kind: "ai",
+        status: "succeeded",
+        rubric_version: Codex::DeckEvaluationSchema::VERSION,
+        prompt_version: Codex::DeckEvaluationPrompt::PROMPT_VERSION,
+        ai_model: "test-model",
+        queued_at: Time.utc(2026, 5, 6, 12),
+        started_at: Time.utc(2026, 5, 6, 12, 0, 5),
+        completed_at: Time.utc(2026, 5, 6, 12, 0, 30),
+        ai_response_snapshot: { "validated_response" => ai_payload }
+      )
 
-      assert_includes md, "# Deterministic analysis — Najeela 5C"
-      assert_includes md, "## Commander Bracket"
+      payload = AnalysisExporter.new(@deck, run: @run, ai_run: ai_run, generated_at: Time.utc(2026, 5, 7)).to_h
+
+      assert payload[:ai_evaluation].present?
+      assert payload[:ai_evaluation][:authoritative]
+      assert_equal Codex::DeckEvaluationPrompt::PROMPT_VERSION, payload[:ai_evaluation][:prompt_version]
+      assert payload[:ai_evaluation][:bracket]["value"].present?
+      assert payload[:ai_evaluation][:axes]["power"].present?
+    end
+
+    test "to_markdown renders bracket headline, scores, and suggestions when only deterministic is present" do
+      md = AnalysisExporter.new(@deck, run: @run, ai_run: nil, generated_at: Time.utc(2026, 5, 7)).to_markdown
+
+      assert_includes md, "# Analysis — Najeela 5C"
+      assert_includes md, "## Deterministic analysis"
+      assert_includes md, "### Commander Bracket"
       assert_includes md, "Bracket 4 — Optimized"
-      assert_includes md, "## Sub-band evidence — six-axis scorecard"
+      assert_includes md, "### Sub-band evidence — six-axis scorecard"
       assert_includes md, "| Power | 7/10 |"
       assert_includes md, "Mana Drain"
       assert_includes md, "Najeela infinite"
-      assert_includes md, "## Suggestions"
+      assert_includes md, "### Suggestions"
       assert_includes md, "- **Add removal** — Pack more interaction."
+    end
+
+    test "to_markdown leads with AI evaluation when present and collapses deterministic" do
+      ai_payload = JSON.parse(file_fixture("codex_deck_evaluation_response_v2.json").read)
+      ai_run = @deck.analysis_runs.create!(
+        user: @user,
+        kind: "ai",
+        status: "succeeded",
+        rubric_version: Codex::DeckEvaluationSchema::VERSION,
+        prompt_version: Codex::DeckEvaluationPrompt::PROMPT_VERSION,
+        ai_model: "test-model",
+        queued_at: Time.utc(2026, 5, 6, 12),
+        started_at: Time.utc(2026, 5, 6, 12, 0, 5),
+        completed_at: Time.utc(2026, 5, 6, 12, 0, 30),
+        ai_response_snapshot: { "validated_response" => ai_payload }
+      )
+
+      md = AnalysisExporter.new(@deck, run: @run, ai_run: ai_run, generated_at: Time.utc(2026, 5, 7)).to_markdown
+
+      assert_includes md, "## AI evaluation (Commander Brackets)"
+      assert_includes md, "### Six-axis sub-band scorecard"
+      assert_match(/<details>.*Preliminary deterministic read/m, md)
     end
 
     test "to_markdown notes when analysis has not run" do
@@ -106,11 +155,11 @@ module Decks
       )
 
       md = AnalysisExporter.new(empty_deck).to_markdown
-      assert_includes md, "Deterministic analysis has not run for this deck yet."
+      assert_includes md, "Analysis has not run for this deck yet."
     end
 
     test "filename includes deck slug and stamp" do
-      filename = AnalysisExporter.new(@deck, run: @run, generated_at: Time.utc(2026, 5, 7, 9, 0)).filename("md")
+      filename = AnalysisExporter.new(@deck, run: @run, ai_run: nil, generated_at: Time.utc(2026, 5, 7, 9, 0)).filename("md")
       assert_equal "ideal-magic-analysis-najeela-5c-20260507T090000Z.md", filename
     end
   end

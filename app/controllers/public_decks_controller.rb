@@ -7,7 +7,9 @@ class PublicDecksController < ApplicationController
     @analysis_run = @deck.latest_deterministic_run
     @scorecard = @analysis_run&.scorecard
     @legality = @analysis_run&.deterministic_snapshot&.dig("legality")
-    @recommendations = Array(@scorecard&.improvement_suggestions)
+    @ai_run = @deck.latest_ai_run
+    @ai_evaluation = Decks::AiEvaluationPresenter.for(@ai_run)
+    @recommendations = (@ai_evaluation&.recommendations.presence || Array(@scorecard&.improvement_suggestions))
   end
 
   def export
@@ -21,7 +23,7 @@ class PublicDecksController < ApplicationController
   end
 
   def analysis
-    exporter = Decks::AnalysisExporter.new(@deck)
+    exporter = Decks::AnalysisExporter.new(@deck, ai_run: @deck.latest_ai_run)
 
     respond_to do |format|
       format.markdown { send_data exporter.to_markdown, type: "text/markdown", disposition: "attachment", filename: exporter.filename("md") }

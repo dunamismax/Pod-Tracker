@@ -14,7 +14,8 @@ class DeckAnalysisExportsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal "text/markdown", response.media_type
     assert_match(/ideal-magic-analysis-existing-deck-/, response.headers["Content-Disposition"])
-    assert_includes response.body, "# Deterministic analysis — Existing deck"
+    assert_includes response.body, "# Analysis — Existing deck"
+    assert_includes response.body, "## Deterministic analysis"
     assert_includes response.body, "| Power |"
   end
 
@@ -40,7 +41,7 @@ class DeckAnalysisExportsControllerTest < ActionDispatch::IntegrationTest
 
     get deck_analysis_export_path(bare, format: :markdown)
     assert_response :success
-    assert_includes response.body, "Deterministic analysis has not run for this deck yet."
+    assert_includes response.body, "Analysis has not run for this deck yet."
   end
 
   private
