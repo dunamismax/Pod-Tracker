@@ -99,18 +99,30 @@ module Codex
       )
 
       result = client.evaluate_scorecard(prompt, model: model_for(analysis_run))
-      validated = validator_for(analysis_run).validate!(extract_json_payload(result.fetch("text")))
+      raw_text = result.fetch("text").to_s
+      latest_rate_limit = latest_rate_limit_from(result["notifications"])
+
+      # Persist the raw response BEFORE validation so the snapshot survives a
+      # parse / validator failure. Without this, an empty or malformed Codex
+      # response leaves no forensic trace beyond the failure message.
       analysis_run.update!(
         ai_model: result["model"].presence || analysis_run.ai_model.presence || DEFAULT_MODEL_LABEL,
         ai_response_snapshot: {
-          "raw_text" => result.fetch("text"),
-          "validated_response" => validated,
+          "raw_text" => raw_text,
           "thread" => result["thread"],
           "turn" => result["turn"],
           "items" => result["items"],
-          "notification_count" => Array(result["notifications"]).size
+          "notification_count" => Array(result["notifications"]).size,
+          "latest_rate_limit_snapshot" => latest_rate_limit
         },
         codex_rate_limit_snapshot: analysis_run.user&.codex_account&.rate_limit_snapshot || analysis_run.codex_rate_limit_snapshot
+      )
+
+      raise ScorecardResponseValidator::InvalidResponse, [ blank_response_message(latest_rate_limit) ] if raw_text.strip.empty?
+
+      validated = validator_for(analysis_run).validate!(extract_json_payload(raw_text))
+      analysis_run.update!(
+        ai_response_snapshot: analysis_run.ai_response_snapshot.merge("validated_response" => validated)
       )
       analysis_run.mark_succeeded!(now: now, codex_rate_limit_snapshot: analysis_run.codex_rate_limit_snapshot)
       analysis_run
@@ -163,6 +175,49 @@ module Codex
       raise ScorecardResponseValidator::InvalidResponse, [ "response did not contain JSON" ] unless start_idx && end_idx && end_idx >= start_idx
 
       JSON.parse(body[start_idx..end_idx])
+    end
+
+    # Pull the most recent account/rateLimits/updated notification's rate-limit
+    # payload, so the runner can both store it on the run and use it to compose
+    # a meaningful failure message when Codex returns an empty response.
+    def latest_rate_limit_from(notifications)
+      Array(notifications).reverse.each do |message|
+        next unless message.is_a?(Hash) && message["method"] == "account/rateLimits/updated"
+        snapshot = message.dig("params", "rateLimits") || message.dig("params", "rateLimitsByLimitId")
+        return snapshot if snapshot.is_a?(Hash)
+      end
+      nil
+    end
+
+    def blank_response_message(rate_limit)
+      reason = rate_limit_exhaustion_reason(rate_limit)
+      base = "Codex returned no response. The AI account is unable to answer right now"
+      return "#{base}." unless reason
+      "#{base} (#{reason}). Try again after the rate-limit window resets, or check the linked ChatGPT account."
+    end
+
+    def rate_limit_exhaustion_reason(rate_limit)
+      return nil unless rate_limit.is_a?(Hash)
+      pools = rate_limit.values.any? { |v| v.is_a?(Hash) && (v.key?("primary") || v.key?(:primary) || v.key?("secondary") || v.key?(:secondary)) } ? rate_limit.values : [ rate_limit ]
+      pools.each do |pool|
+        next unless pool.is_a?(Hash)
+        %w[primary secondary].each do |key|
+          window = pool[key] || pool[key.to_sym]
+          next unless window.is_a?(Hash)
+          used_percent = window["usedPercent"] || window[:usedPercent]
+          if used_percent && used_percent.to_f >= 100
+            limit_id = pool["limitId"] || pool[:limitId]
+            return limit_id ? "#{limit_id} #{key} window exhausted" : "#{key} window exhausted"
+          end
+        end
+        credits = pool["credits"] || pool[:credits]
+        if credits.is_a?(Hash)
+          has_credits = credits.fetch("hasCredits") { credits[:hasCredits] }
+          unlimited = credits.fetch("unlimited") { credits[:unlimited] }
+          return "no credits remaining" if has_credits == false && unlimited != true
+        end
+      end
+      nil
     end
   end
 end

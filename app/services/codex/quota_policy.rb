@@ -157,25 +157,52 @@ module Codex
       [ status, format_window_summary(worst), worst[:resets_at] ]
     end
 
+    # Walk the rate-limit snapshot and surface every {primary, secondary}
+    # window we can find. The Codex App Server returns either a flat object
+    # (legacy / test fixtures) or a dict keyed by limit id ("codex",
+    # "premium", ...) with `usedPercent` rather than absolute `used` / `limit`.
     def extract_windows(snapshot)
+      pools = collect_pools(snapshot)
       windows = []
-      %w[primary secondary].each do |key|
-        window = snapshot[key] || snapshot[key.to_sym]
-        next unless window.is_a?(Hash)
-        used = numeric(window["used"] || window[:used])
-        limit = numeric(window["limit"] || window[:limit])
-        next unless used && limit && limit.positive?
-        remaining = [ limit - used, 0 ].max
-        windows << {
-          label: key,
-          used: used,
-          limit: limit,
-          remaining: remaining,
-          remaining_ratio: remaining.to_f / limit,
-          resets_at: parse_iso_time(window["resetsAt"] || window[:resets_at])
-        }
+      pools.each do |pool_label, pool|
+        %w[primary secondary].each do |key|
+          window = pool[key] || pool[key.to_sym]
+          next unless window.is_a?(Hash)
+          ratio = window_remaining_ratio(window)
+          next unless ratio
+          windows << {
+            label: pool_label ? "#{pool_label} #{key}" : key,
+            remaining_ratio: ratio,
+            resets_at: parse_resets_at(window["resetsAt"] || window[:resets_at] || window[:resetsAt])
+          }
+        end
       end
       windows
+    end
+
+    def collect_pools(snapshot)
+      return [] unless snapshot.is_a?(Hash)
+      direct = snapshot.key?("primary") || snapshot.key?(:primary) || snapshot.key?("secondary") || snapshot.key?(:secondary)
+      return [ [ nil, snapshot ] ] if direct
+
+      snapshot.each_with_object([]) do |(key, value), acc|
+        next unless value.is_a?(Hash)
+        pool_label = (value["limitId"] || value[:limitId] || key).to_s
+        acc << [ pool_label, value ]
+      end
+    end
+
+    def window_remaining_ratio(window)
+      if window.key?("usedPercent") || window.key?(:usedPercent)
+        used_percent = numeric(window["usedPercent"] || window[:usedPercent])
+        return nil unless used_percent
+        [ (100.0 - used_percent) / 100.0, 0.0 ].max
+      else
+        used = numeric(window["used"] || window[:used])
+        limit = numeric(window["limit"] || window[:limit])
+        return nil unless used && limit && limit.positive?
+        [ (limit - used) / limit.to_f, 0.0 ].max
+      end
     end
 
     def numeric(value)
@@ -186,15 +213,17 @@ module Codex
       nil
     end
 
-    def parse_iso_time(value)
-      return nil if value.blank?
+    def parse_resets_at(value)
+      return nil if value.nil? || value == ""
+      return Time.zone.at(value) if value.is_a?(Numeric)
       Time.zone.parse(value.to_s)
     rescue ArgumentError, TypeError
       nil
     end
 
     def format_window_summary(window)
-      base = "Codex #{window[:label]} window: #{window[:used].to_i} of #{window[:limit].to_i} used (#{window[:remaining].to_i} remaining)."
+      pct_remaining = (window[:remaining_ratio] * 100).round
+      base = "Codex #{window[:label]} window: #{pct_remaining}% remaining."
       return base unless window[:resets_at]
       "#{base} Resets #{window[:resets_at].utc.iso8601}."
     end

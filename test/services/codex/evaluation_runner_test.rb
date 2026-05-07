@@ -73,6 +73,33 @@ module Codex
       assert_equal "invalid_ai_response", run.error_code
     end
 
+    test "blank model output reports a rate-limit exhausted message and preserves the raw snapshot" do
+      run = Codex::EvaluationRunner.enqueue_deck!(@deck, user: @user)
+      rate_limit_notification = {
+        "method" => "account/rateLimits/updated",
+        "params" => {
+          "rateLimits" => {
+            "limitId" => "codex",
+            "primary" => { "usedPercent" => 100, "windowDurationMins" => 300, "resetsAt" => 1778190775 },
+            "secondary" => { "usedPercent" => 54, "windowDurationMins" => 10080 },
+            "credits" => { "hasCredits" => false, "balance" => "0", "unlimited" => false },
+            "planType" => "plus"
+          }
+        }
+      }
+      client = FakeEvaluationClient.new("", notifications: [ rate_limit_notification ])
+
+      Codex::EvaluationRunner.new(client: client, clock: StepClock.new).run!(run)
+
+      run.reload
+      assert_equal "failed", run.status
+      assert_equal "invalid_ai_response", run.error_code
+      assert_match(/codex primary window exhausted/, run.error_message)
+      assert_equal "", run.ai_response_snapshot["raw_text"], "raw_text should be persisted even on failure"
+      assert_equal 1, run.ai_response_snapshot["notification_count"]
+      assert_equal 100, run.ai_response_snapshot.dig("latest_rate_limit_snapshot", "primary", "usedPercent")
+    end
+
     test "enqueue_pod uses the v2 pod prompt and runner validates pod output" do
       pod = build_pod
 
@@ -130,8 +157,9 @@ module Codex
     end
 
     class FakeEvaluationClient
-      def initialize(text)
+      def initialize(text, notifications: nil)
         @text = text
+        @notifications = notifications
       end
 
       def evaluate_scorecard(_prompt, model:)
@@ -143,7 +171,7 @@ module Codex
           "thread" => { "id" => "thread-test" },
           "turn" => { "id" => "turn-test" },
           "items" => [],
-          "notifications" => [ { "method" => "turn/completed" } ]
+          "notifications" => @notifications || [ { "method" => "turn/completed" } ]
         }
       end
     end

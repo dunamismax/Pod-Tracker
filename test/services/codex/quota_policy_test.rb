@@ -96,6 +96,40 @@ module Codex
       assert_includes decision.reasons, :codex_credentials_expired
     end
 
+    test "marks rate-limit blocked using the real Codex App Server snapshot shape" do
+      connect_codex!(rate_limit: {
+        "codex" => {
+          "limitId" => "codex",
+          "primary" => { "usedPercent" => 100, "windowDurationMins" => 300, "resetsAt" => 1778190775 },
+          "secondary" => { "usedPercent" => 54, "windowDurationMins" => 10080, "resetsAt" => 1778597256 },
+          "credits" => { "hasCredits" => false, "balance" => "0", "unlimited" => false },
+          "planType" => "plus"
+        }
+      })
+
+      decision = policy.check
+      assert decision.blocked?
+      assert_equal :blocked, decision.rate_limit_status
+      assert_includes decision.reasons, :codex_rate_limit_blocked
+      assert_match(/codex primary window/, decision.rate_limit_summary)
+      assert decision.rate_limit_resets_at, "should surface the resets_at timestamp"
+    end
+
+    test "marks rate-limit ok when the real-shape snapshot has plenty of headroom" do
+      connect_codex!(rate_limit: {
+        "codex" => {
+          "limitId" => "codex",
+          "primary" => { "usedPercent" => 3, "windowDurationMins" => 300, "resetsAt" => 1778210000 },
+          "secondary" => { "usedPercent" => 12, "windowDurationMins" => 10080 },
+          "planType" => "plus"
+        }
+      })
+
+      decision = policy.check
+      assert decision.allowed?
+      assert_equal :ok, decision.rate_limit_status
+    end
+
     private
 
     def connect_codex!(rate_limit: {}, credentials_expire_at: nil)
