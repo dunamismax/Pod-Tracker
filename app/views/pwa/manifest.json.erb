@@ -1,22 +1,60 @@
+<%# Rendered as application/manifest+json from /manifest.json. %>
 {
-  "name": "IdealMagic",
+  "name": "Ideal Magic",
+  "short_name": "Ideal Magic",
+  "id": "/?source=pwa",
+  "description": "Bracket-aware Commander companion: deterministic deck and pod analysis, Rule 0 briefs, evidence-first scoring.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "theme_color": "#09090b",
+  "background_color": "#09090b",
+  "categories": ["games", "utilities", "productivity"],
+  "lang": "en-US",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icon.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "/icon.png",
       "type": "image/png",
       "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512",
       "purpose": "maskable"
     }
   ],
-  "start_url": "/",
-  "display": "standalone",
-  "scope": "/",
-  "description": "IdealMagic.",
-  "theme_color": "red",
-  "background_color": "red"
+  "shortcuts": [
+    {
+      "name": "Decks",
+      "short_name": "Decks",
+      "description": "Browse and analyze your imported Commander decks.",
+      "url": "/decks?source=pwa-shortcut",
+      "icons": [{ "src": "/icon.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Pods",
+      "short_name": "Pods",
+      "description": "Compare 2–4 decks and generate a Rule 0 brief.",
+      "url": "/pods?source=pwa-shortcut",
+      "icons": [{ "src": "/icon.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Sessions",
+      "short_name": "Sessions",
+      "description": "Run a game-night session with check-in and pod seating.",
+      "url": "/sessions?source=pwa-shortcut",
+      "icons": [{ "src": "/icon.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
 }

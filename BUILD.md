@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-07 (Slice 7 - Codex AI evaluation pipeline)
+Last updated: 2026-05-07 (Slice 8 - PWA shell + update prompt)
 
 ## How agents work this file
 
@@ -51,15 +51,16 @@ These don't move:
 - **Game-night sessions:** signed-in users can create a session at `/sessions`, save date/location/notes, create or reuse user-owned players, and check each player in with one owned deck of the night. Sessions suggest pod seating from the checked-in roster, allow manual pod/seat overrides, snapshot each seated deck's name, commanders, deck timestamp, card count, and deterministic analysis, record pod results, and render a session summary.
 - **Matchup journal and meta:** signed-in users can create, search, edit, and remove matchup notes tied to a deck, optional commander, opponent, saved pod, and/or game-night session pod number. Session seating surfaces recent prior notes matching the seated decks, commanders, or opponents. Completed session results now feed post-game prompts, per-deck record/win-rate/average-turn summaries, revision-level result history, and commander meta tables with sample-size labels.
 - **Seeded users:** admin (`stephenvsawyer@gmail.com`, password from `IDEAL_MAGIC_ADMIN_PASSWORD`) and demo (`demo@demo.com` / `demo1234`). `bin/rails demo:reset` factory-resets the demo account.
+- **PWA shell:** `/manifest.json` advertises Ideal Magic with maskable + 192/512 icon variants and Decks/Pods/Sessions shortcuts; `/service-worker.js` cache-firsts the app shell, network-firsts recently visited deck/pod/session pages so they stay readable offline, evicts old caches by asset version + app revision on activate, and a `pwa-update` Stimulus controller prompts a reload when a new worker is waiting.
 - **Production:** live at https://ideal-magic.com via Caddy + systemd + host PostgreSQL. `bin/redeploy` is the iteration loop.
 
 ## Phase Status Summary
 
-Slice 7 is shipped. Account-auth transport, quota policy, response schema, prompt construction, queued execution, replay metadata, and deck/pod AI rendering are in place. Slice 8 PWA/table-side polish is next.
+Slice 8 is partially shipped: the PWA shell is live (manifest, service worker with versioned app-shell + navigation cache, iOS/Android icon coverage, update-prompt banner). Recent decks and analyses now stay readable offline through the navigation cache. Mobile bottom nav, responsive deck-list controls, and explicit offline write-state UX are still open.
 
 ## Current Repo Truth
 
-Ideal Magic can now queue Codex-backed deck and pod AI evaluations from the show pages, gate them through the existing quota policy, persist prompt/input/output/model/latency/rate-limit replay metadata on `AnalysisRun`, and render validated AI summaries, cited adjustments, friction drivers, Rule 0 talking points, and recommendations beside deterministic evidence. The default transport still fails closed unless `CODEX_APP_SERVER_ENABLED=true` is configured.
+Ideal Magic ships an installable PWA: `/manifest.json` and `/service-worker.js` are served from `app/views/pwa/`, the layout links the manifest, declares `theme-color`, `apple-mobile-web-app-*` metadata and a maskable icon, and a Stimulus controller registers the worker, listens for waiting updates, and surfaces a reload banner so users are not trapped on stale assets. The service worker keeps the app shell (root, manifest, icon, `/assets/*`) cache-first with background revalidation, network-firsts the allowlisted `/app`, `/decks`, `/pods`, and `/sessions` navigations into a cache so a recently visited page renders offline, and is keyed by `Rails.application.config.assets.version` plus the app revision so deploys evict old caches. Codex-backed deck and pod AI evaluations remain queue-able from the show pages, gate through the existing quota policy, persist prompt/input/output/model/latency/rate-limit replay metadata on `AnalysisRun`, and render validated AI summaries, cited adjustments, friction drivers, Rule 0 talking points, and recommendations beside deterministic evidence. The default Codex transport still fails closed unless `CODEX_APP_SERVER_ENABLED=true` is configured.
 
 ## Slices
 
@@ -206,10 +207,10 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 ### Slice 8 — PWA and table-side polish
 
-- [ ] Web app manifest, service worker, app-shell cache.
-- [ ] Recent decks and analyses cached for read-only offline access.
-- [ ] iOS home-screen + Android maskable icon coverage.
-- [ ] Cache versioning and an update prompt that doesn't trap users on stale assets.
+- [x] Web app manifest, service worker, app-shell cache. (`/manifest.json` + `/service-worker.js` rendered via `rails/pwa#manifest` and `rails/pwa#service_worker`; the SW cache-firsts the root, manifest, icon, and `/assets/*` so the shell loads when the network is hostile.)
+- [x] Recent decks and analyses cached for read-only offline access. (Navigation requests to `/app`, `/decks`, `/decks/:id`, `/pods`, `/pods/:id`, `/sessions`, `/sessions/:id` are network-first with a cache fallback that tags the response with `X-Ideal-Magic-Offline: 1`.)
+- [x] iOS home-screen + Android maskable icon coverage. (Layout sets `apple-mobile-web-app-capable`, `apple-mobile-web-app-title`, `apple-mobile-web-app-status-bar-style`, `theme-color`, `apple-touch-icon`; manifest declares both `any` and `maskable` icon variants in 192/512.)
+- [x] Cache versioning and an update prompt that doesn't trap users on stale assets. (Cache name is keyed by `Rails.application.config.assets.version` plus the app revision; activate evicts non-matching `ideal-magic-*` caches; the `pwa-update` Stimulus controller surfaces a "Reload" banner when a new worker is waiting and triggers `SKIP_WAITING` so the page reloads onto fresh assets.)
 - [ ] Mobile bottom nav, desktop sidebar nav, responsive deck-list controls (search, tag filter, role filter).
 - [ ] Honest offline states: never pretend AI runs, imports, or new results have reached the server while offline.
 
@@ -228,6 +229,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-07 — Slice 8 PWA shell: dynamic `/manifest.json` + `/service-worker.js` routes wired to `rails/pwa#*`, manifest carries Ideal Magic branding, maskable + 192/512 icon variants, and Decks/Pods/Sessions shortcuts; the SW versions its caches by asset version + app revision, cache-firsts the app shell, network-firsts allowlisted deck/pod/session navigations with a tagged offline fallback, and the layout links the manifest, declares iOS/Android home-screen metadata, and mounts a `pwa-update` Stimulus banner that prompts a reload when a waiting worker is detected.
 - 2026-05-07 — Slice 7 closed: deck and pod pages can queue quota-checked Codex AI evaluations; `CodexEvaluationJob` runs the App Server turn, validates the scorecard response, stores replayable prompt/model/input/output/latency/rate-limit metadata on `AnalysisRun`, and renders summaries, cited adjustments, friction drivers, Rule 0 talking points, recommendations, and queued/running/failed/stale states beside deterministic evidence.
 - 2026-05-07 — Slice 7 prompt contracts: added the v1 Codex scorecard response schema + validator, single-deck and pod prompt builders that pass deterministic facts under citeable `fact.*` IDs, and recorded-fixture tests for prompt facts → response → schema validation without live calls.
 - 2026-05-07 — Slice 7 opened: Codex account-auth now has a feature-flagged stdio JSON-RPC transport for the documented App Server `account/*` methods, keeps `NullTransport` as the default fail-closed path, normalizes account/rate-limit responses into existing account records, and has focused service/controller coverage.

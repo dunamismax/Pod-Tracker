@@ -39,9 +39,10 @@ Rails.application.routes.draw do
   get "up" => "rails/health#show", as: :rails_health_check
   get "ready" => "health#readiness", as: :readiness_check
 
-  # Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.erb)
-  # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
-  # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
+  # PWA: dynamic manifest + service worker rendered from app/views/pwa/.
+  # The service worker scope is the site root, so the worker file is served from /.
+  get "manifest.json" => "rails/pwa#manifest", as: :pwa_manifest, defaults: { format: :json }
+  get "service-worker.js" => "rails/pwa#service_worker", as: :pwa_service_worker, defaults: { format: :js }
 
   # Public marketing surface — readable without an account.
   get "brackets", to: "public#brackets", as: :brackets
