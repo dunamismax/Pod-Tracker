@@ -1,0 +1,81 @@
+{
+  "schema_version": "ai-scorecard-v1",
+  "summary": "The deterministic read looks directionally right; the deck's speed is slightly more threatening than the raw curve implies because its fast mana and tutor density compress setup time.",
+  "adjustments": {
+    "power": {
+      "delta": 1,
+      "confidence": 0.82,
+      "rationale": "Fast mana, tutors, and combo evidence point to a higher practical ceiling than the baseline score alone.",
+      "deterministic_fact_refs": ["fact.score.power", "fact.features.roles", "fact.bracket.combo_pairs"],
+      "uncertainty": []
+    },
+    "speed": {
+      "delta": 1,
+      "confidence": 0.78,
+      "rationale": "The deck can present pressure faster than its average mana curve suggests.",
+      "deterministic_fact_refs": ["fact.score.speed", "fact.features.roles", "fact.features.mana_curve"],
+      "uncertainty": []
+    },
+    "interaction": {
+      "delta": 0,
+      "confidence": 0.7,
+      "rationale": "The deterministic interaction score already captures the removal and stack interaction package.",
+      "deterministic_fact_refs": ["fact.score.interaction", "fact.evidence.interaction"],
+      "uncertainty": []
+    },
+    "consistency": {
+      "delta": 0,
+      "confidence": 0.75,
+      "rationale": "Tutors and card draw support the current consistency read without needing an adjustment.",
+      "deterministic_fact_refs": ["fact.score.consistency", "fact.evidence.consistency"],
+      "uncertainty": []
+    },
+    "salt": {
+      "delta": 0,
+      "confidence": 0.72,
+      "rationale": "Salt drivers are already visible in the deterministic evidence.",
+      "deterministic_fact_refs": ["fact.score.salt", "fact.features.salt"],
+      "uncertainty": []
+    },
+    "social_friction": {
+      "delta": 1,
+      "confidence": 0.74,
+      "rationale": "Compact combo and disclosure-required patterns deserve a stronger Rule 0 warning.",
+      "deterministic_fact_refs": ["fact.score.social_friction", "fact.features.friction", "fact.bracket.combo_pairs"],
+      "uncertainty": []
+    }
+  },
+  "friction_drivers": [
+    {
+      "label": "Compact combo disclosure",
+      "severity": "high",
+      "explanation": "The deck should disclose its compact combo timing before the game starts.",
+      "deterministic_fact_refs": ["fact.bracket.combo_pairs", "fact.features.friction"],
+      "uncertainty": []
+    }
+  ],
+  "rule_zero_talking_points": [
+    {
+      "topic": "Win timing",
+      "prompt": "This deck can threaten a compact combo finish; agree on whether that timing fits the pod.",
+      "deterministic_fact_refs": ["fact.bracket.combo_pairs", "fact.score.speed"],
+      "uncertainty": []
+    },
+    {
+      "topic": "Game Changers",
+      "prompt": "Call out the detected Game Changers before mulligans.",
+      "deterministic_fact_refs": ["fact.bracket.game_changers"],
+      "uncertainty": []
+    }
+  ],
+  "recommendations": [
+    {
+      "category": "rule_zero",
+      "title": "Lead with combo timing",
+      "detail": "Keep the deterministic bracket call visible and explain whether the compact combo is the primary plan or a backup finish.",
+      "owned_collection_relevance": "not_applicable",
+      "deterministic_fact_refs": ["fact.bracket.headline", "fact.bracket.combo_pairs"],
+      "uncertainty": []
+    }
+  ]
+}

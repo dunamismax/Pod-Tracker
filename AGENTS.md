@@ -167,6 +167,8 @@ Three gotchas because the production app and the working tree live on the same m
 
    The `ideal_magic_test` database and its `ideal_magic_test_0..N` parallel-worker siblings already exist on the host PostgreSQL cluster.
 
+4. **Do not leave ad-hoc rows in the shared test database.** The `ideal_magic` role can run the app tests, but Rails cannot disable PostgreSQL referential integrity as that role. If a `bin/rails runner` inspection writes rows into `ideal_magic_test` outside a test transaction, the next fixture load can fail with foreign-key errors against `users`. Prefer read-only runners; if you intentionally dirty the test DB, clean it before rerunning tests.
+
 ---
 
 ## Current Build Manual
