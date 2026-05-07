@@ -49,6 +49,15 @@ class AccountCodexLoginsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to account_codex_login_path(attempt)
   end
 
+  test "new presents device-code sign-in as the production-safe path" do
+    get new_account_codex_login_path
+
+    assert_response :success
+    assert_match(/Device-code sign-in/, response.body)
+    assert_match(/Recommended/, response.body)
+    assert_match(/same machine as the Codex app-server/, response.body)
+  end
+
   test "create starts a browser login attempt and redirects to its show page" do
     @client.respond(:start_chatgpt_browser_login, {
       "loginId" => "abc",

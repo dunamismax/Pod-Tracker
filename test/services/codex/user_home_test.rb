@@ -24,6 +24,16 @@ module Codex
       assert_equal 0o700, mode, "expected 0700, got #{mode.to_s(8)}"
     end
 
+    test "ensure! writes file-backed credential storage config" do
+      path = UserHome.ensure!(@user)
+      config_path = path.join("config.toml")
+
+      assert config_path.exist?
+      assert_includes config_path.read, 'cli_auth_credentials_store = "file"'
+      mode = File.stat(config_path).mode & 0o777
+      assert_equal 0o600, mode, "expected 0600, got #{mode.to_s(8)}"
+    end
+
     test "has_auth? reflects on-disk auth.json" do
       UserHome.ensure!(@user)
       refute UserHome.has_auth?(@user)

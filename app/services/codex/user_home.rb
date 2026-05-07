@@ -39,6 +39,7 @@ module Codex
         path = path_for(user)
         FileUtils.mkdir_p(path)
         FileUtils.chmod(0o700, path)
+        ensure_file_credentials_config!(path)
         path
       end
 
@@ -55,6 +56,19 @@ module Codex
       def reset_root_override!
         @root_path_override = nil
       end
+
+      private
+        def ensure_file_credentials_config!(path)
+          config_path = path.join("config.toml")
+          setting = 'cli_auth_credentials_store = "file"'
+          contents = config_path.exist? ? config_path.read : +""
+          return if contents.match?(/^\s*cli_auth_credentials_store\s*=/)
+
+          contents << "\n" if contents.present? && !contents.end_with?("\n")
+          contents << "#{setting}\n"
+          config_path.write(contents)
+          FileUtils.chmod(0o600, config_path)
+        end
     end
   end
 end

@@ -66,8 +66,7 @@ module Codex
 
     test "poll_chatgpt_login returns awaiting_user while account is not connected" do
       transport = FakeTransport.new(scripted: {
-        "account/read" => { "account" => nil, "requiresOpenaiAuth" => true },
-        "account/rateLimits/read" => {}
+        "account/read" => { "account" => nil, "requiresOpenaiAuth" => true }
       })
       client = AppServerClient.new(transport: transport)
       result = client.poll_chatgpt_login(login_id: "abc")
@@ -75,6 +74,23 @@ module Codex
       assert_equal "awaiting_user", result["state"]
       assert_equal "abc", result["loginId"]
       assert_equal true, transport.calls.first.last["refreshToken"]
+      assert_equal [ "account/read" ], transport.calls.map(&:first)
+    end
+
+    test "poll_chatgpt_login does not read rate limits before authentication" do
+      transport = FakeTransport.new(
+        scripted: {
+          "account/read" => { "account" => nil, "requiresOpenaiAuth" => true }
+        },
+        raise_on: {
+          "account/rateLimits/read" => AppServerClient::RpcError.new("codex account authentication required to read rate limits")
+        }
+      )
+      client = AppServerClient.new(transport: transport)
+      result = client.poll_chatgpt_login(login_id: "abc")
+
+      assert_equal "awaiting_user", result["state"]
+      assert_equal [ "account/read" ], transport.calls.map(&:first)
     end
 
     test "poll_chatgpt_login normalizes connected account metadata" do

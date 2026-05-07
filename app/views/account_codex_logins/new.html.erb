@@ -6,18 +6,18 @@
   <h1 class="font-bold text-4xl">Connect Codex account</h1>
 
   <p class="my-4 text-sm text-zinc-400 leading-relaxed">
-    AI evaluation in Ideal Magic uses OpenAI's documented Codex App Server account-auth flow. Pick a sign-in method below — Ideal Magic never sees your ChatGPT password and never stores OpenAI API keys in your browser.
+    AI evaluation in Ideal Magic uses OpenAI's documented Codex App Server account-auth flow. Device-code sign-in is the production-safe path for ideal-magic.com because the browser OAuth callback is hosted by the Codex app-server on this VM. Ideal Magic never sees your ChatGPT password and never stores OpenAI API keys in your browser.
   </p>
 
   <div class="my-6 grid gap-4 sm:grid-cols-2">
-    <%= button_to account_codex_logins_path, params: { auth_mode: Codex::AccountConnections::BROWSER_AUTH_MODE }, method: :post, class: "rounded-md px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium text-left" do %>
-      <span class="block font-semibold">Browser sign-in</span>
-      <span class="block text-xs text-blue-100">Opens a one-time URL on this device.</span>
+    <%= button_to account_codex_logins_path, params: { auth_mode: Codex::AccountConnections::DEVICE_CODE_AUTH_MODE }, method: :post, class: "rounded-md px-4 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium text-left" do %>
+      <span class="block font-semibold">Device-code sign-in</span>
+      <span class="block text-xs text-blue-100">Recommended. Works from any browser by entering a short code.</span>
     <% end %>
 
-    <%= button_to account_codex_logins_path, params: { auth_mode: Codex::AccountConnections::DEVICE_CODE_AUTH_MODE }, method: :post, class: "rounded-md px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-medium text-left" do %>
-      <span class="block font-semibold">Device-code sign-in</span>
-      <span class="block text-xs text-zinc-300">Better for terminals or other devices. Shows a short code to enter.</span>
+    <%= button_to account_codex_logins_path, params: { auth_mode: Codex::AccountConnections::BROWSER_AUTH_MODE }, method: :post, class: "rounded-md px-4 py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-medium text-left" do %>
+      <span class="block font-semibold">Browser sign-in</span>
+      <span class="block text-xs text-zinc-300">Only for browsers running on the same machine as the Codex app-server.</span>
     <% end %>
   </div>
 

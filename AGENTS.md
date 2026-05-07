@@ -192,6 +192,7 @@ Once the slice list is drained, fold still-useful current-state guidance into st
 - Private Archidekt or Moxfield account sync requires documented provider support or explicit approval.
 - AI work must use OpenAI's documented Codex App Server account-auth surface as the exclusive v1 user-facing model path.
 - Users connect ChatGPT/Codex through Codex-managed browser OAuth or device-code login; Ideal Magic uses the resulting Codex account mode and ChatGPT/Codex rate limits instead of app-owned per-token API billing.
+- On the hosted `ideal-magic.com` surface, device-code login is the normal Codex sign-in path. Codex browser OAuth redirects to `localhost` on the app-server host, so it only works when the user's browser is running on the same machine as the Codex app-server (or through an intentional tunnel).
 - Do not implement generic "Sign in with OpenAI" API OAuth, ChatGPT password collection, scraping, browser-visible API keys, or hand-rolled refresh-token calls outside the documented Codex App Server flow.
 - Card facts and Commander legality must come from deterministic source data, primarily Scryfall bulk data and source-backed rules.
 - AI analysis can interpret deterministic facts, but it must not be the rules authority.

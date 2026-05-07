@@ -315,6 +315,9 @@ module Codex
     #   "authMode", "displayedEmail", "planType", "rateLimit", "expiresAt".
     def get_auth_status(account_id: nil, refresh_token: false)
       account_result = call(:read_account, compact("accountId" => account_id, "refreshToken" => refresh_token))
+      account = account_result["account"]
+      return normalize_auth_status(account_result, {}) unless account.is_a?(Hash)
+
       rate_limit_result = call(:read_rate_limits, {})
       normalize_auth_status(account_result, rate_limit_result)
     end

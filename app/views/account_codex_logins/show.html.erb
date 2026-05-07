@@ -29,7 +29,7 @@
   <% when "awaiting_user" %>
     <% if @attempt.auth_mode == Codex::AccountConnections::BROWSER_AUTH_MODE %>
       <div class="my-6 rounded-md bg-zinc-900/40 p-4">
-        <p class="text-sm text-zinc-400">Open this URL on this device to finish ChatGPT sign-in. Ideal Magic never sees your ChatGPT password.</p>
+        <p class="text-sm text-zinc-400">Open this URL only from a browser running on the same machine as the Codex app-server. The OpenAI callback goes to localhost on that machine. For normal ideal-magic.com use, cancel this attempt and use device-code sign-in.</p>
         <% if @attempt.login_url.present? %>
           <p class="mt-3 break-all text-sm">
             <%= link_to @attempt.login_url, @attempt.login_url, class: "text-blue-400 hover:text-blue-300", target: "_blank", rel: "noopener noreferrer" %>
