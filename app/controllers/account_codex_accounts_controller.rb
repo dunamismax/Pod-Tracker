@@ -8,6 +8,7 @@ class AccountCodexAccountsController < ApplicationController
     end
 
     @codex_account.disconnect!
+    Codex::UserHome.purge!(Current.session.user)
     record_audit("codex.disconnected")
     redirect_to account_path, notice: "Codex account disconnected.", status: :see_other
   end

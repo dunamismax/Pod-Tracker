@@ -28,10 +28,14 @@ class AccountCodexAccountsControllerTest < ActionDispatch::IntegrationTest
   setup do
     @user = users(:one)
     @previous_factory = Codex::AccountConnections.client_factory
+    @tmp_codex_root = Pathname.new(Dir.mktmpdir("codex-home-controller-test-"))
+    Codex::UserHome.root_path_override = @tmp_codex_root
   end
 
   teardown do
     Codex::AccountConnections.client_factory = @previous_factory
+    Codex::UserHome.reset_root_override!
+    FileUtils.remove_entry(@tmp_codex_root) if @tmp_codex_root&.exist?
   end
 
   test "disconnects the codex account, clears credentials, and records an audit event" do
@@ -97,6 +101,8 @@ class AccountCodexAccountsControllerTest < ActionDispatch::IntegrationTest
       status: "connected",
       encrypted_credential_payload: "secret-token"
     )
+    Codex::UserHome.ensure!(@user)
+    File.write(Codex::UserHome.path_for(@user).join("auth.json"), "{}")
     client = FakeClient.new
     client.respond(:get_auth_status, {
       "displayedEmail" => "fresh@example.com",

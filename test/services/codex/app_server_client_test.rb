@@ -210,6 +210,83 @@ module Codex
       assert_raises(AppServerClient::TransportError) { client.get_auth_status }
     end
 
+    test "stdio transport spawns the child process with the supplied env hash" do
+      script = Tempfile.new([ "fake-codex-app-server", ".rb" ])
+      script.write(<<~RUBY)
+        require "json"
+
+        initialize_request = JSON.parse(STDIN.gets)
+        puts JSON.generate("id" => initialize_request.fetch("id"), "result" => { "ok" => true })
+        STDOUT.flush
+
+        initialized = JSON.parse(STDIN.gets)
+        raise "expected initialized notification" unless initialized["method"] == "initialized"
+
+        request = JSON.parse(STDIN.gets)
+        puts JSON.generate("id" => request.fetch("id"), "result" => {
+          "codex_home" => ENV["CODEX_HOME"],
+          "path_present" => !ENV["PATH"].to_s.empty?,
+          "secret_leaked" => ENV["RAILS_SECRET"]
+        })
+        STDOUT.flush
+      RUBY
+      script.close
+
+      transport = AppServerClient::StdioTransport.new(
+        command: [ RbConfig.ruby, script.path ],
+        request_timeout: 2,
+        env: { "CODEX_HOME" => "/tmp/codex-user-99", "PATH" => ENV["PATH"] }
+      )
+      result = transport.request("account/read", {})
+
+      assert_equal "/tmp/codex-user-99", result["codex_home"]
+      assert_equal true, result["path_present"]
+      assert_nil result["secret_leaked"]
+    ensure
+      script&.unlink
+    end
+
+    test "for(user) builds a client whose stdio transport carries the user's CODEX_HOME" do
+      user = users(:one)
+      tmp_root = Pathname.new(Dir.mktmpdir("codex-home-for-test-"))
+      UserHome.root_path_override = tmp_root
+      env = {
+        "CODEX_APP_SERVER_ENABLED" => "true",
+        "CODEX_APP_SERVER_COMMAND" => "/bin/true",
+        "PATH" => ENV["PATH"]
+      }
+      client = AppServerClient.for(user, env: env)
+      transport = client.instance_variable_get(:@transport)
+      transport_env = transport.instance_variable_get(:@env)
+
+      expected_home = tmp_root.join(user.id.to_s).to_s
+      assert_equal expected_home, transport_env["CODEX_HOME"]
+      assert File.directory?(expected_home), "expected user codex home to be created"
+      mode = File.stat(expected_home).mode & 0o777
+      assert_equal 0o700, mode
+    ensure
+      UserHome.reset_root_override!
+      FileUtils.remove_entry(tmp_root) if tmp_root&.exist?
+    end
+
+    test "build_transport_env only forwards an allowlist of parent env keys" do
+      env = AppServerClient.build_transport_env(
+        env: {
+          "PATH" => "/usr/bin",
+          "HOME" => "/home/sawyer",
+          "RAILS_SECRET_KEY_BASE" => "do-not-leak",
+          "IDEAL_MAGIC_DATABASE_PASSWORD" => "do-not-leak"
+        },
+        codex_home: "/var/lib/ideal-magic/codex/42"
+      )
+
+      assert_equal "/var/lib/ideal-magic/codex/42", env["CODEX_HOME"]
+      assert_equal "/usr/bin", env["PATH"]
+      assert_equal "/home/sawyer", env["HOME"]
+      refute env.key?("RAILS_SECRET_KEY_BASE"), "must not forward Rails secrets"
+      refute env.key?("IDEAL_MAGIC_DATABASE_PASSWORD"), "must not forward DB password"
+    end
+
     test "stdio transport initializes the app server protocol before requests" do
       script = Tempfile.new([ "fake-codex-app-server", ".rb" ])
       script.write(<<~RUBY)

@@ -35,6 +35,13 @@ module Codex
       @clock_time = Time.utc(2026, 5, 4, 21, 0, 0)
       @clock = -> { @clock_time }
       @client = FakeClient.new
+      @tmp_codex_root = Pathname.new(Dir.mktmpdir("codex-home-conn-test-"))
+      UserHome.root_path_override = @tmp_codex_root
+    end
+
+    teardown do
+      UserHome.reset_root_override!
+      FileUtils.remove_entry(@tmp_codex_root) if @tmp_codex_root&.exist?
     end
 
     def service
@@ -269,6 +276,8 @@ module Codex
         status: "connected",
         encrypted_credential_payload: "secret"
       )
+      UserHome.ensure!(@user)
+      File.write(UserHome.path_for(@user).join("auth.json"), "{}")
       @client.respond(:get_auth_status, {
         "authMode" => "chatgpt_browser",
         "displayedEmail" => "fresh@example.com",
@@ -294,6 +303,8 @@ module Codex
         status: "connected",
         encrypted_credential_payload: "secret"
       )
+      UserHome.ensure!(@user)
+      File.write(UserHome.path_for(@user).join("auth.json"), "{}")
       @client = FakeClient.new(raises_on: { get_auth_status: AppServerClient::RpcError.new("server died") })
 
       assert_raises(AppServerClient::RpcError) { service.refresh_status }
@@ -315,6 +326,77 @@ module Codex
         status: "disconnected"
       )
       assert_raises(AccountConnections::InvalidAttempt) { service.refresh_status }
+    end
+
+    test "logout purges the user's CODEX_HOME directory" do
+      account = @user.create_codex_account!(
+        auth_mode: "chatgpt_browser",
+        status: "connected",
+        encrypted_credential_payload: "secret",
+        connected_at: 1.day.ago
+      )
+      UserHome.ensure!(@user)
+      File.write(UserHome.path_for(@user).join("auth.json"), "{}")
+      @client.respond(:logout_chatgpt, { "ok" => true })
+
+      service.logout
+      account.reload
+
+      assert_equal "disconnected", account.status
+      refute UserHome.path_for(@user).exist?, "expected CODEX_HOME to be removed"
+    end
+
+    test "logout still purges CODEX_HOME when remote logout errors" do
+      account = @user.create_codex_account!(
+        auth_mode: "chatgpt_browser",
+        status: "connected",
+        encrypted_credential_payload: "secret",
+        connected_at: 1.day.ago
+      )
+      UserHome.ensure!(@user)
+      File.write(UserHome.path_for(@user).join("auth.json"), "{}")
+      @client = FakeClient.new(raises_on: { logout_chatgpt: AppServerClient::TransportError.new("nope") })
+
+      service.logout
+      account.reload
+      refute UserHome.path_for(@user).exist?
+    end
+
+    test "refresh_status flips local status to disconnected when CODEX_HOME has no auth.json" do
+      account = @user.create_codex_account!(
+        auth_mode: "chatgpt_browser",
+        status: "connected",
+        encrypted_credential_payload: "secret"
+      )
+      # No auth.json on disk — DB and disk truth disagree.
+
+      result = service.refresh_status
+
+      assert_equal "disconnected", result.state
+      account.reload
+      assert_equal "disconnected", account.status
+      assert_empty @client.calls, "client must not be called when CODEX_HOME is empty"
+    end
+
+    test "refresh_status hits the client when CODEX_HOME has auth.json" do
+      account = @user.create_codex_account!(
+        auth_mode: "chatgpt_browser",
+        status: "connected",
+        encrypted_credential_payload: "secret"
+      )
+      UserHome.ensure!(@user)
+      File.write(UserHome.path_for(@user).join("auth.json"), "{}")
+      @client.respond(:get_auth_status, {
+        "displayedEmail" => "fresh@example.com",
+        "planType" => "team",
+        "rateLimit" => { "primaryUsedPercent" => 12 }
+      })
+
+      result = service.refresh_status
+      account.reload
+
+      assert_equal "synced", result.state
+      assert_equal "fresh@example.com", account.displayed_email
     end
   end
 end

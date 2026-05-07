@@ -14,10 +14,23 @@ module Codex
     class MissingTarget < Error; end
 
     class << self
+      # Test override. May accept zero arguments or one (the user that the
+      # client should be bound to). Production code does not set this — it
+      # falls through to AppServerClient.for(user) so each evaluation spawns
+      # a fresh transport against the right user's CODEX_HOME.
       attr_writer :client_factory
+      attr_reader :client_factory
 
-      def client_factory
-        @client_factory ||= -> { AppServerClient.from_environment }
+      def build_client_for(user)
+        if @client_factory
+          if @client_factory.respond_to?(:arity) && @client_factory.arity != 0
+            @client_factory.call(user)
+          else
+            @client_factory.call
+          end
+        else
+          AppServerClient.for(user)
+        end
       end
 
       def enqueue_deck!(deck, user:)
@@ -66,7 +79,7 @@ module Codex
       end
     end
 
-    def initialize(client: self.class.client_factory.call, clock: -> { Time.current })
+    def initialize(client: nil, clock: -> { Time.current })
       @client = client
       @clock = clock
     end
@@ -75,6 +88,7 @@ module Codex
       raise MissingTarget, "AI evaluation run must target a deck or pod" unless analysis_run.deck || analysis_run.pod
       return analysis_run unless analysis_run.status == "queued"
 
+      client = @client || self.class.build_client_for(analysis_run.user)
       analysis_run.mark_started!(now: now)
       prompt = prompt_for(analysis_run)
       analysis_run.update!(
@@ -84,7 +98,7 @@ module Codex
         codex_rate_limit_snapshot: analysis_run.user&.codex_account&.rate_limit_snapshot || analysis_run.codex_rate_limit_snapshot
       )
 
-      result = @client.evaluate_scorecard(prompt, model: model_for(analysis_run))
+      result = client.evaluate_scorecard(prompt, model: model_for(analysis_run))
       validated = validator_for(analysis_run).validate!(extract_json_payload(result.fetch("text")))
       analysis_run.update!(
         ai_model: result["model"].presence || analysis_run.ai_model.presence || DEFAULT_MODEL_LABEL,

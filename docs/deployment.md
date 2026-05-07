@@ -56,7 +56,7 @@ Production env vars live in `/etc/ideal-magic-web/env` and are loaded by the sys
 | `SOLID_QUEUE_IN_PUMA` | recommended | `true` until jobs need a separate process. |
 | `APP_HOST` | yes | `ideal-magic.com`. Used for mailer URLs and similar. |
 | `CODEX_APP_SERVER_ENABLED` | optional | `false` by default. Set to `true` only when the Codex App Server runtime is intentionally enabled. |
-| `CODEX_HOME` | optional | Codex credential/cache home. Do not point this at a git-tracked path. |
+| `CODEX_HOME_ROOT` | optional | Root for per-user CODEX_HOME directories. Each signed-in user gets `<root>/<user.id>/`, mode 0700. Production uses `/var/lib/ideal-magic/codex`; do not point this at a git-tracked path or a shared OS account home. |
 | `CODEX_APP_SERVER_COMMAND` | optional | Command used by the stdio transport when enabled. Defaults to `codex app-server`. |
 | `CODEX_APP_SERVER_REQUEST_TIMEOUT_SECONDS` | optional | JSON-RPC request timeout. Defaults to `20`. |
 
@@ -104,6 +104,17 @@ The current production environment was bootstrapped roughly as follows; capture 
 7. Append the `ideal-magic.com` and `www.ideal-magic.com` blocks to `/etc/caddy/Caddyfile`, validate with `caddy validate`, then `systemctl reload caddy`. Caddy will obtain TLS certificates on the first request.
 8. Install `/etc/sudoers.d/ideal-magic-web` with `visudo -c -f` validation so `bin/redeploy` is non-interactive.
 9. Verify: `curl -fsS https://ideal-magic.com/up`.
+
+## Per-user Codex state directories
+
+The Codex App Server transport is multi-tenant. Each Ideal Magic user gets an isolated `CODEX_HOME` under `CODEX_HOME_ROOT`:
+
+- Production root: `/var/lib/ideal-magic/codex/`, owned `sawyer:sawyer`, mode `0700`.
+- Per-user: `<root>/<user.id>/`, mode `0700`. Materialized by `Codex::UserHome.ensure!(user)` the first time the user starts a Codex login.
+- The systemd unit lists `ReadWritePaths=/var/lib/ideal-magic/codex` so the hardened service can write there. `ProtectHome=read-only` keeps the service out of `/home/sawyer/.codex` (Stephen's personal Codex state stays fenced).
+- When a user disconnects Codex (or deletes their Ideal Magic account), `Codex::UserHome.purge!(user)` removes the entire directory, including `auth.json`.
+- `refresh_status` flips the local `codex_accounts` row to `disconnected` if the user's `CODEX_HOME/auth.json` is gone, so the DB never claims a user is connected when on-disk credentials are missing.
+- Stephen's existing `CodexAccount` row from the single-tenant era is kept; he must run "Connect ChatGPT / Codex account" once after the multi-tenant cutover so his per-user CODEX_HOME materializes. `/home/sawyer/.codex` is not migrated.
 
 ## Backups and restore
 

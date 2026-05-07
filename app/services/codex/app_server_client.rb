@@ -51,10 +51,11 @@ module Codex
     class NotConnectedError < Error; end
 
     class StdioTransport
-      def initialize(command:, request_timeout: 20, client_info: CLIENT_INFO)
+      def initialize(command:, request_timeout: 20, client_info: CLIENT_INFO, env: {})
         @command = command
         @request_timeout = request_timeout.to_f
         @client_info = client_info
+        @env = env || {}
         @mutex = Mutex.new
         @next_id = 0
         @initialized = false
@@ -98,7 +99,11 @@ module Codex
         argv = @command.is_a?(Array) ? @command : Shellwords.split(@command.to_s)
         raise TransportError, "CODEX_APP_SERVER_COMMAND is blank." if argv.empty?
 
-        @stdin, @stdout, @stderr, @wait_thread = Open3.popen3(*argv)
+        if @env.any?
+          @stdin, @stdout, @stderr, @wait_thread = Open3.popen3(@env, *argv)
+        else
+          @stdin, @stdout, @stderr, @wait_thread = Open3.popen3(*argv)
+        end
         @initialized = false
         start_stderr_reader
       rescue Errno::ENOENT => e
@@ -215,13 +220,37 @@ module Codex
       end
     end
 
-    def self.from_environment(env: ENV)
+    def self.from_environment(env: ENV, codex_home: nil)
       enabled = ActiveModel::Type::Boolean.new.cast(env["CODEX_APP_SERVER_ENABLED"])
       return new unless enabled
 
       command = env["CODEX_APP_SERVER_COMMAND"].presence || "codex app-server"
       timeout = env.fetch("CODEX_APP_SERVER_REQUEST_TIMEOUT_SECONDS", 20).to_i
-      new(transport: StdioTransport.new(command: command, request_timeout: timeout))
+      transport_env = build_transport_env(env: env, codex_home: codex_home)
+      new(transport: StdioTransport.new(command: command, request_timeout: timeout, env: transport_env))
+    end
+
+    # Build a per-user client whose stdio transport spawns codex with
+    # CODEX_HOME set to the user's isolated state directory. No process-level
+    # caching: each call creates a fresh client so two concurrent evaluations
+    # for two different users cannot share a transport.
+    def self.for(user, env: ENV)
+      UserHome.ensure!(user)
+      from_environment(env: env, codex_home: UserHome.path_for(user).to_s)
+    end
+
+    def self.build_transport_env(env:, codex_home:)
+      transport_env = {}
+      transport_env["CODEX_HOME"] = codex_home if codex_home.present?
+      # Pass through PATH/HOME/LANG so codex can find its dependencies and write
+      # locale-correct output. We deliberately do not forward the entire parent
+      # env, since the production process holds Rails secrets we don't want
+      # leaking into a child process.
+      %w[PATH HOME LANG LC_ALL USER].each do |key|
+        value = env[key]
+        transport_env[key] = value if value.present?
+      end
+      transport_env
     end
 
     def initialize(transport: NullTransport.new)

@@ -15,23 +15,33 @@ module Codex
     class InvalidAttempt < Error; end
 
     class << self
+      # Test override: a callable that returns a client. May accept zero
+      # arguments (legacy fixture clients ignore which user is in flight) or
+      # one argument (the user the connection is for). Production code does
+      # not set this — it falls through to AppServerClient.for(user).
       attr_writer :client_factory
-
-      def client_factory
-        @client_factory ||= begin
-          client = AppServerClient.from_environment
-          -> { client }
-        end
-      end
+      attr_reader :client_factory
 
       def for(user, clock: -> { Time.current }, client_label: DEFAULT_CLIENT_LABEL)
-        new(user, client: client_factory.call, clock: clock, client_label: client_label)
+        new(user, client: build_client_for(user), clock: clock, client_label: client_label)
+      end
+
+      def build_client_for(user)
+        if @client_factory
+          if @client_factory.respond_to?(:arity) && @client_factory.arity != 0
+            @client_factory.call(user)
+          else
+            @client_factory.call
+          end
+        else
+          AppServerClient.for(user)
+        end
       end
     end
 
-    def initialize(user, client: AppServerClient.new, clock: -> { Time.current }, client_label: DEFAULT_CLIENT_LABEL)
+    def initialize(user, client: nil, clock: -> { Time.current }, client_label: DEFAULT_CLIENT_LABEL)
       @user = user
-      @client = client
+      @client = client || self.class.build_client_for(user)
       @clock = clock
       @client_label = client_label
     end
@@ -132,6 +142,7 @@ module Codex
       end
 
       account.disconnect!(now: now)
+      UserHome.purge!(@user)
       Result.new(attempt: nil, codex_account: account, state: "disconnected", detail: remote_detail)
     end
 
@@ -142,6 +153,11 @@ module Codex
       account = @user.codex_account
       return Result.new(attempt: nil, codex_account: nil, state: "absent", detail: {}) if account.nil?
       raise InvalidAttempt, "Codex account is not connected" unless account.connected?
+
+      unless UserHome.has_auth?(@user)
+        account.disconnect!(now: now)
+        return Result.new(attempt: nil, codex_account: account, state: "disconnected", detail: { "reason" => "missing_codex_home_auth" })
+      end
 
       response = @client.get_auth_status
       attributes = {

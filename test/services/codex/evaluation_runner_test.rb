@@ -73,6 +73,40 @@ module Codex
       assert_equal "invalid_ai_response", run.error_code
     end
 
+    test "two concurrent runs for two different users get two distinct per-user clients" do
+      other = users(:two)
+      other.codex_account&.destroy
+      other.create_codex_account!(
+        auth_mode: Codex::AccountConnections::BROWSER_AUTH_MODE,
+        status: "connected",
+        encrypted_credential_payload: "opaque",
+        connected_at: Time.current
+      )
+      other_deck = Decks::FixtureLibrary.new.build_deck("high_power_najeela_5c", user: other)
+      other_deck.save!
+      Decks::Analyzer.run(other_deck, user: other)
+
+      run_a = Codex::EvaluationRunner.enqueue_deck!(@deck, user: @user)
+      run_b = Codex::EvaluationRunner.enqueue_deck!(other_deck, user: other)
+
+      built = []
+      previous_factory = Codex::EvaluationRunner.client_factory
+      response_text = file_fixture("codex_deck_evaluation_response_v2.json").read
+      Codex::EvaluationRunner.client_factory = ->(user) {
+        client = FakeEvaluationClient.new(response_text)
+        built << [ user.id, client.object_id ]
+        client
+      }
+
+      Codex::EvaluationRunner.new.run!(run_a)
+      Codex::EvaluationRunner.new.run!(run_b)
+
+      assert_equal [ @user.id, other.id ], built.map(&:first)
+      assert_equal 2, built.map(&:last).uniq.size, "expected each run to construct a fresh client"
+    ensure
+      Codex::EvaluationRunner.client_factory = previous_factory
+    end
+
     class FakeEvaluationClient
       def initialize(text)
         @text = text

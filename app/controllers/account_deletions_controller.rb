@@ -8,6 +8,7 @@ class AccountDeletionsController < ApplicationController
     if @user.authenticate(params[:current_password].to_s)
       record_deletion
       terminate_session
+      Codex::UserHome.purge!(@user)
       @user.destroy
       redirect_to new_session_path, notice: "Account deleted.", status: :see_other
     else
