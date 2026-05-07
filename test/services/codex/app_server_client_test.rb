@@ -303,6 +303,127 @@ module Codex
       refute env.key?("IDEAL_MAGIC_DATABASE_PASSWORD"), "must not forward DB password"
     end
 
+    test "stdio transport streams a turn that takes longer than the per-request timeout" do
+      script = Tempfile.new([ "fake-codex-app-server", ".rb" ])
+      script.write(<<~RUBY)
+        require "json"
+
+        initialize_request = JSON.parse(STDIN.gets)
+        STDOUT.puts JSON.generate("id" => initialize_request.fetch("id"), "result" => {})
+        STDOUT.flush
+        JSON.parse(STDIN.gets) # initialized
+
+        turn_start = JSON.parse(STDIN.gets)
+        # Drip notifications faster than the idle timeout, but well past the
+        # short non-streaming request timeout. Total wall-clock is several
+        # times the request timeout.
+        4.times do
+          sleep 0.4
+          STDOUT.puts JSON.generate("method" => "item/agentMessage/delta", "params" => { "delta" => "tick" })
+          STDOUT.flush
+        end
+        sleep 0.4
+        STDOUT.puts JSON.generate("id" => turn_start.fetch("id"), "result" => { "id" => "turn-1", "status" => "running" })
+        STDOUT.flush
+        sleep 0.4
+        STDOUT.puts JSON.generate(
+          "method" => "item/completed",
+          "params" => { "item" => { "type" => "agentMessage", "text" => "{\\"ok\\":true}", "phase" => "final_answer" } }
+        )
+        STDOUT.flush
+        sleep 0.4
+        STDOUT.puts JSON.generate("method" => "turn/completed", "params" => {})
+        STDOUT.flush
+      RUBY
+      script.close
+
+      transport = AppServerClient::StdioTransport.new(
+        command: [ RbConfig.ruby, script.path ],
+        request_timeout: 1,
+        stream_timeout: 30,
+        stream_idle_timeout: 5
+      )
+      notifications = []
+      result = transport.request_and_stream("turn/start", { "threadId" => "t" }, until_method: "turn/completed") do |msg|
+        notifications << msg["method"]
+      end
+
+      assert_equal "turn-1", result["id"]
+      assert_includes notifications, "item/agentMessage/delta"
+      assert_includes notifications, "turn/completed"
+    ensure
+      script&.unlink
+    end
+
+    test "stdio transport raises a stall error when stream goes idle past the idle timeout" do
+      script = Tempfile.new([ "fake-codex-app-server", ".rb" ])
+      script.write(<<~RUBY)
+        require "json"
+
+        initialize_request = JSON.parse(STDIN.gets)
+        STDOUT.puts JSON.generate("id" => initialize_request.fetch("id"), "result" => {})
+        STDOUT.flush
+        JSON.parse(STDIN.gets) # initialized
+
+        turn_start = JSON.parse(STDIN.gets)
+        STDOUT.puts JSON.generate("id" => turn_start.fetch("id"), "result" => { "id" => "turn-1", "status" => "running" })
+        STDOUT.flush
+        # Then go quiet — never emits turn/completed.
+        sleep 30
+      RUBY
+      script.close
+
+      transport = AppServerClient::StdioTransport.new(
+        command: [ RbConfig.ruby, script.path ],
+        request_timeout: 5,
+        stream_timeout: 30,
+        stream_idle_timeout: 1
+      )
+      error = assert_raises(AppServerClient::TransportError) do
+        transport.request_and_stream("turn/start", {}, until_method: "turn/completed")
+      end
+      assert_match(/stalled/, error.message)
+      assert_match(/turn\/start/, error.message)
+    ensure
+      script&.unlink
+    end
+
+    test "stdio transport raises a wall-clock error when stream chats past the overall deadline" do
+      script = Tempfile.new([ "fake-codex-app-server", ".rb" ])
+      script.write(<<~RUBY)
+        require "json"
+
+        initialize_request = JSON.parse(STDIN.gets)
+        STDOUT.puts JSON.generate("id" => initialize_request.fetch("id"), "result" => {})
+        STDOUT.flush
+        JSON.parse(STDIN.gets) # initialized
+
+        turn_start = JSON.parse(STDIN.gets)
+        STDOUT.puts JSON.generate("id" => turn_start.fetch("id"), "result" => { "id" => "turn-1", "status" => "running" })
+        STDOUT.flush
+        # Chat fast enough to never trigger idle, but never finish.
+        loop do
+          sleep 0.05
+          STDOUT.puts JSON.generate("method" => "item/agentMessage/delta", "params" => { "delta" => "x" })
+          STDOUT.flush
+        end
+      RUBY
+      script.close
+
+      transport = AppServerClient::StdioTransport.new(
+        command: [ RbConfig.ruby, script.path ],
+        request_timeout: 5,
+        stream_timeout: 1,
+        stream_idle_timeout: 5
+      )
+      error = assert_raises(AppServerClient::TransportError) do
+        transport.request_and_stream("turn/start", {}, until_method: "turn/completed")
+      end
+      assert_match(/wall-clock/, error.message)
+    ensure
+      script&.unlink
+    end
+
     test "stdio transport initializes the app server protocol before requests" do
       script = Tempfile.new([ "fake-codex-app-server", ".rb" ])
       script.write(<<~RUBY)

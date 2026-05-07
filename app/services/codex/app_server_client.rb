@@ -51,9 +51,11 @@ module Codex
     class NotConnectedError < Error; end
 
     class StdioTransport
-      def initialize(command:, request_timeout: 20, client_info: CLIENT_INFO, env: {})
+      def initialize(command:, request_timeout: 20, stream_timeout: 600, stream_idle_timeout: 60, client_info: CLIENT_INFO, env: {})
         @command = command
         @request_timeout = request_timeout.to_f
+        @stream_timeout = stream_timeout.to_f
+        @stream_idle_timeout = stream_idle_timeout.to_f
         @client_info = client_info
         @env = env || {}
         @mutex = Mutex.new
@@ -64,7 +66,7 @@ module Codex
 
       def request(method, params = {}, &notification_handler)
         @mutex.synchronize do
-          with_timeout(method) do
+          with_timeout(method, @request_timeout) do
             start_process!
             initialize_connection! unless @initialized
             send_request(method, params, &notification_handler)
@@ -74,23 +76,46 @@ module Codex
 
       def request_and_stream(method, params = {}, until_method:, &notification_handler)
         @mutex.synchronize do
-          with_timeout(method) do
-            start_process!
-            initialize_connection! unless @initialized
-            response = send_request(method, params, &notification_handler)
-            stream_until(method, until_method, &notification_handler)
-            response
-          end
+          start_process!
+          initialize_connection! unless @initialized
+
+          deadline = monotonic_now + @stream_timeout
+          response = send_request_streaming(method, params, deadline, &notification_handler)
+          stream_until(method, until_method, deadline, &notification_handler)
+          response
         end
       end
 
       private
 
-      def with_timeout(method, &block)
-        Timeout.timeout(@request_timeout, &block)
+      def with_timeout(method, limit, &block)
+        Timeout.timeout(limit, &block)
       rescue Timeout::Error
         stop_process
         raise TransportError, "Codex App Server timed out during #{method}."
+      end
+
+      # Apply both an idle timeout (max gap with no I/O) and an absolute wall-clock
+      # deadline. Used for streaming turn responses where the total duration can
+      # be many minutes but a long silence still indicates a stuck transport.
+      def with_idle_timeout(method, idle_limit, deadline, &block)
+        remaining = deadline - monotonic_now
+        if remaining <= 0
+          stop_process
+          raise TransportError, "Codex App Server exceeded #{format('%.1f', @stream_timeout)}s wall-clock limit during #{method}."
+        end
+        limit = [ idle_limit, remaining ].min
+        Timeout.timeout(limit, &block)
+      rescue Timeout::Error
+        stop_process
+        if monotonic_now >= deadline
+          raise TransportError, "Codex App Server exceeded #{format('%.1f', @stream_timeout)}s wall-clock limit during #{method}."
+        end
+        raise TransportError, "Codex App Server stalled (no message for #{format('%.1f', idle_limit)}s) during #{method}."
+      end
+
+      def monotonic_now
+        Process.clock_gettime(Process::CLOCK_MONOTONIC)
       end
 
       def start_process!
@@ -128,6 +153,15 @@ module Codex
         read_response(id, method, &notification_handler)
       end
 
+      # Streaming variant. Each individual read is bounded by the idle timeout,
+      # and the overall wall-clock deadline applies across reads (so a chatty
+      # server cannot keep the channel alive forever).
+      def send_request_streaming(method, params, deadline, &notification_handler)
+        id = next_id
+        write_message("method" => method, "id" => id, "params" => params)
+        read_response_streaming(id, method, deadline, &notification_handler)
+      end
+
       def read_response(expected_id, method, &notification_handler)
         loop do
           message = read_message(method)
@@ -142,9 +176,23 @@ module Codex
         end
       end
 
-      def stream_until(method, until_method, &notification_handler)
+      def read_response_streaming(expected_id, method, deadline, &notification_handler)
         loop do
-          message = read_message(method)
+          message = with_idle_timeout(method, @stream_idle_timeout, deadline) { read_message(method) }
+          notification_handler&.call(message) if message["id"] != expected_id
+          next unless message["id"] == expected_id
+
+          if (error = message["error"])
+            raise RpcError.new(error["message"].presence || "Codex App Server RPC error.", code: error["code"], data: error["data"])
+          end
+
+          return message.fetch("result", {})
+        end
+      end
+
+      def stream_until(method, until_method, deadline, &notification_handler)
+        loop do
+          message = with_idle_timeout(method, @stream_idle_timeout, deadline) { read_message(method) }
           notification_handler&.call(message)
           return if message["method"] == until_method
         end
@@ -225,9 +273,17 @@ module Codex
       return new unless enabled
 
       command = env["CODEX_APP_SERVER_COMMAND"].presence || "codex app-server"
-      timeout = env.fetch("CODEX_APP_SERVER_REQUEST_TIMEOUT_SECONDS", 20).to_i
+      request_timeout = env.fetch("CODEX_APP_SERVER_REQUEST_TIMEOUT_SECONDS", 20).to_i
+      stream_timeout = env.fetch("CODEX_APP_SERVER_STREAM_TIMEOUT_SECONDS", 600).to_i
+      stream_idle_timeout = env.fetch("CODEX_APP_SERVER_STREAM_IDLE_TIMEOUT_SECONDS", 60).to_i
       transport_env = build_transport_env(env: env, codex_home: codex_home)
-      new(transport: StdioTransport.new(command: command, request_timeout: timeout, env: transport_env))
+      new(transport: StdioTransport.new(
+        command: command,
+        request_timeout: request_timeout,
+        stream_timeout: stream_timeout,
+        stream_idle_timeout: stream_idle_timeout,
+        env: transport_env
+      ))
     end
 
     # Build a per-user client whose stdio transport spawns codex with

@@ -61,7 +61,9 @@ Production env vars live in `/etc/ideal-magic-web/env` and are loaded by the sys
 | `CODEX_APP_SERVER_ENABLED` | optional | `false` by default. Production sets this to `true` when AI evaluation is enabled. |
 | `CODEX_HOME_ROOT` | optional | Root for per-user CODEX_HOME directories. Each signed-in user gets `<root>/<user.id>/`, mode 0700. Production uses `/var/lib/ideal-magic/codex`; do not point this at a git-tracked path or a shared OS account home. |
 | `CODEX_APP_SERVER_COMMAND` | optional | Command used by the stdio transport when enabled. Defaults to `codex app-server`. |
-| `CODEX_APP_SERVER_REQUEST_TIMEOUT_SECONDS` | optional | JSON-RPC request timeout. Defaults to `20`. |
+| `CODEX_APP_SERVER_REQUEST_TIMEOUT_SECONDS` | optional | Per-request timeout for non-streaming JSON-RPC calls (auth, account reads). Defaults to `20`. |
+| `CODEX_APP_SERVER_STREAM_TIMEOUT_SECONDS` | optional | Wall-clock cap for a single streaming turn. AI evaluation streams agent output for the full duration of the model's response, so this is the longest a deck or pod evaluation is allowed to take. Defaults to `600`. |
+| `CODEX_APP_SERVER_STREAM_IDLE_TIMEOUT_SECONDS` | optional | Maximum quiet gap between streamed turn messages before the transport is treated as stuck. Bounded by the wall-clock cap. Defaults to `60`. |
 
 Never commit `/etc/ideal-magic-web/env`, `config/master.key`, or rotated database passwords. Update `.env.example` with placeholder names when a new variable is added so local development stays in sync.
 
