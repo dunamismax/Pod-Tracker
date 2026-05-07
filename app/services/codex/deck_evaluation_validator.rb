@@ -22,12 +22,9 @@ module Codex
       summary
       bracket
       axes
-      friction_drivers
-      rule_zero_talking_points
-      recommendations
     ].freeze
 
-    OPTIONAL_ROOT_KEYS = %w[legality_review].freeze
+    OPTIONAL_ROOT_KEYS = %w[friction_drivers rule_zero_talking_points recommendations legality_review].freeze
 
     BRACKET_KEYS = %w[value label sub_band headline tagline restrictions evidence uncertainty].freeze
     BRACKET_OPTIONAL_KEYS = %w[expected_min_turn game_changers].freeze
@@ -44,36 +41,44 @@ module Codex
 
     def validate(response)
       payload = parse(response)
-      errors = []
 
       unless payload.is_a?(Hash)
         return Result.new(payload: payload, errors: [ "response must be a JSON object" ])
       end
+
+      payload = DeckEvaluationNormalizer.new.call(payload)
+      errors = []
 
       validate_keys(payload, ROOT_KEYS, OPTIONAL_ROOT_KEYS, "$", errors)
       validate_schema_version(payload, errors)
       validate_present_string(payload, "summary", "$.summary", errors)
       validate_bracket(payload["bracket"], errors)
       validate_axes(payload["axes"], errors)
-      validate_array(payload["friction_drivers"], "$.friction_drivers", errors, max: 12) do |item, path|
-        validate_keys(item, DRIVER_KEYS, DRIVER_OPTIONAL_KEYS, path, errors)
-        validate_present_string(item, "label", "#{path}.label", errors)
-        validate_enum(item, "severity", DeckEvaluationSchema::SEVERITIES, "#{path}.severity", errors)
-        validate_present_string(item, "explanation", "#{path}.explanation", errors)
-        validate_optional_string_array(item["evidence"], "#{path}.evidence", errors)
+      if payload.key?("friction_drivers")
+        validate_array(payload["friction_drivers"], "$.friction_drivers", errors, max: 12) do |item, path|
+          validate_keys(item, DRIVER_KEYS, DRIVER_OPTIONAL_KEYS, path, errors)
+          validate_present_string(item, "label", "#{path}.label", errors)
+          validate_enum(item, "severity", DeckEvaluationSchema::SEVERITIES, "#{path}.severity", errors)
+          validate_present_string(item, "explanation", "#{path}.explanation", errors)
+          validate_optional_string_array(item["evidence"], "#{path}.evidence", errors)
+        end
       end
-      validate_array(payload["rule_zero_talking_points"], "$.rule_zero_talking_points", errors, min: 1, max: 12) do |item, path|
-        validate_keys(item, TALKING_KEYS, [], path, errors)
-        validate_present_string(item, "topic", "#{path}.topic", errors)
-        validate_present_string(item, "prompt", "#{path}.prompt", errors)
+      if payload.key?("rule_zero_talking_points")
+        validate_array(payload["rule_zero_talking_points"], "$.rule_zero_talking_points", errors, max: 12) do |item, path|
+          validate_keys(item, TALKING_KEYS, [], path, errors)
+          validate_present_string(item, "topic", "#{path}.topic", errors)
+          validate_present_string(item, "prompt", "#{path}.prompt", errors)
+        end
       end
-      validate_array(payload["recommendations"], "$.recommendations", errors, max: 12) do |item, path|
-        validate_keys(item, RECOMMENDATION_KEYS, RECOMMENDATION_OPTIONAL_KEYS, path, errors)
-        validate_present_string(item, "category", "#{path}.category", errors)
-        validate_present_string(item, "title", "#{path}.title", errors)
-        validate_present_string(item, "detail", "#{path}.detail", errors)
-        if item.key?("owned_collection_relevance")
-          validate_enum(item, "owned_collection_relevance", DeckEvaluationSchema::OWNERSHIP_RELEVANCE, "#{path}.owned_collection_relevance", errors)
+      if payload.key?("recommendations")
+        validate_array(payload["recommendations"], "$.recommendations", errors, max: 12) do |item, path|
+          validate_keys(item, RECOMMENDATION_KEYS, RECOMMENDATION_OPTIONAL_KEYS, path, errors)
+          validate_present_string(item, "category", "#{path}.category", errors)
+          validate_present_string(item, "title", "#{path}.title", errors)
+          validate_present_string(item, "detail", "#{path}.detail", errors)
+          if item.key?("owned_collection_relevance")
+            validate_enum(item, "owned_collection_relevance", DeckEvaluationSchema::OWNERSHIP_RELEVANCE, "#{path}.owned_collection_relevance", errors)
+          end
         end
       end
 

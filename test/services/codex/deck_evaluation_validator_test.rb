@@ -43,26 +43,34 @@ module Codex
       assert_includes result.errors, "$.bracket.value must be one of 1, 2, 3, 4, 5"
     end
 
-    test "rejects unknown root keys and missing required fields" do
+    test "rejects unknown root keys that the normalizer can't salvage" do
       payload = JSON.parse(file_fixture("codex_deck_evaluation_response_v2.json").read)
-      payload.delete("summary")
-      payload["unexpected"] = true
+      payload["totally_unrelated"] = { "x" => 1 }
 
       result = DeckEvaluationValidator.new.validate(payload)
 
       assert_not result.valid?
-      assert_includes result.errors, "$.summary is required"
-      assert_includes result.errors, "$.unexpected is not allowed"
+      assert_includes result.errors, "$.totally_unrelated is not allowed"
     end
 
-    test "rejects invalid restriction status enum" do
+    test "synthesizes a summary when the AI omits it but provides bracket headline/tagline" do
+      payload = JSON.parse(file_fixture("codex_deck_evaluation_response_v2.json").read)
+      payload.delete("summary")
+
+      result = DeckEvaluationValidator.new.validate(payload)
+
+      assert result.valid?, result.errors.join("\n")
+      assert result.payload["summary"].present?
+    end
+
+    test "coerces unknown restriction status into a safe value" do
       payload = JSON.parse(file_fixture("codex_deck_evaluation_response_v2.json").read)
       payload["bracket"]["restrictions"][0]["status"] = "weirdo"
 
       result = DeckEvaluationValidator.new.validate(payload)
 
-      assert_not result.valid?
-      assert(result.errors.any? { |e| e.include?("$.bracket.restrictions[0].status must be one of") })
+      assert result.valid?, result.errors.join("\n")
+      assert_includes DeckEvaluationSchema::RESTRICTION_STATUSES, result.payload.dig("bracket", "restrictions", 0, "status")
     end
   end
 end

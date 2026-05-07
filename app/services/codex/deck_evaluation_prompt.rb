@@ -42,7 +42,7 @@ module Codex
         "Use the Commander banlist for legality. Use the Game Changers list to count GCs. Apply the bracket gates exactly.",
         "Cite the specific cards in this decklist that drove each call. Do not invent cards.",
         "Take as much time as you need; this is a queued background evaluation, not an interactive turn.",
-        "Return one JSON object that matches the supplied response schema. No prose around the JSON."
+        "Return one JSON object that matches the supplied response schema EXACTLY — same keys, same nesting, same field names. Do not echo prompt input keys (deck_id, deck_name, format) into the response. No prose around the JSON."
       ].join(" ")
     end
 
@@ -109,14 +109,61 @@ module Codex
         "must_match_schema" => true,
         "rules" => [
           "Return only one JSON object. No code fences. No prose around the JSON.",
+          "Top-level keys must be exactly: schema_version, summary, bracket, axes, friction_drivers, rule_zero_talking_points, recommendations, and optionally legality_review. Do not add deck_id, deck_name, format, game_changers, restrictions, key_evidence, or evidence at the top level — those belong inside bracket.",
+          "bracket is an object with these keys ONLY: value, label, sub_band, expected_min_turn (or null), headline, tagline, restrictions, game_changers, evidence, uncertainty. Do not add a 'rationale' key inside bracket — its content goes in headline + tagline + evidence.",
           "bracket.value must be an integer 1..5 corresponding to the matched bracket.",
-          "sub_band must be 'low', 'mid', or 'high'.",
-          "Each axis must include an integer value 0..10, a rationale, and an evidence array of cards or patterns from this decklist.",
-          "Use the uncertainty arrays to flag thin signal rather than guessing.",
-          "Restrictions must list the bracket's gates with status ok / ok_singleton / absent / any_allowed / present_allowed / violation.",
-          "If you find a banned card, flag it under legality_review.flagged_cards and explain in legality_review.note. Do not lower the bracket on banned cards alone.",
+          "bracket.sub_band must be 'low', 'mid', or 'high'.",
+          "bracket.restrictions must be an array of objects { label, status, detail, evidence? }, where status is one of ok / ok_singleton / absent / any_allowed / present_allowed / violation.",
+          "Each axis (power, speed, interaction, consistency, salt, social_friction) is an object with EXACTLY these keys: value (integer 0..10), rationale (string), evidence (array of card/pattern strings), uncertainty (array of strings — empty array allowed but the key must be present).",
+          "Use the uncertainty arrays to flag thin signal rather than guessing. Empty arrays are fine; the keys must still be present.",
+          "If you find a banned card, flag it under legality_review.flagged_cards (array of card names) and explain in legality_review.note (string). Do not add a 'legal' boolean. Do not lower the bracket on banned cards alone.",
           "Headlines and taglines should be reusable as a Rule 0 opener."
-        ]
+        ],
+        "skeleton" => response_skeleton
+      }
+    end
+
+    def response_skeleton
+      {
+        "schema_version" => DeckEvaluationSchema::VERSION,
+        "summary" => "<one paragraph>",
+        "bracket" => {
+          "value" => 3,
+          "label" => "<bracket label>",
+          "sub_band" => "mid",
+          "expected_min_turn" => nil,
+          "headline" => "<short headline>",
+          "tagline" => "<short tagline>",
+          "restrictions" => [
+            { "label" => "<gate>", "status" => "ok", "detail" => "<why>", "evidence" => [] }
+          ],
+          "game_changers" => [
+            { "name" => "<card>", "category" => "<category>" }
+          ],
+          "evidence" => [ "<short note>" ],
+          "uncertainty" => []
+        },
+        "axes" => DeckEvaluationSchema::AXES.index_with do
+          {
+            "value" => 5,
+            "rationale" => "<one or two sentences>",
+            "evidence" => [ "<card or pattern>" ],
+            "uncertainty" => []
+          }
+        end,
+        "friction_drivers" => [
+          { "label" => "<driver>", "severity" => "moderate", "explanation" => "<why>", "evidence" => [] }
+        ],
+        "rule_zero_talking_points" => [
+          { "topic" => "<topic>", "prompt" => "<sentence to read out>" }
+        ],
+        "recommendations" => [
+          { "category" => "tuning", "title" => "<short>", "detail" => "<one or two sentences>" }
+        ],
+        "legality_review" => {
+          "note" => "<short legality note>",
+          "flagged_cards" => []
+        }
       }
     end
 
@@ -136,7 +183,10 @@ module Codex
     def system_message
       [
         "You are the Ideal Magic Commander deck evaluator.",
-        "You produce one JSON object that follows the supplied schema exactly.",
+        "You produce one JSON object that follows the supplied schema exactly — match the response_contract.skeleton key-for-key.",
+        "Place game_changers, restrictions, evidence, and uncertainty INSIDE the bracket object, not at the top level. Do not echo deck_id / deck_name / format into the response.",
+        "Each of the six axes is an object with exactly value, rationale, evidence, uncertainty. Always include uncertainty as an array (empty is fine).",
+        "legality_review is optional; if you include it, use { note, flagged_cards } only — do not add a 'legal' boolean.",
         "You apply the published Commander Brackets gates strictly: a deck cannot be Bracket 3 if it has more than 3 Game Changers, runs mass land denial, chains extra turns, or can find a two-card game-ending combo before turn 6.",
         "You apply the Commander banlist as the legality authority. The Game Changers list is descriptive, not a ban list.",
         "You sub-band low/mid/high using how the deck plays inside its bracket — a tuned Bracket 3 trending into Bracket 4 is high; a precon-class Bracket 3 is low.",

@@ -29,9 +29,6 @@ module Codex
           summary
           bracket
           axes
-          friction_drivers
-          rule_zero_talking_points
-          recommendations
         ],
         "properties" => {
           "schema_version" => { "const" => VERSION },
@@ -44,7 +41,7 @@ module Codex
             "properties" => AXES.index_with { axis_schema }
           },
           "friction_drivers" => array_schema(driver_schema, max: 12),
-          "rule_zero_talking_points" => array_schema(talking_point_schema, min: 1, max: 12),
+          "rule_zero_talking_points" => array_schema(talking_point_schema, max: 12),
           "recommendations" => array_schema(recommendation_schema, max: 12),
           "legality_review" => legality_review_schema
         }
