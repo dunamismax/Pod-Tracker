@@ -62,7 +62,7 @@ Full rubric: [docs/analysis-rubric.md](docs/analysis-rubric.md).
 
 Ideal Magic runs live at [ideal-magic.com](https://ideal-magic.com) and the planned build is complete. The Rails foundation, card corpus pipeline, Commander legality engine, account system, deck import, deterministic scoring, collection import, deck gaps, demand pressure, recommendation ownership labels, pods, game-night check-in, pod seating, result recording, matchup note capture/search, post-game prompts, deck/commander meta summaries, revision-level result history, per-user Codex account-auth transport with production-safe device-code sign-in, AI scorecard schema/prompt contracts, queued AI evaluation pipeline, AI-result rendering, plain-text/CSV/JSON deck and Markdown/JSON analysis exports, opt-in revocable public deck and pod share links that mirror the AI Commander Brackets evaluation when one has run (decklist + deterministic + AI analysis; no playgroup notes, table results, collection fit, opponent identity, or audit history leak), the installable PWA shell (manifest, versioned service worker, offline-readable recent pages, reload prompt), the explicit offline write-state banner, mobile bottom nav and responsive deck filters, and the self-hosted deployment shape are all in place. Single-deck AI evaluation is authoritative for bracket placement and the six power-band axes once a Codex run succeeds; pod AI evaluation is authoritative for pod bracket spread, table-fit axes, per-deck table roles, and the Rule 0 brief. Deterministic reads stay as preliminary fallbacks. The Codex deck and pod prompts run on `deck-eval-v3` / `pod-eval-v3` against the unchanged v2 response schemas — each card ships with full oracle text and Ideal Magic role/salt/friction tags, and the prompts walk a structured per-axis evaluation protocol with explicit pitfalls and an evidence quality bar, which is what produces the sub-band six-axis scorecard values on the deck show page.
 
-Build sequencing and current repo truth live in [BUILD.md](BUILD.md). Operational runbook for the live deployment lives in [docs/deployment.md](docs/deployment.md).
+Operational runbook for the live deployment lives in [docs/deployment.md](docs/deployment.md). Repo-local operator and product rules live in [AGENTS.md](AGENTS.md).
 
 ## Documentation
 
@@ -73,7 +73,6 @@ Build sequencing and current repo truth live in [BUILD.md](BUILD.md). Operationa
 - [docs/deployment.md](docs/deployment.md) — the intended self-hosted deployment shape.
 - [docs/runbooks/postgres-backups.md](docs/runbooks/postgres-backups.md) — daily `pg_dump` backups, retention, and the restore drill.
 - [docs/runbooks/scryfall-corpus-refresh.md](docs/runbooks/scryfall-corpus-refresh.md) — the daily Scryfall card-corpus refresh job.
-- [BUILD.md](BUILD.md) — active build execution manual.
 - [AGENTS.md](AGENTS.md) — repo-local operating rules for contributors.
 
 ## For Developers
@@ -102,7 +101,7 @@ bin/redeploy
 
 `bin/redeploy` pulls, bundles, runs `db:prepare`, precompiles assets, restarts the systemd unit, and then health-checks `https://ideal-magic.com/up`. See [docs/deployment.md](docs/deployment.md) for the full deployment shape.
 
-Use `mise` (or another Ruby version manager that honors `.ruby-version` / `.mise.toml`) to select the pinned Ruby. Stack details, dependencies, and the full build sequence live in [BUILD.md](BUILD.md).
+Use `mise` (or another Ruby version manager that honors `.ruby-version` / `.mise.toml`) to select the pinned Ruby. The stack is a Ruby 4.0.3 / Rails 8.1.3 monolith on PostgreSQL 17, with Hotwire (Turbo + Stimulus), Tailwind CSS v4, ViewComponent, Propshaft, and Solid Queue / Cache / Cable in-Puma. Quality gates run through `bin/verify` (RuboCop, ERB lint, bundler-audit, importmap audit, Brakeman, Rails tests, system tests, seeds replant). See [AGENTS.md](AGENTS.md) for the operator rules and [docs/deployment.md](docs/deployment.md) for the deployment shape.
 
 ## Fan Content Notice
 

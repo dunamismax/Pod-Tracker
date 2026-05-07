@@ -79,4 +79,4 @@ Expected durable concepts:
 
 ## Build Direction
 
-Ideal Magic is the single primary Magic project. Every feature in this scope document must be implemented natively on Ideal Magic's Rails stack as defined in `BUILD.md`, not adapted from any other architecture.
+Ideal Magic is the single primary Magic project. Every feature in this scope document must be implemented natively on Ideal Magic's Rails stack (see `AGENTS.md` for the operator rules and `README.md` for stack/setup), not adapted from any other architecture.

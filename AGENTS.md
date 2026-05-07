@@ -1,13 +1,14 @@
 # AGENTS.md
 
-This is the standalone operating manual for Ideal Magic. Reading this file plus `README.md` and `BUILD.md` is sufficient context to begin work; no other prompt files need to be loaded.
+This is the standalone operating manual for Ideal Magic. Reading this file plus `README.md` is sufficient context to begin work; no other prompt files need to be loaded.
 
 ## Read Order
 
 1. `AGENTS.md` (this file)
 2. `README.md`
-3. `BUILD.md`
-4. Task-relevant code or docs
+3. Task-relevant code or docs
+
+The product build is closed. There is no more `BUILD.md`. Active product state lives in `README.md`; durable operator and product rules live here. New work after the build close should be tracked through commit history, GitHub issues, or short-form notes — do not re-create a global plan file.
 
 ---
 
@@ -169,33 +170,55 @@ Three gotchas because the production app and the working tree live on the same m
 
 4. **Do not leave ad-hoc rows in the shared test database.** The `ideal_magic` role can run the app tests, but Rails cannot disable PostgreSQL referential integrity as that role. If a `bin/rails runner` inspection writes rows into `ideal_magic_test` outside a test transaction, the next fixture load can fail with foreign-key errors against `users`. Prefer read-only runners; if you intentionally dirty the test DB, clean it before rerunning tests.
 
----
-
-## Current Build Manual
-
-`BUILD.md` is the active implementation manual, organized as user-visible vertical slices. Read it first; it has its own operating rules at the top. Highlights:
-
-- Ship vertical slices that move user-visible product forward, not horizontal plumbing. Skip ahead between slices when value is higher elsewhere.
-- 2–4 related checkboxes per pass minimum. One-box passes need a reason in the commit.
-- Check boxes only for shipped, tested, in-`main` work. Trim ceremony — one line in "Recent slices," update "What's live now" only when user-visible capability changes.
-- Update `README.md` when current product or setup truth changes. Keep future execution detail in `BUILD.md`.
-- Slices and boxes are editable. Delete or rewrite work that turns out wrong-shaped, premature, or redundant.
-
-Once the slice list is drained, fold still-useful current-state guidance into stable project docs and retire `BUILD.md` unless Stephen asks to keep it.
+5. **`Decks::FixtureLibrary` does not seed `OracleCard` rows.** The fixture decks under `db/seeds/commander/deck_fixtures/` build `Deck` + `DeckCard` records by name only; the `card_tag_assignments` join is the only thing wired through the test setup's `CommanderFormat::CardTagImporter.new.import!`. Tests that build a fixture deck cannot assert on `oracle_card.oracle_text`, `oracle_card.color_identity`, or any card-tag content sourced through `OracleCard#card_tags` — those fields are nil unless the test seeds OracleCards itself. Test the prompt structure (keys present, arrays well-formed) rather than the prompt content.
 
 ---
 
 ## Product Boundaries
 
+These rules don't move:
+
 - Ideal Magic is Commander-first for v1.
-- Public deck URLs, pasted decklists, and user-provided exports are allowed.
-- Private Archidekt or Moxfield account sync requires documented provider support or explicit approval.
-- AI work must use OpenAI's documented Codex App Server account-auth surface as the exclusive v1 user-facing model path.
-- Users connect ChatGPT/Codex through Codex-managed browser OAuth or device-code login; Ideal Magic uses the resulting Codex account mode and ChatGPT/Codex rate limits instead of app-owned per-token API billing.
+- Public deck URLs, pasted decklists, and uploaded text exports are the supported import paths. No scraping authenticated provider data. Private Archidekt or Moxfield account sync requires documented provider support or explicit approval.
+- Card facts and Commander legality come from deterministic source data — Scryfall bulk data plus mtgcommander.net rules and banlist. AI interprets, never rules. Card legality stays deterministic regardless of any AI evaluation outcome.
+- AI must use OpenAI's documented Codex App Server account-auth surface as the exclusive v1 user-facing model path. Users connect ChatGPT/Codex through Codex-managed browser OAuth or device-code login; Ideal Magic rides the resulting Codex account mode and ChatGPT/Codex rate limits instead of app-owned per-token API billing.
 - On the hosted `ideal-magic.com` surface, device-code login is the normal Codex sign-in path. Codex browser OAuth redirects to `localhost` on the app-server host, so it only works when the user's browser is running on the same machine as the Codex app-server (or through an intentional tunnel).
 - Do not implement generic "Sign in with OpenAI" API OAuth, ChatGPT password collection, scraping, browser-visible API keys, or hand-rolled refresh-token calls outside the documented Codex App Server flow.
-- Card facts and Commander legality must come from deterministic source data, primarily Scryfall bulk data and source-backed rules.
-- AI analysis can interpret deterministic facts, but it must not be the rules authority.
+- Codex credentials are per-user, encrypted at rest, never logged, never rendered to a browser. Each user gets their own `CODEX_HOME=<CODEX_HOME_ROOT>/<user.id>/` (mode 0700), materialized by `Codex::UserHome.ensure!(user)` on first login. Logout / disconnect / account deletion all `UserHome.purge!`.
+- Salt and social-friction scores are conversation aids, not moral judgments. Evidence-backed, neutral language.
+- Mobile-first. The site has to be usable on a phone in a noisy game store at 9 PM.
+- Self-hostable. No hard dependency on external PaaS for the runtime path.
+- WotC Fan Content Policy applies. Card names/text/art use the unofficial disclaimer; nothing is paywalled without legal review.
+
+## AI Evaluation Contract
+
+The deck and pod AI evaluations have two version axes that move independently:
+
+- **Schema version** (`deck-evaluation-v2`, `pod-evaluation-v2`) — the response contract. Bump this only when the JSON shape the AI returns actually changes. Bumping forces a normalizer/validator update and breaks comparability with prior runs.
+- **Prompt version** (`deck-eval-v3`, `pod-eval-v3`) — the request shape: what context the AI is shown and how it is asked to reason. Prompt versions can evolve freely without bumping the schema, which is what keeps prior runs comparable across prompt revisions.
+
+When you improve the prompt without changing the response shape, bump only `PROMPT_VERSION` in the prompt class. Tests reference `Codex::DeckEvaluationPrompt::PROMPT_VERSION` rather than the literal string, so bumps don't break test infrastructure. AI-evaluation rendering is authoritative once a successful run exists; the deterministic six-axis scorecard stays as a collapsible "preliminary read."
+
+## External Sources To Re-check Before Touching Integrations
+
+- **Scryfall**: bulk data preferred; the request limit is <10 req/s. The card corpus refresh job runs daily — see `docs/runbooks/scryfall-corpus-refresh.md`.
+- **Commander rules + banlist**: live at mtgcommander.net. Latest official update referenced in repo data is the 2024-09-23 quarterly update; the legality snapshot lives at `db/seeds/commander/legality_snapshots/current.json`.
+- **Commander Brackets** (Wizards beta): canonical update referenced in repo data is 2026-02-09 (Farewell + Biorhythm added to Game Changers, Biorhythm unbanned, Lutri remains companion-banned only). The Game Changers list lives at `db/seeds/commander/brackets/game_changers.json`. Re-check before shipping bracket-list changes.
+- **Codex App Server**: account-auth endpoints at `https://developers.openai.com/codex/app-server` are the supported surface for v1 AI.
+- **Archidekt**: publicly observable API for public decks but no formal docs — adapter at `app/services/decks/archidekt_client.rb` may break.
+- **Moxfield**: public deck pages and a public API (`api2.moxfield.com/v3/decks/all/<slug>`) but no formal docs — same caveat.
+
+Re-check versions and endpoints when starting a new integration; trust the latest source over this file.
+
+## Human-only Calibration Work
+
+These depend on real beta usage and real games — not agent tasks:
+
+- Calibrate score bands and bracket placements against actual precon / casual / upgraded / high-power / cEDH decks once Stephen and a small group can play with it.
+- Tune the salt/social-friction taxonomy from observed playgroup feedback.
+- Decide whether passkeys/WebAuthn lands based on how often password-only auth becomes friction.
+
+If real-world feedback turns into engineering work, file it in commit history or as a GitHub issue.
 
 ---
 
@@ -233,7 +256,7 @@ Deployment-shape rules:
 - `config/database.yml` reads the production primary host from `IDEAL_MAGIC_DATABASE_HOST` (default `localhost`). PostgreSQL on this VM uses peer auth on the default socket, so TCP/`localhost` is required for the `ideal_magic` role.
 - Adding a new production-only env var: update `.env.example` (placeholder), update `/etc/ideal-magic-web/env`, restart the service. Do not bake secrets into the unit file.
 - Adding a new background process (e.g. a separate worker if Solid-in-Puma stops fitting): add a sibling systemd unit (`ideal-magic-worker.service`) modeled on `ideal-magic-web.service`, do not introduce Docker Compose just to add one process.
-- Backups, scheduled Scryfall refresh runbook, and restore drills are still pending — `BUILD.md` Slice 8 tracks them.
+- Daily `pg_dump` backups run via `bin/backup_db` + `config/systemd/ideal-magic-backup.{service,timer}` at 03:30 UTC. `bin/restore_db_drill` re-checks sha256 and pg_restores into a throwaway database. Operator runbook: `docs/runbooks/postgres-backups.md`.
 
 ## Seeded Accounts
 
@@ -259,6 +282,6 @@ You wake fresh each session. This file is the only persistent local prompt for t
 
 - If you hit a real time sink, an undocumented gotcha, a non-obvious environment quirk, or a workflow lesson that would have saved you minutes if you had read it up front, edit this file in the same session and ship the change with your other commits. The next agent will have no other way to learn it.
 - If Stephen says "remember this" and it should shape future behavior in this repo, update this file directly.
-- When repo truth changes, update `README.md` (current state) or `BUILD.md` (planned tranches) accordingly.
+- When repo truth changes, update `README.md` (current state) or this file (durable rules). Do not resurrect `BUILD.md` or any equivalent global plan file.
 - Do not create additional prompt, profile, continuity, setup, or bootstrap files. If a durable rule matters, it goes here.
 - Keep wording portable across agents and vendors. Keep it tight — every line should pay rent.

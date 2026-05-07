@@ -117,4 +117,4 @@ Expect `oracle_cards` and `card_printings` to grow monotonically over time; `car
 
 ## When to re-check Scryfall externally
 
-Per `BUILD.md`'s "External truth" list, Scryfall asks for <10 req/s and bulk data for large workloads. Re-check those terms (and the bulk file naming under `/bulk-data`) before changing the importer or scheduling more than one refresh per day.
+Per the "External Sources" list in `AGENTS.md`, Scryfall asks for <10 req/s and bulk data for large workloads. Re-check those terms (and the bulk file naming under `/bulk-data`) before changing the importer or scheduling more than one refresh per day.

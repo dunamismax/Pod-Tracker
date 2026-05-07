@@ -134,7 +134,7 @@ Backups are not complete until restore has been tested. Run `bin/restore_db_dril
 ## Health checks
 
 - `/up` — process up. Used by `bin/redeploy`.
-- `/ready` — database connectivity (planned; see `BUILD.md` Slice 8).
+- `/ready` — database connectivity (planned). Not currently implemented; `/up` is the only health endpoint in production today.
 
 `/up` is silenced in the Rails log via `config.silence_healthcheck_path = "/up"`, so frequent probes do not pollute production logs.
 
