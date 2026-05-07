@@ -19,6 +19,28 @@
     </div>
   </div>
 
+  <div class="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+    <div class="flex flex-wrap items-baseline justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-medium text-white">Export</h2>
+        <p class="mt-1 text-xs text-zinc-500">
+          Decklist downloads in plain text, CSV, or JSON. Analysis downloads as Markdown or JSON for sharing or archiving.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="text-zinc-500 self-center">Decklist:</span>
+        <%= link_to "Text", deck_export_path(@deck, format: :text), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+        <%= link_to "CSV", deck_export_path(@deck, format: :csv), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+        <%= link_to "JSON", deck_export_path(@deck, format: :json), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+        <% if @scorecard.present? %>
+          <span class="ml-2 text-zinc-500 self-center">Analysis:</span>
+          <%= link_to "Markdown", deck_analysis_export_path(@deck, format: :markdown), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+          <%= link_to "JSON", deck_analysis_export_path(@deck, format: :json), class: "rounded-md border border-zinc-700 px-2.5 py-1.5 font-medium text-zinc-200 hover:bg-zinc-800" %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
   <% unparsed_lines = Array(@deck.import_metadata["unparsed_lines"]) %>
   <% if unparsed_lines.any? %>
     <div class="rounded-md border border-amber-800 bg-amber-950/40 p-4 text-sm text-amber-200">

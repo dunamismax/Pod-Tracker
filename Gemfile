@@ -19,6 +19,9 @@ gem "tailwindcss-rails"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 gem "jbuilder"
 
+# Standard library csv extracted from default gems on Ruby 3.4+.
+gem "csv"
+
 # Rails-native component layer for reusable view objects.
 gem "view_component", "~> 4.8"
 

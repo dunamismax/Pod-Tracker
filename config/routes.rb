@@ -14,6 +14,8 @@ Rails.application.routes.draw do
   resources :account_provider_links, only: %i[new create destroy]
   resources :decks, only: %i[index show new create destroy] do
     resource :ai_evaluation, only: :create, controller: "deck_ai_evaluations"
+    resource :export, only: :show, controller: "deck_exports"
+    resource :analysis_export, only: :show, controller: "deck_analysis_exports", path: "analysis"
   end
   resource :collection, only: :show
   resources :collection_imports, only: %i[show create]

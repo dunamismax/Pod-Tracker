@@ -27,6 +27,9 @@ class AccountExportsController < ApplicationController
           deck_count: @user.decks.count,
           analysis_run_count: @user.analysis_runs.count,
           pod_count: @user.pods.count,
+          collection_card_count: @user.collection_cards.count,
+          game_night_count: @user.game_nights.count,
+          matchup_note_count: @user.matchup_notes.count,
           audit_event_count: @user.audit_events.count
         }
       )

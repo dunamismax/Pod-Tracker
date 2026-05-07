@@ -1,6 +1,6 @@
 module Accounts
   class Exporter
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def initialize(user, generated_at: Time.current)
       @user = user
@@ -17,6 +17,9 @@ module Accounts
         decks: decks_payload,
         analysis_runs: analysis_runs_payload,
         pods: pods_payload,
+        collection: collection_payload,
+        game_nights: game_nights_payload,
+        matchup_notes: matchup_notes_payload,
         audit_events: audit_events_payload
       }
     end
@@ -129,6 +132,105 @@ module Accounts
             slots: pod.pod_slots.order(:position).map do |slot|
               { id: slot.id, position: slot.position, deck_id: slot.deck_id, label: slot.label }
             end
+          }
+        end
+      end
+
+      def collection_payload
+        cards = @user.collection_cards.order(:normalized_name, :id).map do |card|
+          {
+            id: card.id,
+            name: card.name,
+            normalized_name: card.normalized_name,
+            quantity: card.quantity,
+            source_type: card.source_type,
+            created_at: iso(card.created_at),
+            updated_at: iso(card.updated_at)
+          }
+        end
+        imports = @user.collection_imports.order(:id).map do |import|
+          {
+            id: import.id,
+            source_type: import.source_type,
+            status: import.status,
+            imported_count: import.imported_count,
+            unresolved_count: import.unresolved_count,
+            created_at: iso(import.created_at),
+            updated_at: iso(import.updated_at)
+          }
+        end
+        { cards: cards, imports: imports }
+      end
+
+      def game_nights_payload
+        @user.game_nights
+             .includes(:game_night_players, :game_night_decks, :game_night_pod_seats, :game_night_pod_results)
+             .order(:played_on, :id)
+             .map do |gn|
+          {
+            id: gn.id,
+            name: gn.name,
+            played_on: gn.played_on&.iso8601,
+            location: gn.location,
+            notes: gn.notes,
+            status: gn.status,
+            created_at: iso(gn.created_at),
+            updated_at: iso(gn.updated_at),
+            players: gn.game_night_players.map do |gnp|
+              { id: gnp.id, player_id: gnp.player_id, position: gnp.position }
+            end,
+            decks: gn.game_night_decks.map do |gnd|
+              {
+                id: gnd.id,
+                deck_id: gnd.deck_id,
+                player_id: gnd.player_id,
+                position: gnd.position,
+                deck_name_snapshot: gnd.deck_name_snapshot,
+                commander_names_snapshot: gnd.commander_names_snapshot
+              }
+            end,
+            pod_seats: gn.game_night_pod_seats.map do |seat|
+              {
+                id: seat.id,
+                pod_number: seat.pod_number,
+                seat_number: seat.seat_number,
+                player_id: seat.player_id,
+                deck_id: seat.deck_id,
+                deck_name_snapshot: seat.deck_name_snapshot,
+                commander_names_snapshot: seat.commander_names_snapshot,
+                analysis_snapshot: seat.analysis_snapshot
+              }
+            end,
+            pod_results: gn.game_night_pod_results.map do |result|
+              {
+                id: result.id,
+                pod_number: result.pod_number,
+                winner_player_id: result.winner_player_id,
+                draw: result.draw,
+                turns: result.turns,
+                win_condition: result.win_condition,
+                notes: result.notes
+              }
+            end
+          }
+        end
+      end
+
+      def matchup_notes_payload
+        @user.matchup_notes.order(:happened_at, :id).map do |note|
+          {
+            id: note.id,
+            deck_id: note.deck_id,
+            commander_id: note.commander_id,
+            opponent_id: note.opponent_id,
+            pod_id: note.pod_id,
+            game_night_id: note.game_night_id,
+            game_night_pod_number: note.game_night_pod_number,
+            tags: note.tags,
+            body: note.body,
+            happened_at: iso(note.happened_at),
+            created_at: iso(note.created_at),
+            updated_at: iso(note.updated_at)
           }
         end
       end
