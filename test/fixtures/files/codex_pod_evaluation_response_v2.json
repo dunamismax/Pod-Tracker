@@ -1,0 +1,131 @@
+{
+  "schema_version": "pod-evaluation-v2",
+  "summary": "This table is stretched: Korlash is trying to play a slower battlecruiser game while Tymna and Thrasios can pressure the game with compact combo lines, and Atraxa sits between them with resilient planeswalker value.",
+  "bracket_spread": {
+    "min": 2,
+    "max": 5,
+    "spread": 3,
+    "distinct": [2, 3, 5],
+    "game_changer_total": 5,
+    "headline": "Mixed pod from Core to cEDH",
+    "verdict": "The pod is mismatched unless the cEDH deck self-handicaps or swaps out.",
+    "rationale": "The highest deck can threaten protected wins well before the slowest deck is meaningfully online, so the table is likely to revolve around stopping the cEDH seat.",
+    "evidence": [
+      "Korlash is a Bracket 2 mono-black precon-style deck",
+      "Tymna and Thrasios shows Thassa's Oracle plus consultation-style pressure",
+      "Atraxa has planeswalker value and a stronger midgame than Korlash"
+    ],
+    "uncertainty": []
+  },
+  "rule_zero_brief": {
+    "headline": "Agree on whether this is a high-power game before shuffling.",
+    "pregame_template": "This pod spans B2 to B5. Tymna/Thrasios has compact combo pressure; Korlash is much slower. Are we playing the cEDH deck straight, asking it to slow down, or swapping decks?",
+    "talking_points": [
+      {
+        "topic": "Combo speed",
+        "prompt": "Can the Tymna/Thrasios pilot explain whether early two-card wins are live this game?"
+      },
+      {
+        "topic": "Table expectation",
+        "prompt": "Does everyone want a high-power game, or should the strongest deck change?"
+      }
+    ],
+    "disclosures": [
+      {
+        "label": "Compact combo",
+        "severity": "high",
+        "detail": "One deck can end the game much earlier than the others are built to answer.",
+        "evidence": ["Thassa's Oracle", "Demonic Consultation"]
+      }
+    ],
+    "uncertainty": []
+  },
+  "axes": {
+    "power": {
+      "value": 8,
+      "rationale": "The pod's ceiling is set by the cEDH seat rather than the average deck.",
+      "evidence": ["Tymna/Thrasios compact combo pressure"],
+      "uncertainty": []
+    },
+    "speed": {
+      "value": 8,
+      "rationale": "One deck can pressure the game before the lower bracket deck develops.",
+      "evidence": ["Fast combo seat", "Korlash slower setup"],
+      "uncertainty": []
+    },
+    "interaction": {
+      "value": 6,
+      "rationale": "The strongest deck likely has efficient protection, but the table as a whole is uneven.",
+      "evidence": ["cEDH interaction expectation", "precon interaction gap"],
+      "uncertainty": []
+    },
+    "consistency": {
+      "value": 7,
+      "rationale": "The high-end deck is consistent enough to define the game, while the lower decks are less reliable.",
+      "evidence": ["Tymna/Thrasios tutor density", "Korlash low redundancy"],
+      "uncertainty": []
+    },
+    "salt": {
+      "value": 7,
+      "rationale": "A fast mismatch can create frustration even when the cards themselves are legal.",
+      "evidence": ["Bracket spread 3", "compact combo disclosure"],
+      "uncertainty": []
+    },
+    "social_friction": {
+      "value": 9,
+      "rationale": "This table needs an explicit Rule 0 agreement before play.",
+      "evidence": ["B2 to B5 spread", "one deck likely archenemy"],
+      "uncertainty": []
+    }
+  },
+  "decks": [
+    {
+      "position": 1,
+      "deck_name": "Korlash Precon",
+      "commanders": ["Korlash, Heir to Blackblade"],
+      "bracket": 2,
+      "sub_band": "low",
+      "table_role": "Slow value deck",
+      "rationale": "This seat is likely behind on speed and stack interaction.",
+      "evidence": ["mono-black battlecruiser plan"],
+      "uncertainty": []
+    },
+    {
+      "position": 2,
+      "deck_name": "Atraxa Superfriends",
+      "commanders": ["Atraxa, Praetors' Voice"],
+      "bracket": 3,
+      "sub_band": "high",
+      "table_role": "Midgame value engine",
+      "rationale": "Atraxa can dominate longer games but is still slower than the combo seat.",
+      "evidence": ["planeswalker engine"],
+      "uncertainty": []
+    },
+    {
+      "position": 3,
+      "deck_name": "Tymna Thrasios Oracle",
+      "commanders": ["Tymna the Weaver", "Thrasios, Triton Hero"],
+      "bracket": 5,
+      "sub_band": "mid",
+      "table_role": "Archenemy combo deck",
+      "rationale": "This seat sets the table's real speed and interaction requirements.",
+      "evidence": ["Thassa's Oracle", "Demonic Consultation"],
+      "uncertainty": []
+    }
+  ],
+  "friction_drivers": [
+    {
+      "label": "Bracket mismatch",
+      "severity": "high",
+      "explanation": "The lowest and highest seats are separated by three brackets.",
+      "evidence": ["B2", "B5"]
+    }
+  ],
+  "recommendations": [
+    {
+      "category": "pod",
+      "title": "Swap or self-handicap the cEDH seat",
+      "detail": "The cleanest fair game is to replace Tymna/Thrasios with a Bracket 3 deck, or have that pilot disclose and avoid early combo lines."
+    }
+  ]
+}

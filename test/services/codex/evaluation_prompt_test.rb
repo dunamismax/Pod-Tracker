@@ -70,14 +70,24 @@ module Codex
       payload = PodEvaluationPrompt.new.call(pod, pod_analysis_run: run)
 
       assert_equal PodEvaluationPrompt::PROMPT_VERSION, payload["prompt_version"]
-      assert_equal ScorecardResponseSchema::VERSION, payload["schema_version"]
+      assert_equal PodEvaluationSchema::VERSION, payload["schema_version"]
+      assert_equal PodEvaluationSchema::VERSION, payload.dig("response_schema", "properties", "schema_version", "const")
       assert_equal 3, payload.dig("input", "pod", "slots").size
 
-      fact_ids = payload.dig("input", "deterministic_facts").map { |fact| fact["id"] }
-      assert_includes fact_ids, "fact.pod.bracket"
-      assert_includes fact_ids, "fact.pod.aggregate.power"
-      assert_includes fact_ids, "fact.pod.slot1.identity"
-      assert_includes fact_ids, "fact.pod.warnings"
+      assert_equal BracketBriefing::BRACKETS_VERSION, payload.dig("input", "context", "version")
+      assert payload.dig("input", "deterministic_pod_analysis", "available")
+      assert payload.dig("input", "pod", "slots").all? { |slot| Array(slot["cards"]).any? }
+      assert_includes payload.dig("input", "response_contract", "rules").join(" "), "pod-level values"
+    end
+
+    test "recorded v2 pod-evaluation fixture validates against the pod schema" do
+      payload = JSON.parse(file_fixture("codex_pod_evaluation_response_v2.json").read)
+      result = PodEvaluationValidator.new.validate(payload)
+
+      assert result.valid?, result.errors.join("\n")
+      assert_equal 5, result.payload.dig("bracket_spread", "max")
+      assert_equal 6, result.payload.dig("axes").size
+      assert_equal 3, result.payload.fetch("decks").size
     end
 
     private

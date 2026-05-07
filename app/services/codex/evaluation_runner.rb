@@ -114,7 +114,7 @@ module Codex
       )
       analysis_run.mark_succeeded!(now: now, codex_rate_limit_snapshot: analysis_run.codex_rate_limit_snapshot)
       analysis_run
-    rescue ScorecardResponseValidator::InvalidResponse, DeckEvaluationValidator::InvalidResponse => error
+    rescue ScorecardResponseValidator::InvalidResponse, DeckEvaluationValidator::InvalidResponse, PodEvaluationValidator::InvalidResponse => error
       analysis_run.mark_failed!(code: "invalid_ai_response", message: error.message, now: now)
       analysis_run
     rescue AppServerClient::Error => error
@@ -147,7 +147,10 @@ module Codex
     end
 
     def validator_for(run)
-      run.deck ? DeckEvaluationValidator.new : ScorecardResponseValidator.new
+      return DeckEvaluationValidator.new if run.deck
+      return PodEvaluationValidator.new if run.pod
+
+      ScorecardResponseValidator.new
     end
 
     def extract_json_payload(text)

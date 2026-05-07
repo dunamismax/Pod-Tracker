@@ -99,6 +99,37 @@ class PodsControllerTest < ActionDispatch::IntegrationTest
     clear_enqueued_jobs
   end
 
+  test "show renders successful pod v2 AI evaluation as authoritative" do
+    sign_in_as(@user)
+    connect_codex_account!
+    pod = Pod.create!(user: @user, name: "AI read pod", format: "commander", status: "draft")
+    pod.pod_slots.create!(deck: @deck_a, position: 1)
+    pod.pod_slots.create!(deck: @deck_b, position: 2)
+    Pods::Analyzer.run(pod, user: @user)
+    pod.analysis_runs.create!(
+      user: @user,
+      kind: "ai",
+      status: "succeeded",
+      rubric_version: Codex::PodEvaluationSchema::VERSION,
+      prompt_version: Codex::PodEvaluationPrompt::PROMPT_VERSION,
+      ai_model: "fake-model",
+      queued_at: 2.minutes.ago,
+      started_at: 90.seconds.ago,
+      completed_at: 1.minute.ago,
+      ai_response_snapshot: {
+        "validated_response" => JSON.parse(file_fixture("codex_pod_evaluation_response_v2.json").read)
+      }
+    )
+
+    get pod_path(pod)
+
+    assert_response :success
+    assert_select "[data-testid='ai-pod-analysis']"
+    assert_select "h3", text: "Mixed pod from Core to cEDH"
+    assert_select "summary", text: /Show preliminary deterministic pod read/
+    assert_select "[data-testid='ai-evaluation']"
+  end
+
   private
 
     def build_deck(slug)

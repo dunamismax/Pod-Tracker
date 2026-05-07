@@ -73,6 +73,28 @@ module Codex
       assert_equal "invalid_ai_response", run.error_code
     end
 
+    test "enqueue_pod uses the v2 pod prompt and runner validates pod output" do
+      pod = build_pod
+
+      assert_difference -> { pod.analysis_runs.where(kind: "ai").count }, 1 do
+        assert_enqueued_with(job: CodexEvaluationJob) do
+          Codex::EvaluationRunner.enqueue_pod!(pod, user: @user)
+        end
+      end
+
+      run = pod.latest_ai_run
+      assert_equal Codex::PodEvaluationPrompt::PROMPT_VERSION, run.prompt_version
+      assert_equal Codex::PodEvaluationSchema::VERSION, run.rubric_version
+
+      client = FakeEvaluationClient.new(file_fixture("codex_pod_evaluation_response_v2.json").read)
+      Codex::EvaluationRunner.new(client: client, clock: StepClock.new).run!(run)
+
+      run.reload
+      assert_equal "succeeded", run.status
+      assert_equal Codex::PodEvaluationSchema::VERSION, run.ai_response_snapshot.dig("validated_response", "schema_version")
+      assert_equal "Mixed pod from Core to cEDH", run.ai_response_snapshot.dig("validated_response", "bracket_spread", "headline")
+    end
+
     test "two concurrent runs for two different users get two distinct per-user clients" do
       other = users(:two)
       other.codex_account&.destroy
@@ -133,6 +155,27 @@ module Codex
 
       def call
         @time += 1.second
+      end
+    end
+
+    def build_pod
+      library = Decks::FixtureLibrary.new
+      decks = %w[
+        precon_korlash_mono_black
+        atraxa_superfriends_upgraded
+        cedh_tymna_thrasios_thoracle
+      ].map do |slug|
+        deck = library.build_deck(slug, user: @user)
+        deck.save!
+        Decks::Analyzer.run(deck, user: @user)
+        deck
+      end
+
+      Pod.create!(user: @user, name: "Runner pod", format: "commander", status: "draft").tap do |pod|
+        decks.each_with_index do |deck, idx|
+          pod.pod_slots.create!(deck: deck, position: idx + 1)
+        end
+        Pods::Analyzer.run(pod, user: @user)
       end
     end
   end

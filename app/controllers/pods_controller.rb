@@ -15,6 +15,8 @@ class PodsController < ApplicationController
     @warnings = Array(@latest_run&.warnings)
     @suggestions = Array(@latest_run&.suggestions)
     @ai_run = @pod.latest_ai_run
+    @ai_evaluation = Pods::AiEvaluationPresenter.for(@ai_run)
+    @codex_account = current_user.codex_account
   end
 
   def new

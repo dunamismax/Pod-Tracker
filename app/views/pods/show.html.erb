@@ -38,8 +38,27 @@
     </div>
   <% end %>
 
-  <% if @latest_run.present? %>
+  <% if @ai_evaluation.present? %>
+    <%= render "ai_analysis", evaluation: @ai_evaluation %>
+
+    <details class="rounded-lg border border-zinc-800 bg-zinc-900/40">
+      <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-zinc-300">
+        Show preliminary deterministic pod read
+        <span class="ml-2 text-xs text-zinc-500">(used before AI evaluation; AI is now authoritative)</span>
+      </summary>
+      <div class="border-t border-zinc-800 p-4">
+        <% if @latest_run.present? %>
+          <%= render "analysis", pod: @pod, snapshot: @snapshot, brief: @brief, warnings: @warnings, suggestions: @suggestions %>
+        <% else %>
+          <p class="text-sm text-zinc-400">No deterministic pod analysis is recorded.</p>
+        <% end %>
+      </div>
+    </details>
+  <% elsif @latest_run.present? %>
     <%= render "analysis", pod: @pod, snapshot: @snapshot, brief: @brief, warnings: @warnings, suggestions: @suggestions %>
+    <p class="text-xs text-zinc-500">
+      This is a preliminary deterministic pod read. Run the AI evaluation below for a deeper Rule 0 review that scores table fit against the official Commander Brackets and rewrites the pod brief.
+    </p>
   <% else %>
     <div class="rounded-md border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-300">
       No pod analysis yet.
@@ -50,5 +69,7 @@
       run: @ai_run,
       enqueue_path: pod_ai_evaluation_path(@pod),
       title: "AI pod evaluation",
-      target_label: "pod" %>
+      target_label: "pod",
+      codex_account: @codex_account,
+      authoritative: true %>
 </section>
