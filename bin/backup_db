@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# bin/backup_db — pg_dump every Ideal Magic production database to a timestamped
+# directory. Designed to run from the host (or from a systemd timer) as the
+# `sawyer` user with read access to /etc/ideal-magic-web/env.
+#
+# Output layout:
+#   $BACKUP_ROOT/<UTC-date>/<UTC-timestamp>/
+#       ideal_magic_production.dump
+#       ideal_magic_production_cache.dump
+#       ideal_magic_production_queue.dump
+#       ideal_magic_production_cable.dump
+#       MANIFEST            # one line per dump: "<db> <bytes> <sha256>"
+#       OK                  # written last; absence means the run failed
+#
+# Each dump uses pg_dump's custom format (`-Fc`) so it can be restored with
+# `pg_restore` against an empty database.
+#
+# Environment:
+#   BACKUP_ROOT             default /var/backups/ideal-magic
+#   BACKUP_RETENTION_DAYS   default 14 — directories under $BACKUP_ROOT older
+#                           than this are pruned after a successful run.
+#   IDEAL_MAGIC_ENV_FILE    default /etc/ideal-magic-web/env. Must define
+#                           IDEAL_MAGIC_DATABASE_PASSWORD; HOST/PORT/USER fall
+#                           back to localhost / 5432 / ideal_magic.
+#
+# Exit codes:
+#   0  every dump succeeded and OK was written.
+#   1  any pg_dump failed; the run directory is left in place (without OK)
+#      so the failure is inspectable.
+
+set -euo pipefail
+
+ENV_FILE="${IDEAL_MAGIC_ENV_FILE:-/etc/ideal-magic-web/env}"
+BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/ideal-magic}"
+RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
+
+DATABASES=(
+  "ideal_magic_production"
+  "ideal_magic_production_cache"
+  "ideal_magic_production_queue"
+  "ideal_magic_production_cable"
+)
+
+if [ ! -r "$ENV_FILE" ]; then
+  echo "backup_db: cannot read env file $ENV_FILE" >&2
+  exit 1
+fi
+
+# Pull only the database-related variables from the env file. We deliberately
+# don't `source` the whole file so unrelated production secrets don't leak into
+# this script's environment.
+PGPASSWORD="$(grep -E '^IDEAL_MAGIC_DATABASE_PASSWORD=' "$ENV_FILE" | head -n1 | cut -d= -f2-)"
+PGHOST="$(grep -E '^IDEAL_MAGIC_DATABASE_HOST=' "$ENV_FILE" | head -n1 | cut -d= -f2- || true)"
+PGHOST="${PGHOST:-localhost}"
+PGPORT="${IDEAL_MAGIC_DATABASE_PORT:-5432}"
+PGUSER="${IDEAL_MAGIC_DATABASE_USER:-ideal_magic}"
+
+if [ -z "$PGPASSWORD" ]; then
+  echo "backup_db: IDEAL_MAGIC_DATABASE_PASSWORD not set in $ENV_FILE" >&2
+  exit 1
+fi
+export PGPASSWORD PGHOST PGPORT PGUSER
+
+stamp_date="$(date -u +%Y-%m-%d)"
+stamp_full="$(date -u +%Y%m%dT%H%M%SZ)"
+run_dir="$BACKUP_ROOT/$stamp_date/$stamp_full"
+
+mkdir -p "$run_dir"
+chmod 0700 "$run_dir"
+
+manifest="$run_dir/MANIFEST"
+: >"$manifest"
+
+failed=0
+for db in "${DATABASES[@]}"; do
+  out="$run_dir/${db}.dump"
+  partial="${out}.partial"
+  echo "==> pg_dump $db -> $out"
+  if pg_dump \
+       --format=custom \
+       --no-owner \
+       --no-privileges \
+       --compress=9 \
+       --file="$partial" \
+       "$db"; then
+    mv "$partial" "$out"
+    bytes="$(stat -c '%s' "$out")"
+    sha="$(sha256sum "$out" | awk '{print $1}')"
+    printf '%s %s %s\n' "$db" "$bytes" "$sha" >>"$manifest"
+  else
+    echo "backup_db: pg_dump $db failed" >&2
+    rm -f "$partial"
+    failed=1
+  fi
+done
+
+if [ "$failed" -ne 0 ]; then
+  echo "backup_db: one or more dumps failed; leaving $run_dir without OK marker" >&2
+  exit 1
+fi
+
+date -u +%Y-%m-%dT%H:%M:%SZ >"$run_dir/OK"
+
+# Prune empty (or in-progress) sibling timestamps under today's date.
+find "$BACKUP_ROOT/$stamp_date" -mindepth 1 -maxdepth 1 -type d ! -name "$stamp_full" -empty -delete 2>/dev/null || true
+
+# Retention: drop any date directory whose mtime is older than the configured
+# window. Empty parent date directories are then removed.
+if [ "$RETENTION_DAYS" -gt 0 ] 2>/dev/null; then
+  find "$BACKUP_ROOT" -mindepth 2 -maxdepth 2 -type d -mtime "+$RETENTION_DAYS" -exec rm -rf {} + 2>/dev/null || true
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -empty -delete 2>/dev/null || true
+fi
+
+echo "==> backup complete: $run_dir"

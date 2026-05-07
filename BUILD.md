@@ -2,7 +2,7 @@
 
 Active build manual for Ideal Magic. Reading this plus `AGENTS.md` and `README.md` is enough context to ship.
 
-Last updated: 2026-05-07 (Slice 9 - public deck + analysis share links)
+Last updated: 2026-05-07 (Slice 9 closed - pg_dump backups + Scryfall refresh runbook)
 
 ## How agents work this file
 
@@ -56,7 +56,7 @@ These don't move:
 
 ## Phase Status Summary
 
-Slice 9 is mostly shipped: deck pages now offer plain-text/CSV/JSON decklist downloads and Markdown/JSON deterministic-analysis downloads; the JSON account export covers collection cards + import history, game-night players/decks/seats/results, and matchup notes; and decks now have opt-in revocable share tokens that expose a read-only public deck page (`/d/:token`) plus matching token-gated decklist and analysis downloads, with playgroup notes, AI runs, performance, and collection data deliberately withheld. The `pg_dump` + restore-drill operator runbook and the Scryfall refresh runbook are still open. Slice 8 remains delivered: PWA shell + update banner, mobile bottom nav, deck-index filters, and the global "offline pause" banner that disables submit on every mutating form.
+Slice 9 is closed: deck pages offer plain-text/CSV/JSON decklist downloads and Markdown/JSON deterministic-analysis downloads; the JSON account export covers collection cards + import history, game-night players/decks/seats/results, and matchup notes; decks have opt-in revocable share tokens that expose a read-only public deck page (`/d/:token`) plus matching token-gated decklist and analysis downloads (with playgroup notes, AI runs, performance, and collection data deliberately withheld); `bin/backup_db` + `bin/restore_db_drill` plus the canonical `config/systemd/ideal-magic-backup.{service,timer}` units now drive daily `pg_dump` backups for all four production databases with a documented restore drill at `docs/runbooks/postgres-backups.md`; and the daily Scryfall card-corpus refresh job has an operator runbook at `docs/runbooks/scryfall-corpus-refresh.md`. Slice 8 remains delivered: PWA shell + update banner, mobile bottom nav, deck-index filters, and the global "offline pause" banner that disables submit on every mutating form.
 
 ## Current Repo Truth
 
@@ -220,8 +220,8 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 - [x] Analysis export to Markdown and JSON. (`Decks::AnalysisExporter` + `DeckAnalysisExportsController` route at `GET /decks/:id/analysis.{markdown,json}`; markdown variant covers the bracket headline, sub-band scores, restrictions, legality, and suggestions; JSON variant ships the full payload with the latest deterministic run.)
 - [x] Public deck and analysis share links with opt-in revocation; safe defaults (no playgroup notes leak). (`decks.share_token`/`shared_at`/`share_revoked_at`, `DeckSharesController` POST/DELETE, `PublicDecksController` at `GET /d/:token` plus `GET /d/:token/export.{text,csv,json}` and `GET /d/:token/analysis.{markdown,json}`. The public page renders decklist + deterministic analysis + bracket + legality + suggestions only — AI runs, performance, collection fit, and matchup notes stay private.)
 - [x] Extend account export to cover collection, sessions, and matchup notes once those slices land. (`Accounts::Exporter` schema bumped to v2; payload now carries collection cards + import history, game-night players/decks/seats/results, and matchup notes; export audit metadata records the new counts.)
-- [ ] PostgreSQL `pg_dump` backup script + scheduled timer + a documented restore drill.
-- [ ] Operator runbook for the daily Scryfall corpus refresh job.
+- [x] PostgreSQL `pg_dump` backup script + scheduled timer + a documented restore drill. (`bin/backup_db` dumps all four production databases under `$BACKUP_ROOT` with custom-format pg_dump, sha256 manifest, and date-keyed retention; `bin/restore_db_drill` re-checks sha256 and pg_restores into a throwaway database; `config/systemd/ideal-magic-backup.{service,timer}` ship the canonical 03:30 UTC daily timer; `docs/runbooks/postgres-backups.md` covers install, manual run, restore-for-real, and failure modes.)
+- [x] Operator runbook for the daily Scryfall corpus refresh job. (`docs/runbooks/scryfall-corpus-refresh.md` documents the 10:30 UTC `Scryfall::CardCorpusRefreshJob` schedule, manual `perform_now`/`perform_later` flow, monitoring via `card_corpus_refreshes`, retry/backoff behavior, and the deliberately-separate Commander legality-snapshot import.)
 
 ---
 
@@ -229,6 +229,7 @@ The v1 differentiator. Build it on top of deterministic analysis, not as a repla
 
 Newest first. One line per shipped tranche.
 
+- 2026-05-07 — Slice 9 closed: daily `pg_dump` backups via `bin/backup_db` (custom-format dumps + sha256 manifest + date-keyed retention) wired through `config/systemd/ideal-magic-backup.{service,timer}` at 03:30 UTC, restore drill (`bin/restore_db_drill`) verifies manifest sha256 and pg_restores into a throwaway database, and operator runbooks for both PostgreSQL backups (`docs/runbooks/postgres-backups.md`) and the daily Scryfall corpus refresh (`docs/runbooks/scryfall-corpus-refresh.md`) ship in-tree, with `docs/deployment.md` updated to point at them.
 - 2026-05-07 — Slice 9 public deck + analysis share links: decks gain opt-in revocable share tokens (`share_token` / `shared_at` / `share_revoked_at`) issued + revoked through `DeckSharesController`, the deck show page surfaces the public URL with explicit "playgroup notes stay private" copy, and `PublicDecksController` exposes the read-only deck page at `GET /d/:token` plus token-gated `export.{text,csv,json}` and `analysis.{markdown,json}` downloads — public surface intentionally omits AI runs, table performance, collection fit, matchup notes, and audit history.
 - 2026-05-07 — Slice 9 deck + analysis exports and broader account export: deck show page surfaces plain-text/CSV/JSON decklist and Markdown/JSON deterministic-analysis downloads via `Decks::Exporter` + `Decks::AnalysisExporter` and dedicated controllers; account export bumps to schema v2 with collection cards + import history, game-night players/decks/seats/results, and matchup notes; export audit metadata records the new counts; `csv` added to the Gemfile (Ruby 4.0 no longer ships it as a default gem) and a `text/markdown` MIME type registered.
 - 2026-05-07 — Slice 8 mobile nav + filters + honest offline UX: fixed five-up mobile bottom nav for authenticated users (Decks/Pods/Sessions/Journal/Collection) with active-section highlighting via `ApplicationController#mobile_nav_section`, deck index gains search-by-name/commander plus bracket and status filters, and a global `offline` Stimulus controller surfaces a "nothing has reached the server yet" banner and disables `[type=submit]` inside `form[data-offline-disable]` across deck import, AI evaluation, pod creation, session creation/seating/result, matchup-note CRUD, and collection forms.

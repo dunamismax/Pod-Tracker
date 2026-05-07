@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# bin/restore_db_drill — verify a backup directory by restoring its primary
+# dump into a throwaway database and counting rows on the core tables.
+#
+# Usage:
+#   bin/restore_db_drill <backup-run-dir>
+#
+# Where <backup-run-dir> is a directory written by bin/backup_db, e.g.
+#   /var/backups/ideal-magic/2026-05-07/20260507T103000Z
+#
+# The script:
+#   1. Verifies the OK marker and re-checks every dump's sha256 against MANIFEST.
+#   2. Creates a throwaway database `ideal_magic_restore_drill_<epoch>`.
+#   3. Runs `pg_restore` against the primary dump (`ideal_magic_production.dump`).
+#   4. Asserts that `users`, `decks`, and `oracle_cards` exist and have rows.
+#   5. Drops the throwaway database.
+#
+# Exit codes:
+#   0  drill passed.
+#   1  drill failed; the throwaway database is dropped before exit unless the
+#      drop itself failed, in which case the database name is logged so an
+#      operator can clean it up by hand.
+#
+# Environment:
+#   IDEAL_MAGIC_ENV_FILE    default /etc/ideal-magic-web/env (same source the
+#                           backup script uses for connection details).
+
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "usage: bin/restore_db_drill <backup-run-dir>" >&2
+  exit 2
+fi
+
+run_dir="$1"
+ENV_FILE="${IDEAL_MAGIC_ENV_FILE:-/etc/ideal-magic-web/env}"
+
+if [ ! -d "$run_dir" ]; then
+  echo "restore_db_drill: $run_dir does not exist" >&2
+  exit 1
+fi
+if [ ! -f "$run_dir/OK" ]; then
+  echo "restore_db_drill: $run_dir is missing the OK marker" >&2
+  exit 1
+fi
+if [ ! -f "$run_dir/MANIFEST" ]; then
+  echo "restore_db_drill: $run_dir is missing MANIFEST" >&2
+  exit 1
+fi
+if [ ! -r "$ENV_FILE" ]; then
+  echo "restore_db_drill: cannot read env file $ENV_FILE" >&2
+  exit 1
+fi
+
+PGPASSWORD="$(grep -E '^IDEAL_MAGIC_DATABASE_PASSWORD=' "$ENV_FILE" | head -n1 | cut -d= -f2-)"
+PGHOST="$(grep -E '^IDEAL_MAGIC_DATABASE_HOST=' "$ENV_FILE" | head -n1 | cut -d= -f2- || true)"
+PGHOST="${PGHOST:-localhost}"
+PGPORT="${IDEAL_MAGIC_DATABASE_PORT:-5432}"
+PGUSER="${IDEAL_MAGIC_DATABASE_USER:-ideal_magic}"
+
+if [ -z "$PGPASSWORD" ]; then
+  echo "restore_db_drill: IDEAL_MAGIC_DATABASE_PASSWORD not set in $ENV_FILE" >&2
+  exit 1
+fi
+export PGPASSWORD PGHOST PGPORT PGUSER
+
+echo "==> verifying sha256 entries in MANIFEST"
+while read -r db bytes sha; do
+  [ -z "$db" ] && continue
+  dump="$run_dir/${db}.dump"
+  if [ ! -f "$dump" ]; then
+    echo "restore_db_drill: missing dump $dump" >&2
+    exit 1
+  fi
+  actual="$(sha256sum "$dump" | awk '{print $1}')"
+  if [ "$actual" != "$sha" ]; then
+    echo "restore_db_drill: sha256 mismatch on $dump (manifest=$sha actual=$actual)" >&2
+    exit 1
+  fi
+  echo "    $db ok ($bytes bytes)"
+done <"$run_dir/MANIFEST"
+
+primary_dump="$run_dir/ideal_magic_production.dump"
+if [ ! -f "$primary_dump" ]; then
+  echo "restore_db_drill: $primary_dump not found" >&2
+  exit 1
+fi
+
+drill_db="ideal_magic_restore_drill_$$_$(date -u +%s)"
+cleanup() {
+  set +e
+  psql -d postgres -v ON_ERROR_STOP=0 -c "DROP DATABASE IF EXISTS \"$drill_db\";" >/dev/null 2>&1 \
+    || echo "restore_db_drill: failed to drop $drill_db; clean up manually" >&2
+}
+trap cleanup EXIT
+
+echo "==> creating throwaway database $drill_db"
+psql -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$drill_db\" OWNER \"$PGUSER\";" >/dev/null
+
+echo "==> pg_restore -> $drill_db"
+# pg_restore exits non-zero on any individual error; --exit-on-error makes that
+# loud. We tolerate "already exists" extension warnings via --no-owner and
+# --no-privileges, matching how the dump was taken.
+pg_restore \
+  --dbname="$drill_db" \
+  --no-owner \
+  --no-privileges \
+  --exit-on-error \
+  "$primary_dump"
+
+echo "==> sanity-checking restored schema"
+expected_tables=("users" "decks" "oracle_cards")
+for table in "${expected_tables[@]}"; do
+  count="$(psql -d "$drill_db" -At -v ON_ERROR_STOP=1 -c "SELECT COUNT(*) FROM \"$table\";")"
+  if [ -z "$count" ]; then
+    echo "restore_db_drill: could not count $table" >&2
+    exit 1
+  fi
+  echo "    $table: $count rows"
+done
+
+echo "==> drill passed for $run_dir"

@@ -107,14 +107,13 @@ The current production environment was bootstrapped roughly as follows; capture 
 
 ## Backups and restore
 
-Not yet implemented. Tracked in `BUILD.md` Slice 8. What is needed before public traffic:
+Daily `pg_dump` backups of all four production databases run from a systemd timer. The script (`bin/backup_db`), the matching restore-verification drill (`bin/restore_db_drill`), and the canonical service + timer files (`config/systemd/ideal-magic-backup.{service,timer}`) ship in-tree. Operator runbook with install steps, schedule, retention, manual-run flow, restore-for-real procedure, and failure modes lives at [docs/runbooks/postgres-backups.md](runbooks/postgres-backups.md).
 
-- `pg_dump` of all four production databases on a systemd timer.
-- Active Storage blob backup once user uploads exist as durable product data.
-- A restore script exercised against a fresh database cluster.
-- Off-host copy of `config/master.key` and `/etc/ideal-magic-web/env`.
+Off-host copies of run directories, plus out-of-band copies of `config/master.key` and `/etc/ideal-magic-web/env`, are intentionally _not_ wired into the timer — choosing the destination commits a long-lived secret to the production host. The runbook covers the trade-offs.
 
-Backups are not complete until restore has been tested.
+Active Storage blob backup is not yet relevant: there are no user uploads in v1. Revisit when uploads land.
+
+Backups are not complete until restore has been tested. Run `bin/restore_db_drill` quarterly even if nothing changed.
 
 ## Health checks
 
@@ -133,3 +132,7 @@ When the worker eventually needs to leave Puma (or the Codex App Server runtime 
 4. Add a matching `NOPASSWD` entry to `/etc/sudoers.d/ideal-magic-web` and extend `bin/redeploy` to restart the new unit alongside the web one.
 
 Resist the urge to bring in Docker Compose just to add one process.
+
+## Scheduled jobs
+
+The daily Scryfall card-corpus refresh runs in-Puma via Solid Queue's recurring schedule (`config/recurring.yml`). Operator runbook — schedule, manual run, monitoring, failure modes, and the relationship to the legality snapshot — lives at [docs/runbooks/scryfall-corpus-refresh.md](runbooks/scryfall-corpus-refresh.md).

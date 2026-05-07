@@ -71,6 +71,8 @@ Build sequencing and current repo truth live in [BUILD.md](BUILD.md). Operationa
 - [docs/provider-integrations.md](docs/provider-integrations.md) — which deck and collection sources are supported and why.
 - [docs/security.md](docs/security.md) — auth, secret handling, privacy, and fan-content boundaries.
 - [docs/deployment.md](docs/deployment.md) — the intended self-hosted deployment shape.
+- [docs/runbooks/postgres-backups.md](docs/runbooks/postgres-backups.md) — daily `pg_dump` backups, retention, and the restore drill.
+- [docs/runbooks/scryfall-corpus-refresh.md](docs/runbooks/scryfall-corpus-refresh.md) — the daily Scryfall card-corpus refresh job.
 - [BUILD.md](BUILD.md) — active build execution manual.
 - [AGENTS.md](AGENTS.md) — repo-local operating rules for contributors.
 
