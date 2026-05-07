@@ -70,8 +70,27 @@
     </div>
   <% end %>
 
-  <% if @scorecard.present? %>
+  <% if @ai_evaluation.present? %>
+    <%= render "ai_analysis", evaluation: @ai_evaluation, legality: @legality, recommendations: @recommendations %>
+
+    <details class="rounded-lg border border-zinc-800 bg-zinc-900/40">
+      <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-zinc-300">
+        Show preliminary deterministic read
+        <span class="ml-2 text-xs text-zinc-500">(used before AI evaluation; AI is now authoritative)</span>
+      </summary>
+      <div class="border-t border-zinc-800 p-4">
+        <% if @scorecard.present? %>
+          <%= render "analysis", scorecard: @scorecard, run: @analysis_run, legality: @legality, recommendations: @scorecard.improvement_suggestions %>
+        <% else %>
+          <p class="text-sm text-zinc-400">No deterministic run is recorded.</p>
+        <% end %>
+      </div>
+    </details>
+  <% elsif @scorecard.present? %>
     <%= render "analysis", scorecard: @scorecard, run: @analysis_run, legality: @legality, recommendations: @recommendations %>
+    <p class="text-xs text-zinc-500">
+      This is a preliminary deterministic read. Run the AI evaluation below for a deeper, deckcheck-style review that scores this deck against the official Commander Brackets and rewrites these numbers.
+    </p>
   <% else %>
     <div class="rounded-md border border-zinc-800 bg-zinc-900 p-4 text-sm text-zinc-300">
       Deterministic analysis has not run for this deck yet.
@@ -82,7 +101,9 @@
       run: @ai_run,
       enqueue_path: deck_ai_evaluation_path(@deck),
       title: "AI deck evaluation",
-      target_label: "deck" %>
+      target_label: "deck",
+      codex_account: @codex_account,
+      authoritative: true %>
 
   <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
     <div class="flex flex-wrap items-baseline justify-between gap-3">

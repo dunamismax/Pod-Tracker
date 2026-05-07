@@ -13,7 +13,7 @@ module Codex
       @library = Decks::FixtureLibrary.new
     end
 
-    test "deck prompt packages deterministic facts, decklist, rubric, and response schema" do
+    test "deck prompt packages bracket briefing, decklist, deterministic signals, and v2 schema" do
       deck = @library.build_deck("high_power_najeela_5c", user: @user)
       deck.save!
       run = Decks::Analyzer.run(deck, user: @user)
@@ -21,37 +21,42 @@ module Codex
       payload = DeckEvaluationPrompt.new.call(deck, analysis_run: run)
 
       assert_equal DeckEvaluationPrompt::PROMPT_VERSION, payload["prompt_version"]
-      assert_equal ScorecardResponseSchema::VERSION, payload["schema_version"]
-      assert_equal ScorecardResponseSchema::VERSION, payload.dig("response_schema", "properties", "schema_version", "const")
+      assert_equal DeckEvaluationSchema::VERSION, payload["schema_version"]
+      assert_equal DeckEvaluationSchema::VERSION, payload.dig("response_schema", "properties", "schema_version", "const")
       assert_equal deck.name, payload.dig("input", "deck", "name")
       assert_equal deck.deck_cards.where(board: %w[commander main]).count, payload.dig("input", "deck", "cards").size
 
-      fact_ids = payload.dig("input", "deterministic_facts").map { |fact| fact["id"] }
-      assert_includes fact_ids, "fact.score.power"
-      assert_includes fact_ids, "fact.bracket.combo_pairs"
-      assert_includes fact_ids, "fact.features.roles"
+      context = payload.dig("input", "context")
+      assert_equal BracketBriefing::BRACKETS_VERSION, context["version"]
+      assert_equal 5, Array(context["brackets"]).size
+      assert_includes Array(context.dig("game_changers", "cards")).map { |c| c["name"] }, "Demonic Tutor"
+      assert_includes Array(context.dig("banlist", "banned_names")), "Mana Crypt"
+
+      assert_equal "commander", payload.dig("input", "deck", "format")
+      assert payload.dig("input", "deterministic_signals", "available")
 
       user_message = payload["messages"].last.fetch("content")
       parsed = JSON.parse(user_message)
       assert_equal payload["input"], parsed
     end
 
-    test "recorded response fixture only references fact ids the deck prompt can provide" do
+    test "deck prompt builds even when the deck has no deterministic run yet" do
       deck = @library.build_deck("high_power_najeela_5c", user: @user)
       deck.save!
-      run = Decks::Analyzer.run(deck, user: @user)
-      prompt = DeckEvaluationPrompt.new.call(deck, analysis_run: run)
-      fact_ids = prompt.dig("input", "deterministic_facts").map { |fact| fact["id"] }
-      response = ScorecardResponseValidator.new.validate!(
-        JSON.parse(file_fixture("codex_scorecard_response_v1.json").read)
-      )
 
-      refs = response.fetch("adjustments").values.flat_map { |entry| entry.fetch("deterministic_fact_refs") }
-      refs += response.fetch("friction_drivers").flat_map { |entry| entry.fetch("deterministic_fact_refs") }
-      refs += response.fetch("rule_zero_talking_points").flat_map { |entry| entry.fetch("deterministic_fact_refs") }
-      refs += response.fetch("recommendations").flat_map { |entry| entry.fetch("deterministic_fact_refs") }
+      payload = DeckEvaluationPrompt.new.call(deck, analysis_run: nil)
 
-      assert_empty refs.uniq - fact_ids
+      assert_equal DeckEvaluationSchema::VERSION, payload["schema_version"]
+      assert_equal false, payload.dig("input", "deterministic_signals", "available")
+    end
+
+    test "recorded v2 deck-evaluation fixture validates against the deck schema" do
+      payload = JSON.parse(file_fixture("codex_deck_evaluation_response_v2.json").read)
+      result = DeckEvaluationValidator.new.validate(payload)
+
+      assert result.valid?, result.errors.join("\n")
+      assert_equal 4, result.payload.dig("bracket", "value")
+      assert_equal 6, result.payload.dig("axes").size
     end
 
     test "pod prompt packages pod snapshot and pod-aware fact ids" do

@@ -85,7 +85,7 @@ module Codex
       )
 
       result = @client.evaluate_scorecard(prompt, model: model_for(analysis_run))
-      validated = ScorecardResponseValidator.new.validate!(extract_json_payload(result.fetch("text")))
+      validated = validator_for(analysis_run).validate!(extract_json_payload(result.fetch("text")))
       analysis_run.update!(
         ai_model: result["model"].presence || analysis_run.ai_model.presence || DEFAULT_MODEL_LABEL,
         ai_response_snapshot: {
@@ -100,7 +100,7 @@ module Codex
       )
       analysis_run.mark_succeeded!(now: now, codex_rate_limit_snapshot: analysis_run.codex_rate_limit_snapshot)
       analysis_run
-    rescue ScorecardResponseValidator::InvalidResponse => error
+    rescue ScorecardResponseValidator::InvalidResponse, DeckEvaluationValidator::InvalidResponse => error
       analysis_run.mark_failed!(code: "invalid_ai_response", message: error.message, now: now)
       analysis_run
     rescue AppServerClient::Error => error
@@ -130,6 +130,10 @@ module Codex
       else
         PodEvaluationPrompt.new.call(run.pod)
       end
+    end
+
+    def validator_for(run)
+      run.deck ? DeckEvaluationValidator.new : ScorecardResponseValidator.new
     end
 
     def extract_json_payload(text)

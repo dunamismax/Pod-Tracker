@@ -1,0 +1,121 @@
+{
+  "schema_version": "deck-evaluation-v2",
+  "summary": "Najeela 5C is a tuned high-power Bracket 4 deck. Fast mana, instant-speed tutors, and a combat-focused win loop allow it to threaten lethal as early as turn 4 without committing the whole hand. Multiple Game Changers and chained extra turns keep it firmly out of Bracket 3.",
+  "bracket": {
+    "value": 4,
+    "label": "Optimized",
+    "sub_band": "high",
+    "expected_min_turn": null,
+    "headline": "Bracket 4 (Optimized) — high band",
+    "tagline": "High-power non-cEDH. Fast mana plus chained extra turns plus tutors.",
+    "restrictions": [
+      {
+        "label": "Game Changers",
+        "status": "any_allowed",
+        "detail": "Bracket 4 permits any number of Game Changers. The deck runs 5 detected GCs.",
+        "evidence": ["Mana Vault", "Demonic Tutor", "Vampiric Tutor"]
+      },
+      {
+        "label": "Mass land denial",
+        "status": "absent",
+        "detail": "No Armageddon, Cataclysm, Winter Orb, etc. detected in the decklist.",
+        "evidence": []
+      },
+      {
+        "label": "Extra turns",
+        "status": "present_allowed",
+        "detail": "Najeela's activated ability creates chained extra combats; not extra turns by Wizards' definition but operationally similar.",
+        "evidence": ["Najeela, the Blade-Blossom"]
+      },
+      {
+        "label": "Two-card combo",
+        "status": "present_allowed",
+        "detail": "Najeela + any free combat enabler can chain into lethal in one turn cycle.",
+        "evidence": ["Najeela, the Blade-Blossom", "Cryptolith Rite"]
+      }
+    ],
+    "game_changers": [
+      { "name": "Mana Vault", "category": "fast_mana" },
+      { "name": "Demonic Tutor", "category": "tutor" },
+      { "name": "Vampiric Tutor", "category": "tutor" },
+      { "name": "Force of Will", "category": "protection" },
+      { "name": "Cyclonic Rift", "category": "reset" }
+    ],
+    "evidence": [
+      "Najeela commander shell with chained combats",
+      "Five Game Changers in the 99",
+      "Tutored mana base across 5 colors"
+    ],
+    "uncertainty": []
+  },
+  "axes": {
+    "power": {
+      "value": 8,
+      "rationale": "Wins through prepared interaction with tutored answers and a fast combat win.",
+      "evidence": ["Najeela, the Blade-Blossom", "Demonic Tutor", "Cryptolith Rite"],
+      "uncertainty": []
+    },
+    "speed": {
+      "value": 8,
+      "rationale": "Fast mana plus tutors compress goldfish time to turn 4 reliably.",
+      "evidence": ["Mana Vault", "Mox Diamond", "Vampiric Tutor"],
+      "uncertainty": []
+    },
+    "interaction": {
+      "value": 7,
+      "rationale": "Free counterspells and instant removal protect the combo turn.",
+      "evidence": ["Force of Will", "Cyclonic Rift"],
+      "uncertainty": []
+    },
+    "consistency": {
+      "value": 8,
+      "rationale": "Black tutor suite finds Najeela's combat enablers reliably.",
+      "evidence": ["Demonic Tutor", "Vampiric Tutor"],
+      "uncertainty": []
+    },
+    "salt": {
+      "value": 6,
+      "rationale": "Chained combats and a single-turn kill produce a long solo turn.",
+      "evidence": ["Najeela, the Blade-Blossom"],
+      "uncertainty": []
+    },
+    "social_friction": {
+      "value": 7,
+      "rationale": "Pod needs alignment on combo timing and chained-combat etiquette.",
+      "evidence": ["Najeela, the Blade-Blossom", "Cryptolith Rite"],
+      "uncertainty": []
+    }
+  },
+  "friction_drivers": [
+    {
+      "label": "Single-turn combo finish",
+      "severity": "high",
+      "explanation": "Najeela activations cascade into a one-turn lethal once Cryptolith Rite or similar is resolved.",
+      "evidence": ["Najeela, the Blade-Blossom", "Cryptolith Rite"]
+    }
+  ],
+  "rule_zero_talking_points": [
+    {
+      "topic": "Combo timing",
+      "prompt": "Najeela can win in one big turn after a free-combat enabler. Agree on whether that closing speed fits the pod."
+    },
+    {
+      "topic": "Game Changers count",
+      "prompt": "Five Game Changers; pod should know that going in."
+    }
+  ],
+  "recommendations": [
+    {
+      "category": "rule_zero",
+      "title": "Disclose combo enabler turn",
+      "detail": "Lead Rule 0 by naming Cryptolith Rite / Druids' Repository as the combat enabler.",
+      "owned_collection_relevance": "not_applicable"
+    },
+    {
+      "category": "tuning",
+      "title": "Add a second wipe answer",
+      "detail": "A second instant-speed wipe answer (e.g. Veil of Summer) would tighten resilience.",
+      "owned_collection_relevance": "unknown"
+    }
+  ]
+}

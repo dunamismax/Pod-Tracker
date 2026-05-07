@@ -169,6 +169,46 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
     clear_enqueued_jobs
   end
 
+  test "shows the connect-codex CTA when no codex account is linked" do
+    sign_in_as(@user)
+    deck = create_deck_for(@user)
+    create_analysis_for(deck)
+
+    get deck_path(deck)
+
+    assert_response :success
+    assert_select "a", text: /Connect ChatGPT/
+  end
+
+  test "AI evaluation becomes authoritative on the deck page once a v2 run succeeds" do
+    sign_in_as(@user)
+    connect_codex_account!
+    deck = create_deck_for(@user)
+    create_analysis_for(deck)
+
+    payload = JSON.parse(file_fixture("codex_deck_evaluation_response_v2.json").read)
+    deck.analysis_runs.create!(
+      user: @user,
+      kind: "ai",
+      status: "succeeded",
+      rubric_version: Codex::DeckEvaluationSchema::VERSION,
+      prompt_version: Codex::DeckEvaluationPrompt::PROMPT_VERSION,
+      ai_model: "codex-test",
+      queued_at: 5.minutes.ago,
+      started_at: 4.minutes.ago,
+      completed_at: 3.minutes.ago,
+      ai_response_snapshot: { "validated_response" => payload }
+    )
+
+    get deck_path(deck)
+
+    assert_response :success
+    assert_select "[data-testid='ai-deck-analysis']"
+    assert_select "h2", text: /AI deck evaluation/
+    assert_match(/Bracket 4/, response.body)
+    assert_select "summary", text: /Show preliminary deterministic read/
+  end
+
   test "cannot view another user's deck" do
     sign_in_as(@user)
     other_deck = create_deck_for(users(:two))

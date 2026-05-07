@@ -1,0 +1,289 @@
+<%
+  evaluation ||= nil
+  legality ||= nil
+  recommendations ||= evaluation&.recommendations
+  raise "ai_analysis partial requires evaluation" if evaluation.nil?
+
+  bracket_color = {
+    1 => "border-sky-700 bg-sky-950/40 text-sky-100",
+    2 => "border-emerald-700 bg-emerald-950/40 text-emerald-100",
+    3 => "border-amber-700 bg-amber-950/40 text-amber-100",
+    4 => "border-orange-700 bg-orange-950/40 text-orange-100",
+    5 => "border-rose-700 bg-rose-950/40 text-rose-100"
+  }[evaluation.bracket_value]
+
+  axis_specs = [
+    { key: "power", label: "Power" },
+    { key: "speed", label: "Speed" },
+    { key: "interaction", label: "Interaction" },
+    { key: "consistency", label: "Consistency" },
+    { key: "salt", label: "Salt" },
+    { key: "social_friction", label: "Social friction" }
+  ]
+%>
+
+<section class="space-y-4" data-testid="ai-deck-analysis">
+  <header class="flex flex-wrap items-baseline justify-between gap-3">
+    <div>
+      <h2 class="text-lg font-medium text-white">AI deck evaluation</h2>
+      <p class="mt-1 text-xs text-zinc-500">
+        Evaluated by Codex against the official Commander Brackets, the canonical Game Changers list, and the current Commander banlist.
+        <% if evaluation.prompt_version.present? %>
+          · Prompt <code class="font-mono"><%= evaluation.prompt_version %></code>
+        <% end %>
+        <% if evaluation.model.present? %>
+          · Model <code class="font-mono"><%= evaluation.model %></code>
+        <% end %>
+        <% if evaluation.completed_at.present? %>
+          · Completed <%= time_ago_in_words(evaluation.completed_at) %> ago
+        <% end %>
+        <% if evaluation.stale? %>
+          · <span class="text-amber-300">Stale after deterministic changes</span>
+        <% end %>
+      </p>
+    </div>
+  </header>
+
+  <% if evaluation.bracket_value.present? %>
+    <article class="rounded-lg border <%= bracket_color %> p-5">
+      <header class="flex flex-wrap items-baseline justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase tracking-wide opacity-80">Commander Brackets · AI placement</p>
+          <h3 class="mt-1 text-2xl font-semibold">
+            <%= evaluation.bracket_headline.presence || "Bracket #{evaluation.bracket_value}" %>
+          </h3>
+          <% if evaluation.bracket_tagline.present? %>
+            <p class="mt-1 text-sm opacity-90"><%= evaluation.bracket_tagline %></p>
+          <% end %>
+        </div>
+        <div class="text-right text-sm">
+          <p class="text-xs uppercase tracking-wide opacity-80">Sub-band</p>
+          <p class="mt-1 font-mono text-base"><%= evaluation.bracket_sub_band&.capitalize || "—" %></p>
+          <% if evaluation.expected_min_turn.present? %>
+            <p class="mt-1 text-xs opacity-80">Expected min turns: <%= evaluation.expected_min_turn %>+</p>
+          <% else %>
+            <p class="mt-1 text-xs opacity-80">Any-turn wins permitted</p>
+          <% end %>
+        </div>
+      </header>
+
+      <%= link_to "What does Bracket #{evaluation.bracket_value} mean?",
+          "/brackets##{evaluation.bracket_label.to_s.parameterize}",
+          class: "mt-3 inline-block text-xs underline opacity-90 hover:opacity-100" %>
+
+      <% if evaluation.summary.present? %>
+        <p class="mt-4 text-sm leading-relaxed"><%= evaluation.summary %></p>
+      <% end %>
+
+      <% if evaluation.bracket_evidence.any? %>
+        <ul class="mt-4 space-y-1 text-sm opacity-90">
+          <% evaluation.bracket_evidence.each do |line| %>
+            <li class="flex gap-2"><span class="opacity-60">·</span><span><%= line %></span></li>
+          <% end %>
+        </ul>
+      <% end %>
+
+      <% if evaluation.restrictions.any? %>
+        <div class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+          <% evaluation.restrictions.each do |r| %>
+            <%
+              status = r["status"].to_s
+              status_label = {
+                "ok" => "OK",
+                "ok_singleton" => "OK · single",
+                "absent" => "—",
+                "any_allowed" => "Any allowed",
+                "present_allowed" => "Present (allowed)",
+                "violation" => "Violation"
+              }[status] || status.humanize
+              status_color = case status
+              when "violation" then "text-rose-300"
+              when "ok", "absent", "ok_singleton", "any_allowed", "present_allowed" then "text-emerald-300"
+              else "text-zinc-300"
+              end
+            %>
+            <div class="rounded border border-zinc-800/60 bg-zinc-900/40 p-3">
+              <div class="flex items-baseline justify-between gap-2">
+                <p class="font-medium"><%= r["label"] %></p>
+                <p class="text-xs <%= status_color %> font-mono uppercase tracking-wide"><%= status_label %></p>
+              </div>
+              <p class="mt-1 text-xs opacity-80"><%= r["detail"] %></p>
+              <% if Array(r["evidence"]).any? %>
+                <p class="mt-1 text-xs opacity-70"><%= Array(r["evidence"]).join(", ") %></p>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <% if evaluation.game_changers.any? %>
+        <div class="mt-4">
+          <p class="text-xs uppercase tracking-wide opacity-80">Game Changers in this deck (<%= evaluation.game_changers.size %>)</p>
+          <ul class="mt-1 flex flex-wrap gap-2 text-xs">
+            <% evaluation.game_changers.each do |gc| %>
+              <li class="rounded-full bg-zinc-900/60 px-2.5 py-1 font-mono">
+                <%= gc["name"] %>
+                <% if gc["category"].present? %>
+                  <span class="opacity-60">· <%= gc["category"]&.humanize&.downcase %></span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <% if evaluation.bracket_uncertainty.any? %>
+        <div class="mt-4 rounded border border-zinc-800/60 bg-zinc-900/30 p-3 text-xs opacity-90">
+          <p class="font-medium uppercase tracking-wide opacity-80">Uncertainty flagged</p>
+          <ul class="mt-1 list-disc pl-5 space-y-1">
+            <% evaluation.bracket_uncertainty.each do |line| %>
+              <li><%= line %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+    </article>
+  <% end %>
+
+  <details class="rounded-lg border border-zinc-800 bg-zinc-900/60" open>
+    <summary class="cursor-pointer list-none px-4 py-3 text-sm font-medium text-white">
+      Sub-band evidence — six-axis scorecard
+      <span class="ml-2 text-xs text-zinc-500">(0–10 axes that place the deck inside its bracket)</span>
+    </summary>
+    <ul class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+      <% axis_specs.each do |spec| %>
+        <% axis = evaluation.axis(spec[:key]) %>
+        <li class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+          <details class="group">
+            <summary class="flex cursor-pointer list-none items-baseline justify-between gap-3">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-zinc-400"><%= spec[:label] %></p>
+                <p class="mt-1 text-2xl font-semibold text-white"><%= axis["value"] || "—" %><span class="text-sm text-zinc-500">/10</span></p>
+              </div>
+              <span class="text-xs text-emerald-300 group-open:hidden">Evidence ▸</span>
+              <span class="text-xs text-emerald-300 hidden group-open:inline">Hide ▾</span>
+            </summary>
+            <% if axis["rationale"].present? %>
+              <p class="mt-2 text-xs text-zinc-300"><%= axis["rationale"] %></p>
+            <% end %>
+            <% if Array(axis["evidence"]).any? %>
+              <ul class="mt-2 space-y-1 text-xs text-zinc-400">
+                <% Array(axis["evidence"]).each do |line| %>
+                  <li class="flex gap-2"><span class="text-zinc-600">·</span><span><%= line %></span></li>
+                <% end %>
+              </ul>
+            <% end %>
+            <% if Array(axis["uncertainty"]).any? %>
+              <p class="mt-2 text-xs text-amber-300/80">
+                Uncertain: <%= Array(axis["uncertainty"]).join("; ") %>
+              </p>
+            <% end %>
+          </details>
+        </li>
+      <% end %>
+    </ul>
+  </details>
+
+  <% if legality.present? %>
+    <% issues = Array(legality["issues"]) %>
+    <% legal = legality["legal"] %>
+    <div class="rounded-lg border <%= legal ? 'border-emerald-800 bg-emerald-950/30' : 'border-amber-800 bg-amber-950/30' %> p-4 text-sm">
+      <p class="font-medium <%= legal ? 'text-emerald-200' : 'text-amber-200' %>">
+        Commander legality:
+        <%= legal ? "Legal" : "Issues found" %>
+      </p>
+      <p class="mt-1 text-xs text-zinc-400">Legality remains source-backed deterministic; the AI does not adjudicate banned cards.</p>
+      <% if legality["snapshot_effective_on"].present? %>
+        <p class="mt-1 text-xs text-zinc-400">
+          Snapshot <%= legality["snapshot_source"] %> · effective <%= legality["snapshot_effective_on"] %>
+        </p>
+      <% end %>
+      <% if issues.any? %>
+        <ul class="mt-3 space-y-1 text-xs">
+          <% issues.first(20).each do |issue| %>
+            <li class="flex gap-2">
+              <span class="font-mono uppercase text-zinc-500"><%= issue["severity"] %></span>
+              <span class="text-zinc-200">
+                <%= issue["message"] %>
+                <% if issue["card_name"].present? %>
+                  <span class="text-zinc-500">(<%= issue["card_name"] %>)</span>
+                <% end %>
+              </span>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if evaluation.legality_review.present? %>
+    <div class="rounded-lg border border-amber-800/60 bg-amber-950/20 p-4 text-sm">
+      <p class="font-medium text-amber-200">AI legality note</p>
+      <p class="mt-1 text-xs text-amber-100/90"><%= evaluation.legality_review["note"] %></p>
+      <% if Array(evaluation.legality_review["flagged_cards"]).any? %>
+        <p class="mt-1 font-mono text-xs text-amber-100/90">
+          Flagged: <%= Array(evaluation.legality_review["flagged_cards"]).join(", ") %>
+        </p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if evaluation.friction_drivers.any? || evaluation.talking_points.any? %>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <% if evaluation.friction_drivers.any? %>
+        <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+          <h3 class="text-sm font-medium text-white">Friction drivers</h3>
+          <ul class="mt-2 space-y-2 text-sm">
+            <% evaluation.friction_drivers.each do |driver| %>
+              <li class="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+                <p class="font-medium text-zinc-100">
+                  <%= driver["label"] %>
+                  <span class="text-xs text-zinc-500">· <%= driver["severity"] %></span>
+                </p>
+                <p class="mt-1 text-xs text-zinc-400"><%= driver["explanation"] %></p>
+                <% if Array(driver["evidence"]).any? %>
+                  <p class="mt-1 text-xs text-zinc-500"><%= Array(driver["evidence"]).join(", ") %></p>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <% if evaluation.talking_points.any? %>
+        <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+          <h3 class="text-sm font-medium text-white">Rule 0 talking points</h3>
+          <ul class="mt-2 space-y-2 text-sm">
+            <% evaluation.talking_points.each do |point| %>
+              <li class="rounded-md border border-zinc-800 bg-zinc-950 p-3">
+                <p class="font-medium text-zinc-100"><%= point["topic"] %></p>
+                <p class="mt-1 text-xs text-zinc-400"><%= point["prompt"] %></p>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% recs = Array(recommendations) %>
+  <% if recs.any? %>
+    <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <h3 class="text-sm font-medium text-white">Suggestions</h3>
+      <ul class="mt-2 space-y-2 text-sm text-zinc-200">
+        <% recs.each do |rec| %>
+          <% ownership = rec["ownership"] || {} %>
+          <li class="flex flex-col">
+            <span class="font-medium"><%= rec["title"] %></span>
+            <span class="text-xs text-zinc-400"><%= rec["detail"] %></span>
+            <% if ownership.any? %>
+              <span class="mt-1 text-xs <%= ownership["status"] == "owned_options" ? "text-emerald-300" : "text-amber-300" %>">
+                <%= ownership["label"] %> · <%= ownership["detail"] %>
+              </span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+</section>

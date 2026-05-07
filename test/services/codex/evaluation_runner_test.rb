@@ -40,7 +40,7 @@ module Codex
       run = @deck.latest_ai_run
       assert_equal "queued", run.status
       assert_equal Codex::DeckEvaluationPrompt::PROMPT_VERSION, run.prompt_version
-      assert_equal Codex::ScorecardResponseSchema::VERSION, run.rubric_version
+      assert_equal Codex::DeckEvaluationSchema::VERSION, run.rubric_version
       assert_equal @deck.name, run.ai_request_snapshot.dig("target", "name")
       assert_equal @user.codex_account.rate_limit_snapshot, run.codex_rate_limit_snapshot
       assert_equal Codex::EvaluationRunner::DEFAULT_MODEL_LABEL, run.ai_model
@@ -48,7 +48,7 @@ module Codex
 
     test "run stores validated output, latency, prompt metadata, and rate-limit snapshot" do
       run = Codex::EvaluationRunner.enqueue_deck!(@deck, user: @user)
-      client = FakeEvaluationClient.new(file_fixture("codex_scorecard_response_v1.json").read)
+      client = FakeEvaluationClient.new(file_fixture("codex_deck_evaluation_response_v2.json").read)
 
       Codex::EvaluationRunner.new(client: client, clock: StepClock.new).run!(run)
 
@@ -57,7 +57,7 @@ module Codex
       assert_equal Codex::DeckEvaluationPrompt::PROMPT_VERSION, run.prompt_version
       assert_equal "fake-model", run.ai_model
       assert_operator run.latency_ms, :>, 0
-      assert_match(/directionally right/, run.ai_response_snapshot.dig("validated_response", "summary"))
+      assert_equal 4, run.ai_response_snapshot.dig("validated_response", "bracket", "value")
       assert_equal @deck.name, run.ai_request_snapshot.dig("target", "name")
       assert_equal @user.codex_account.rate_limit_snapshot, run.codex_rate_limit_snapshot
     end

@@ -47,11 +47,14 @@ class DecksController < ApplicationController
     @scorecard = @analysis_run&.scorecard
     @legality = @analysis_run&.deterministic_snapshot&.dig("legality")
     @ai_run = @deck.latest_ai_run
+    @ai_evaluation = Decks::AiEvaluationPresenter.for(@ai_run)
+    @codex_account = current_user.codex_account
     @ownership = Collections::Ownership.for_deck(user: current_user, deck: @deck)
+    base_recommendations = @ai_evaluation&.recommendations.presence || @scorecard&.improvement_suggestions
     @recommendations = Collections::RecommendationOwnership.annotate(
       user: current_user,
       deck: @deck,
-      recommendations: @scorecard&.improvement_suggestions
+      recommendations: base_recommendations
     )
     performance = Meta::PerformanceSummary.for_user(current_user)
     @deck_performance = performance.deck_performance(@deck)

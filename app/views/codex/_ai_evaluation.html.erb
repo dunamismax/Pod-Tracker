@@ -3,7 +3,12 @@
   enqueue_path ||= nil
   title ||= "AI evaluation"
   target_label ||= "analysis"
+  codex_account = local_assigns.fetch(:codex_account, nil)
+  authoritative = local_assigns.fetch(:authoritative, false)
   payload = run&.ai_payload || {}
+  is_deck_v2 = payload["schema_version"] == Codex::DeckEvaluationSchema::VERSION
+
+  # v1 (pod / legacy deck) fields
   adjustments = payload["adjustments"].is_a?(Hash) ? payload["adjustments"] : {}
   drivers = Array(payload["friction_drivers"])
   talking_points = Array(payload["rule_zero_talking_points"])
@@ -16,25 +21,51 @@
     "salt" => "Salt",
     "social_friction" => "Social friction"
   }
+
+  needs_codex = codex_account.nil? || !codex_account.connected?
 %>
 
 <section class="rounded-lg border border-blue-900/70 bg-blue-950/20 p-5" data-testid="ai-evaluation">
   <header class="flex flex-wrap items-start justify-between gap-4">
     <div>
-      <p class="text-xs uppercase tracking-wide text-blue-300">Codex augmentation</p>
+      <p class="text-xs uppercase tracking-wide text-blue-300">Codex evaluation</p>
       <h2 class="mt-1 text-lg font-medium text-white"><%= title %></h2>
       <p class="mt-1 text-sm text-zinc-400">
-        Deterministic scoring stays authoritative. Codex adds cited adjustments, uncertainty, and Rule 0 language.
+        <% if authoritative %>
+          The AI runs the bracket call and the six 0–10 axes. Deterministic numbers are kept as a preliminary read until this evaluation completes.
+        <% else %>
+          Deterministic scoring stays authoritative. Codex adds cited adjustments, uncertainty, and Rule 0 language.
+        <% end %>
       </p>
     </div>
 
-    <% if enqueue_path.present? && (run.nil? || %w[succeeded failed canceled].include?(run.status)) %>
+    <% if needs_codex %>
+      <div class="flex flex-col items-end gap-2 text-right">
+        <%= link_to "Connect ChatGPT / Codex account", new_account_codex_login_path, class: "rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-blue-500" %>
+        <p class="max-w-xs text-xs text-zinc-500">
+          Sign in with your existing ChatGPT subscription through Codex App Server. Ideal Magic never sees your password and never holds OpenAI API keys.
+        </p>
+      </div>
+    <% elsif enqueue_path.present? && (run.nil? || %w[succeeded failed canceled].include?(run.status)) %>
       <%= button_to "Run AI evaluation", enqueue_path, method: :post, form: { data: { offline_disable: true } }, class: "rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-blue-500" %>
     <% end %>
   </header>
 
-  <% if run.nil? %>
-    <p class="mt-4 text-sm text-zinc-400">No AI evaluation has been queued for this <%= target_label %> yet.</p>
+  <% if needs_codex %>
+    <div class="mt-4 rounded-md border border-blue-900/60 bg-blue-950/30 p-4 text-sm text-blue-100">
+      <p class="font-medium">No ChatGPT / Codex account is linked to this Ideal Magic account yet.</p>
+      <p class="mt-1 text-xs text-blue-100/80">
+        AI evaluations of decks and pods run through your own ChatGPT subscription using the documented Codex App Server flow. Connect a ChatGPT account on the
+        <%= link_to "account page", account_path, class: "underline" %>
+        or via the button above to enable AI evaluation.
+      </p>
+    </div>
+  <% elsif run.nil? %>
+    <p class="mt-4 text-sm text-zinc-400">No AI evaluation has been queued for this <%= target_label %> yet.
+      <% if authoritative %>
+        Running it can take a couple of minutes; the page will reflect the AI numbers once it finishes.
+      <% end %>
+    </p>
   <% elsif run.active? %>
     <div class="mt-4 rounded-md border border-blue-800 bg-blue-950/40 p-4 text-sm text-blue-100">
       <p class="font-medium">AI evaluation is <%= run.status %>.</p>
@@ -43,12 +74,27 @@
         <% if run.started_at.present? %>
           · started <%= time_ago_in_words(run.started_at) %> ago
         <% end %>
+        <% if authoritative %>
+          · the AI is reasoning through the deck against the bracket rules, banlist, and Game Changers list. This usually takes 30–120 seconds.
+        <% end %>
       </p>
     </div>
   <% elsif run.status == "failed" %>
     <div class="mt-4 rounded-md border border-rose-800 bg-rose-950/30 p-4 text-sm text-rose-100">
       <p class="font-medium">AI evaluation failed.</p>
       <p class="mt-1 text-xs text-rose-100/80"><%= run.error_message.presence || run.error_code %></p>
+    </div>
+  <% elsif run.status == "succeeded" && is_deck_v2 %>
+    <div class="mt-4 flex flex-wrap gap-2 text-xs">
+      <span class="rounded-md bg-emerald-900/60 px-2.5 py-1 text-emerald-100">AI evaluation is the authoritative read above</span>
+      <span class="rounded-md bg-zinc-900 px-2.5 py-1 text-zinc-300">Prompt <%= run.prompt_version || "unknown" %></span>
+      <span class="rounded-md bg-zinc-900 px-2.5 py-1 text-zinc-300">Model <%= run.ai_model || "unknown" %></span>
+      <% if run.latency_ms.present? %>
+        <span class="rounded-md bg-zinc-900 px-2.5 py-1 text-zinc-300"><%= number_with_delimiter(run.latency_ms) %> ms</span>
+      <% end %>
+      <% if run.stale? %>
+        <span class="rounded-md bg-amber-950 px-2.5 py-1 text-amber-200">Stale — re-run after deterministic changes</span>
+      <% end %>
     </div>
   <% elsif run.status == "succeeded" %>
     <div class="mt-4 flex flex-wrap gap-2 text-xs">
