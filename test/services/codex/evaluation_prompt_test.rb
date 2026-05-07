@@ -32,8 +32,39 @@ module Codex
       assert_includes Array(context.dig("game_changers", "cards")).map { |c| c["name"] }, "Demonic Tutor"
       assert_includes Array(context.dig("banlist", "banned_names")), "Mana Crypt"
 
+      # The axis playbook now carries per-axis evaluate/pitfalls guidance so
+      # the AI has more than just anchor bands to score against.
+      power_axis = Array(context["axes"]).find { |a| a["key"] == "power" }
+      assert power_axis, "axes payload should include the power axis"
+      assert power_axis["evaluate"].is_a?(Array) && power_axis["evaluate"].any?
+      assert power_axis["pitfalls"].is_a?(Array) && power_axis["pitfalls"].any?
+      assert power_axis["evidence_examples"].is_a?(Array) && power_axis["evidence_examples"].any?
+      assert context["axis_invariants"].is_a?(Array) && context["axis_invariants"].any?
+
       assert_equal "commander", payload.dig("input", "deck", "format")
       assert payload.dig("input", "deterministic_signals", "available")
+
+      # The richer card payload should expose name/quantity/board on every
+      # card and (for cards with linked OracleCards in the test DB) carry
+      # oracle text, keywords, color identity, and tag slugs.
+      cards = Array(payload.dig("input", "deck", "cards"))
+      assert cards.all? { |c| c.key?("name") && c.key?("quantity") && c.key?("board") }
+
+      composition = payload.dig("input", "deck", "composition_overview")
+      assert composition.is_a?(Hash)
+      assert composition.key?("land_count")
+      assert composition["mana_value_buckets"].is_a?(Hash)
+      assert composition["type_breakdown"].is_a?(Hash)
+
+      protocol = payload.dig("input", "evaluation_protocol")
+      assert protocol.is_a?(Hash)
+      step_names = Array(protocol["steps"]).map { |s| s["name"] }
+      assert_includes step_names, "Walk the mana base"
+      assert_includes step_names, "Score the six axes against the absolute scale"
+
+      assert payload.dig("input", "evidence_quality_bar").is_a?(Array)
+      assert payload.dig("input", "common_pitfalls").is_a?(Array)
+      assert payload.dig("input", "output_quality_checklist").is_a?(Array)
 
       user_message = payload["messages"].last.fetch("content")
       parsed = JSON.parse(user_message)
@@ -78,6 +109,16 @@ module Codex
       assert payload.dig("input", "deterministic_pod_analysis", "available")
       assert payload.dig("input", "pod", "slots").all? { |slot| Array(slot["cards"]).any? }
       assert_includes payload.dig("input", "response_contract", "rules").join(" "), "pod-level values"
+
+      # Pod prompt v3 enriches each seated deck's cards with oracle text
+      # and Ideal Magic tag slugs so the AI can reason about table fit,
+      # not just commander names. The structural assertions hold even
+      # when test DBs do not link OracleCards.
+      first_slot_cards = Array(payload.dig("input", "pod", "slots", 0, "cards"))
+      assert first_slot_cards.all? { |c| c.key?("name") && c.key?("quantity") }
+      assert_includes Array(payload.dig("input", "evaluation_protocol", "steps")).map { |s| s["name"] },
+                      "Score pod-level axes (absolute 0-10)"
+      assert payload.dig("input", "common_pitfalls").is_a?(Array)
     end
 
     test "recorded v2 pod-evaluation fixture validates against the pod schema" do
