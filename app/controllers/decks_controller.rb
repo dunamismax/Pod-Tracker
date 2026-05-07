@@ -5,7 +5,41 @@ class DecksController < ApplicationController
   before_action :load_deck, only: %i[show destroy]
 
   def index
-    @decks = current_user.decks.order(updated_at: :desc).limit(50)
+    @search = params[:q].to_s.strip
+    @bracket_filter = params[:bracket].to_s.strip
+    @status_filter = params[:status].to_s.strip
+
+    scope = current_user.decks.order(updated_at: :desc)
+
+    if @search.present?
+      pattern = "%#{ActiveRecord::Base.sanitize_sql_like(@search)}%"
+      scope = scope.where(
+        "decks.name ILIKE :pattern OR EXISTS (SELECT 1 FROM unnest(decks.commander_names) AS cn WHERE cn ILIKE :pattern)",
+        pattern: pattern
+      )
+    end
+
+    if Deck::STATUSES.include?(@status_filter)
+      scope = scope.where(status: @status_filter)
+    end
+
+    if (1..5).cover?(@bracket_filter.to_i) && @bracket_filter.to_i.to_s == @bracket_filter
+      bracket = @bracket_filter.to_i
+      scope = scope.where(<<~SQL, bracket: bracket)
+        EXISTS (
+          SELECT 1
+            FROM analysis_runs ar
+            JOIN scorecards s ON s.analysis_run_id = ar.id
+           WHERE ar.deck_id = decks.id
+             AND ar.kind = 'deterministic'
+             AND ar.status = 'succeeded'
+             AND s.bracket = :bracket
+        )
+      SQL
+    end
+
+    @total_decks = current_user.decks.count
+    @decks = scope.limit(100)
   end
 
   def show

@@ -70,9 +70,19 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="bg-zinc-950 text-zinc-100 antialiased" data-controller="pwa-update">
+  <body class="bg-zinc-950 text-zinc-100 antialiased <%= 'pb-16 sm:pb-0' if authenticated? %>"
+        data-controller="pwa-update offline">
+    <div data-offline-target="banner" hidden role="status" aria-live="polite"
+         class="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-2">
+      <div class="flex w-full max-w-md items-center gap-3 rounded-lg border border-amber-700/40 bg-amber-950/95 px-4 py-2 text-sm text-amber-100 shadow-lg backdrop-blur">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M8.5 16.5a5 5 0 017 0M5 13a9 9 0 0114 0M2 9a13 13 0 0120 0" />
+        </svg>
+        <span class="grow">Offline. Anything you submit is paused until you reconnect — nothing has reached the server yet.</span>
+      </div>
+    </div>
     <div data-pwa-update-target="banner" hidden role="status" aria-live="polite"
-         class="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-4 sm:bottom-4">
+         class="fixed inset-x-0 bottom-16 z-50 flex justify-center px-4 pb-4 sm:bottom-4">
       <div class="flex w-full max-w-md items-center gap-3 rounded-lg border border-emerald-700/40 bg-zinc-900/95 px-4 py-3 text-sm text-zinc-100 shadow-lg backdrop-blur">
         <span class="grow">A new version of Ideal Magic is ready.</span>
         <button type="button" data-action="pwa-update#reload"
@@ -130,6 +140,8 @@
       <% end %>
       <%= yield %>
     </main>
+
+    <%= render "shared/mobile_bottom_nav" if authenticated? %>
 
     <footer class="border-t border-zinc-900">
       <div class="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-6 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">

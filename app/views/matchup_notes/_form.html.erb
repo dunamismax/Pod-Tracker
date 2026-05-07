@@ -9,7 +9,7 @@
   </div>
 <% end %>
 
-<%= form_with model: matchup_note, local: true, class: "space-y-5" do |form| %>
+<%= form_with model: matchup_note, local: true, class: "space-y-5", data: { offline_disable: true } do |form| %>
   <div class="grid gap-4 sm:grid-cols-2">
     <div>
       <%= form.label :deck_id, "Deck", class: "block text-xs font-medium text-zinc-400" %>

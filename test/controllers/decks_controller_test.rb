@@ -15,6 +15,43 @@ class DecksControllerTest < ActionDispatch::IntegrationTest
     1 Command Tower
   TXT
 
+  test "index filters decks by name search and bracket" do
+    sign_in_as(@user)
+    atraxa = create_deck_for(@user)
+    najeela = @user.decks.create!(
+      name: "Najeela 5C Tempo",
+      format: "commander",
+      status: "imported",
+      visibility: "private",
+      source_type: "pasted_text",
+      commander_names: [ "Najeela, the Blade-Blossom" ],
+      last_imported_at: Time.current
+    )
+    create_analysis_for(najeela)
+
+    get decks_path(q: "Atraxa")
+    assert_response :success
+    assert_select "a", text: atraxa.name
+    assert_select "a", text: najeela.name, count: 0
+
+    get decks_path(bracket: "2")
+    assert_response :success
+    assert_select "a", text: najeela.name
+    assert_select "a", text: atraxa.name, count: 0
+
+    get decks_path(bracket: "5")
+    assert_response :success
+    assert_select "p", /No decks match those filters/
+  end
+
+  test "index renders the mobile bottom nav for authenticated users" do
+    sign_in_as(@user)
+
+    get decks_path
+    assert_response :success
+    assert_select "nav[aria-label=Primary] a[aria-current=page]", text: /Decks/
+  end
+
   test "imports a pasted decklist" do
     sign_in_as(@user)
 

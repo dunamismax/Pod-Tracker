@@ -11,9 +11,56 @@
     <%= link_to "Import a deck", new_deck_path, class: "rounded-md bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
   </div>
 
-  <% if @decks.empty? %>
+  <% if @total_decks.to_i > 0 %>
+    <%= form_with url: decks_path, method: :get, local: true,
+                  class: "rounded-lg border border-zinc-800 bg-zinc-900 p-3 sm:p-4" do |form| %>
+      <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_10rem_auto]">
+        <div>
+          <%= form.label :q, "Search", class: "sr-only" %>
+          <%= form.search_field :q, value: @search,
+                placeholder: "Name or commander",
+                class: "w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white placeholder-zinc-500" %>
+        </div>
+        <div>
+          <%= form.label :bracket, "Bracket", class: "sr-only" %>
+          <%= form.select :bracket,
+                [ ["Any bracket", ""],
+                  ["Bracket 1 — Exhibition", "1"],
+                  ["Bracket 2 — Core", "2"],
+                  ["Bracket 3 — Upgraded", "3"],
+                  ["Bracket 4 — Optimized", "4"],
+                  ["Bracket 5 — cEDH", "5"] ],
+                { selected: @bracket_filter },
+                class: "w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white" %>
+        </div>
+        <div>
+          <%= form.label :status, "Status", class: "sr-only" %>
+          <%= form.select :status,
+                [ ["Any status", ""] ] + Deck::STATUSES.map { |s| [s.humanize, s] },
+                { selected: @status_filter },
+                class: "w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white" %>
+        </div>
+        <div class="flex gap-2">
+          <%= form.submit "Filter", class: "rounded-md bg-zinc-800 px-3.5 py-2 text-sm font-medium text-white hover:bg-zinc-700" %>
+          <% if @search.present? || @bracket_filter.present? || @status_filter.present? %>
+            <%= link_to "Reset", decks_path,
+                  class: "rounded-md border border-zinc-700 px-3.5 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800" %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if @total_decks.to_i.zero? %>
     <div class="rounded-lg border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center">
       <p class="text-sm text-zinc-400">No decks yet. Paste a Commander decklist to get started.</p>
+    </div>
+  <% elsif @decks.empty? %>
+    <div class="rounded-lg border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center">
+      <p class="text-sm text-zinc-400">
+        No decks match those filters.
+        <%= link_to "Reset filters", decks_path, class: "text-emerald-300 hover:text-emerald-200" %>.
+      </p>
     </div>
   <% else %>
     <ul class="divide-y divide-zinc-800 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">

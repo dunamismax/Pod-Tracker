@@ -15,7 +15,7 @@
     <div class="space-y-6">
       <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
         <h2 class="text-lg font-medium text-white">Add cards</h2>
-        <%= form_with url: collection_cards_path, scope: :collection_card, local: true, class: "mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_auto]" do |form| %>
+        <%= form_with url: collection_cards_path, scope: :collection_card, local: true, class: "mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_7rem_auto]", data: { offline_disable: true } do |form| %>
           <div>
             <%= form.label :name, "Card name", class: "text-sm font-medium text-zinc-200" %>
             <%= form.text_field :name, class: "mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white", placeholder: "Sol Ring" %>
@@ -41,7 +41,7 @@
             </ul>
           </div>
         <% end %>
-        <%= form_with model: @import_form, url: collection_imports_path, scope: :collection_import_form, local: true, multipart: true, class: "mt-4 space-y-4" do |form| %>
+        <%= form_with model: @import_form, url: collection_imports_path, scope: :collection_import_form, local: true, multipart: true, class: "mt-4 space-y-4", data: { offline_disable: true } do |form| %>
           <div>
             <%= form.label :collection_list, "Paste text or CSV", class: "text-sm font-medium text-zinc-200" %>
             <%= form.text_area :collection_list, rows: 8, class: "mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-sm text-white", placeholder: "2 Sol Ring&#10;4 Arcane Signet&#10;&#10;or CSV: name,quantity".html_safe %>

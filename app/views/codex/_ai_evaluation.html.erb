@@ -29,7 +29,7 @@
     </div>
 
     <% if enqueue_path.present? && (run.nil? || %w[succeeded failed canceled].include?(run.status)) %>
-      <%= button_to "Run AI evaluation", enqueue_path, method: :post, class: "rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-blue-500" %>
+      <%= button_to "Run AI evaluation", enqueue_path, method: :post, form: { data: { offline_disable: true } }, class: "rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-blue-500" %>
     <% end %>
   </header>
 

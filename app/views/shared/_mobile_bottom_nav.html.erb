@@ -1,0 +1,41 @@
+<%#
+  Fixed bottom-nav for authenticated users on phone-sized viewports. The
+  desktop top-nav stays in the header at sm+; this partial only renders below
+  that breakpoint and gives table-side users the five primary destinations
+  with one thumb tap. `current_section` is set per controller (see
+  ApplicationController#mobile_nav_section) so the active item highlights.
+%>
+<% return unless authenticated? %>
+<%
+  active = local_assigns[:current_section] || mobile_nav_section
+  items = [
+    { key: "decks", label: "Decks", path: decks_path,
+      svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h10"/>' },
+    { key: "pods", label: "Pods", path: pods_path,
+      svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 4a4 4 0 110 8 4 4 0 010-8zm-7 16a7 7 0 0114 0"/>' },
+    { key: "sessions", label: "Sessions", path: game_nights_path,
+      svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M7 4v4m10-4v4M5 12h14v8H5z"/>' },
+    { key: "journal", label: "Journal", path: matchup_notes_path,
+      svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M5 4h11l3 3v13H5z M9 9h6 M9 13h6 M9 17h4"/>' },
+    { key: "collection", label: "Collection", path: collection_path,
+      svg: '<path stroke-linecap="round" stroke-linejoin="round" d="M4 5a2 2 0 012-2h8l4 4v12a2 2 0 01-2 2H6a2 2 0 01-2-2z M9 13l2 2 4-4"/>' }
+  ]
+%>
+<nav aria-label="Primary"
+     class="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-900 bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-[backdrop-filter]:bg-zinc-950/85 sm:hidden">
+  <ul class="grid grid-cols-5">
+    <% items.each do |item| %>
+      <% is_active = active.to_s == item[:key] %>
+      <li>
+        <%= link_to item[:path],
+              class: "flex flex-col items-center justify-center gap-0.5 px-1 py-2 text-[10px] font-medium #{is_active ? 'text-emerald-300' : 'text-zinc-400 hover:text-zinc-100'}",
+              "aria-current": (is_active ? "page" : nil) do %>
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6">
+            <%= item[:svg].html_safe %>
+          </svg>
+          <span><%= item[:label] %></span>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+</nav>

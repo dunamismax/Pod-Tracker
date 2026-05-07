@@ -60,7 +60,7 @@
       </p>
     </div>
 
-    <%= form_with url: seat_pods_game_night_path(@game_night), method: :post, local: true, class: "space-y-4 p-5" do %>
+    <%= form_with url: seat_pods_game_night_path(@game_night), method: :post, local: true, class: "space-y-4 p-5", data: { offline_disable: true } do %>
       <div class="space-y-3">
         <% @seating_rows.each_with_index do |row, index| %>
           <% player = @checked_in.detect { |check_in| check_in.player_id.to_s == row["player_id"].to_s }&.player %>
@@ -230,7 +230,7 @@
         </div>
       <% end %>
 
-      <%= form_with url: pod_results_game_night_path(@game_night), method: :patch, local: true, class: "space-y-5 p-5" do %>
+      <%= form_with url: pod_results_game_night_path(@game_night), method: :patch, local: true, class: "space-y-5 p-5", data: { offline_disable: true } do %>
         <% @pod_seats_by_number.each_with_index do |(pod_number, seats), index| %>
           <% result = @pod_results_by_number[pod_number] %>
           <fieldset class="space-y-3 rounded-md border border-zinc-800 bg-zinc-950 p-4">

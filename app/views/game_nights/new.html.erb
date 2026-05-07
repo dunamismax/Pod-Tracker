@@ -13,7 +13,7 @@
       Import at least one deck before starting a session. <%= link_to "Import a deck", new_deck_path, class: "underline" %> first.
     </div>
   <% else %>
-    <%= form_with model: @form, url: game_nights_path, scope: :game_night_form, local: true, class: "space-y-5" do |form| %>
+    <%= form_with model: @form, url: game_nights_path, scope: :game_night_form, local: true, class: "space-y-5", data: { offline_disable: true } do |form| %>
       <% if @form.errors.any? %>
         <div class="rounded-md border border-red-800 bg-red-950/40 p-3 text-sm text-red-200">
           <ul class="list-disc pl-5">
