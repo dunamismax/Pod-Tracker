@@ -11,6 +11,12 @@ class AccountAuthFlowsTest < ApplicationSystemTestCase
     click_button "Create account"
 
     assert_text "Account created. Check your email to verify your address."
+    assert_text "Sign in"
+
+    user = User.find_by!(email_address: "new-player@example.com")
+    visit email_verification_path(token: user.generate_token_for(:email_verification))
+
+    assert_text "Email verified."
     assert_text "Ideal Magic"
 
     visit account_path
@@ -54,6 +60,7 @@ class AccountAuthFlowsTest < ApplicationSystemTestCase
 
   test "user deletes account after password confirmation" do
     user = users(:two)
+    user.update!(email_verified_at: Time.current)
 
     sign_in_through_ui(user)
     visit new_account_deletion_path

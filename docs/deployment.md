@@ -58,6 +58,16 @@ Production env vars live in `/etc/ideal-magic-web/env` and are loaded by the sys
 | `RAILS_MAX_THREADS` | recommended | Puma threads per worker. Currently `5`. Keep `database.yml` `max_connections` ≥ this. |
 | `SOLID_QUEUE_IN_PUMA` | recommended | `true` until jobs need a separate process. |
 | `APP_HOST` | yes | `ideal-magic.com`. Used for mailer URLs and similar. |
+| `MAIL_FROM` | yes | Sender address for account verification and password reset mail, for example `"Ideal Magic <no-reply@ideal-magic.com>"`. |
+| `SMTP_ADDRESS` | yes | SMTP host. Without this, Rails falls back to localhost SMTP and account mail will fail unless a local MTA is installed. |
+| `SMTP_PORT` | yes | Usually `587` for STARTTLS submission. |
+| `SMTP_DOMAIN` | recommended | HELO domain. Defaults to `APP_HOST`. |
+| `SMTP_USERNAME` | provider-dependent | SMTP username when the provider requires authentication. |
+| `SMTP_PASSWORD` | provider-dependent | SMTP password or app password. Never commit it. |
+| `SMTP_AUTHENTICATION` | provider-dependent | Defaults to `plain`; leave blank only for unauthenticated local relays. |
+| `SMTP_ENABLE_STARTTLS_AUTO` | recommended | Defaults to `true`. |
+| `SMTP_OPEN_TIMEOUT` | recommended | Defaults to `5` seconds. |
+| `SMTP_READ_TIMEOUT` | recommended | Defaults to `5` seconds. |
 | `CODEX_APP_SERVER_ENABLED` | optional | `false` by default. Production sets this to `true` when AI evaluation is enabled. |
 | `CODEX_HOME_ROOT` | optional | Root for per-user CODEX_HOME directories. Each signed-in user gets `<root>/<user.id>/`, mode 0700. Production uses `/var/lib/ideal-magic/codex`; do not point this at a git-tracked path or a shared OS account home. |
 | `CODEX_APP_SERVER_COMMAND` | optional | Command used by the stdio transport when enabled. Defaults to `codex app-server`. |

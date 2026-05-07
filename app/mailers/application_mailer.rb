@@ -1,4 +1,4 @@
 class ApplicationMailer < ActionMailer::Base
-  default from: "from@example.com"
+  default from: -> { ENV.fetch("MAIL_FROM", "Ideal Magic <no-reply@ideal-magic.com>") }
   layout "mailer"
 end

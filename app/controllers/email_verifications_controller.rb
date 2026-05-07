@@ -8,9 +8,11 @@ class EmailVerificationsController < ApplicationController
     if user.nil?
       redirect_to root_path, alert: "Verification link is invalid or has expired."
     elsif user.email_verified?
+      start_new_session_for(user) unless Current.session&.user == user
       redirect_to root_path, notice: "Email already verified."
     else
       user.update!(email_verified_at: Time.current)
+      start_new_session_for(user) unless Current.session&.user == user
       redirect_to root_path, notice: "Email verified."
     end
   end
@@ -21,8 +23,7 @@ class EmailVerificationsController < ApplicationController
     if user.email_verified?
       redirect_to account_path, notice: "Your email is already verified."
     else
-      UserMailer.verify_email(user).deliver_later
-      user.update_columns(email_verification_sent_at: Time.current)
+      Accounts::EmailVerificationDelivery.call(user)
       redirect_to account_path, notice: "Verification email sent."
     end
   end

@@ -8,6 +8,7 @@ class EmailVerificationsControllerTest < ActionDispatch::IntegrationTest
     get email_verification_path(token: token)
     assert_redirected_to root_path
     assert @user.reload.email_verified?
+    assert_not_nil cookies[:session_id]
   end
 
   test "show with invalid token redirects with alert" do
@@ -22,6 +23,7 @@ class EmailVerificationsControllerTest < ActionDispatch::IntegrationTest
     get email_verification_path(token: token)
     assert_redirected_to root_path
     assert_match(/already verified/i, flash[:notice])
+    assert_not_nil cookies[:session_id]
   end
 
   test "create resends verification email when signed in" do

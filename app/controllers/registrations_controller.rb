@@ -10,9 +10,8 @@ class RegistrationsController < ApplicationController
     @user = User.new(registration_params)
 
     if @user.save
-      send_email_verification(@user)
-      start_new_session_for(@user)
-      redirect_to root_path, notice: "Account created. Check your email to verify your address."
+      Accounts::EmailVerificationDelivery.call(@user)
+      redirect_to new_session_path(email_address: @user.email_address), notice: "Account created. Check your email to verify your address."
     else
       render :new, status: :unprocessable_entity
     end
@@ -21,10 +20,5 @@ class RegistrationsController < ApplicationController
   private
     def registration_params
       params.require(:user).permit(:email_address, :password, :password_confirmation, :display_name, :timezone, :preferred_units)
-    end
-
-    def send_email_verification(user)
-      UserMailer.verify_email(user).deliver_later
-      user.update_columns(email_verification_sent_at: Time.current)
     end
 end
