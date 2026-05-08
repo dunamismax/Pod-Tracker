@@ -3,7 +3,7 @@ class RegistrationsController < ApplicationController
   rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to new_registration_path, alert: "Try again later." }
 
   def new
-    @user = User.new(timezone: "UTC", preferred_units: "imperial")
+    @user = User.new
   end
 
   def create
@@ -19,6 +19,18 @@ class RegistrationsController < ApplicationController
 
   private
     def registration_params
-      params.require(:user).permit(:email_address, :password, :password_confirmation, :display_name, :timezone, :preferred_units)
+      params.require(:user)
+            .permit(:email_address, :password, :password_confirmation, :display_name, :timezone, :preferred_units)
+            .then { |attrs| attrs.merge(timezone: resolved_timezone(attrs[:timezone]), preferred_units: resolved_units(attrs[:preferred_units])) }
+    end
+
+    def resolved_timezone(value)
+      return value if value.present? && ActiveSupport::TimeZone[value].present?
+      "UTC"
+    end
+
+    def resolved_units(value)
+      return value if User::PREFERRED_UNITS.include?(value)
+      "imperial"
     end
 end

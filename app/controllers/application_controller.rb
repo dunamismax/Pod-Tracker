@@ -21,6 +21,8 @@ class ApplicationController < ActionController::Base
     when "matchup_notes" then "journal"
     when "collections", "collection_imports", "collection_cards", "unresolved_entries" then "collection"
     when "dashboard" then "decks"
+    when "accounts", "account_deletions", "account_exports", "account_codex_accounts",
+         "account_codex_logins", "account_provider_links" then "account"
     end
   end
 end
