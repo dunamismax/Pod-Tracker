@@ -60,7 +60,15 @@ Rails.application.configure do
   app_host = ENV.fetch("APP_HOST", "ideal-magic.com")
   config.action_mailer.default_url_options = { host: app_host, protocol: "https" }
 
-  if ENV["SMTP_ADDRESS"].present?
+  if ENV["SMTP2GO_API_KEY"].present?
+    config.action_mailer.delivery_method = :smtp2go
+    config.action_mailer.smtp2go_settings = {
+      api_key: ENV.fetch("SMTP2GO_API_KEY"),
+      endpoint: ENV.fetch("SMTP2GO_ENDPOINT", "https://api.smtp2go.com/v3/email/send"),
+      open_timeout: ENV.fetch("SMTP2GO_OPEN_TIMEOUT", 5).to_i,
+      read_timeout: ENV.fetch("SMTP2GO_READ_TIMEOUT", 10).to_i
+    }
+  elsif ENV["SMTP_ADDRESS"].present?
     config.action_mailer.delivery_method = :smtp
     config.action_mailer.smtp_settings = {
       address: ENV.fetch("SMTP_ADDRESS"),

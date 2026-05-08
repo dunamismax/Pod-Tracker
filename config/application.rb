@@ -6,6 +6,10 @@ require "rails/all"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+require_relative "../lib/smtp2go_delivery_method"
+
+ActionMailer::Base.add_delivery_method :smtp2go, Smtp2goDeliveryMethod
+
 module IdealMagic
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
