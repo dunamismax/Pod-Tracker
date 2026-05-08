@@ -11,6 +11,32 @@
     <%= link_to "Start a session", new_game_night_path, class: "rounded-md bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
   </div>
 
+  <% if @pending_invitations.any? %>
+    <section class="rounded-lg border border-emerald-900/60 bg-emerald-950/20">
+      <div class="border-b border-emerald-900/50 px-5 py-4">
+        <h2 class="text-base font-medium text-emerald-200">Invitations waiting on you</h2>
+        <p class="mt-1 text-sm text-emerald-200/70">Accept and pick which deck you're bringing.</p>
+      </div>
+      <ul class="divide-y divide-emerald-900/40">
+        <% @pending_invitations.each do |invitation| %>
+          <li class="flex flex-wrap items-baseline justify-between gap-3 px-5 py-4">
+            <div>
+              <p class="text-sm font-medium text-white"><%= invitation.game_night.name %></p>
+              <p class="mt-1 text-xs text-zinc-400">
+                <%= invitation.game_night.played_on.to_fs(:long) %>
+                <% if invitation.game_night.location.present? %>· <%= invitation.game_night.location %><% end %>
+                · hosted by <%= invitation.game_night.user.attribution_name %>
+              </p>
+            </div>
+            <%= link_to "Open invite",
+                        invitation_response_path(token: invitation.token),
+                        class: "rounded-md bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-500" %>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
   <% if @game_nights.empty? %>
     <div class="rounded-lg border border-dashed border-zinc-800 bg-zinc-950 p-8 text-center">
       <p class="text-sm text-zinc-400">No sessions yet. Start one when players arrive for Commander night.</p>

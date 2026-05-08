@@ -30,7 +30,13 @@ Rails.application.routes.draw do
   resources :game_nights, path: "sessions", only: %i[index show new create destroy] do
     post :seat_pods, on: :member
     patch :pod_results, on: :member
+    resources :invitations, only: %i[create destroy], controller: "game_night_invitations" do
+      post :resend, on: :member
+    end
   end
+  get "invitations/:token", to: "game_night_invitations#show", as: :invitation_response
+  patch "invitations/:token/accept", to: "game_night_invitations#accept", as: :accept_invitation_response
+  patch "invitations/:token/decline", to: "game_night_invitations#decline", as: :decline_invitation_response
   get "p/:token", to: "public_pods#show", as: :public_pod
   get "d/:token", to: "public_decks#show", as: :public_deck
   get "d/:token/export", to: "public_decks#export", as: :public_deck_export, defaults: { format: :text }

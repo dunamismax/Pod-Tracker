@@ -26,30 +26,140 @@
 
   <div class="rounded-lg border border-zinc-800 bg-zinc-900">
     <div class="border-b border-zinc-800 px-5 py-4">
-      <h2 class="text-lg font-medium text-white">Checked-in players</h2>
-      <p class="mt-1 text-sm text-zinc-500">Deck snapshots preserve what each player brought before later edits change a deck.</p>
+      <h2 class="text-lg font-medium text-white">Roster</h2>
+      <p class="mt-1 text-sm text-zinc-500">In-person check-ins and invitees who've already replied. Deck snapshots preserve what each player brought before later edits change a deck.</p>
     </div>
-    <ul class="divide-y divide-zinc-800">
-      <% @checked_in.each do |check_in| %>
-        <% night_deck = @decks_by_player_id[check_in.player_id] %>
-        <li class="px-5 py-4">
-          <div class="flex flex-wrap items-baseline justify-between gap-4">
-            <div>
-              <p class="text-base font-medium text-white"><%= check_in.player.name %></p>
-              <% if night_deck %>
-                <p class="mt-1 text-sm text-zinc-400">
-                  <%= link_to night_deck.deck_name_snapshot, deck_path(night_deck.deck), class: "text-emerald-300 hover:text-emerald-200" %>
-                  <% if night_deck.commander_names_snapshot.present? %>
-                    · <%= night_deck.commander_names_snapshot.join(", ") %>
-                  <% end %>
-                </p>
-              <% end %>
+    <% if @checked_in.any? %>
+      <ul class="divide-y divide-zinc-800">
+        <% @checked_in.each do |check_in| %>
+          <% night_deck = @decks_by_player_id[check_in.player_id] %>
+          <li class="px-5 py-4">
+            <div class="flex flex-wrap items-baseline justify-between gap-4">
+              <div>
+                <p class="text-base font-medium text-white"><%= check_in.player.name %></p>
+                <% if night_deck %>
+                  <p class="mt-1 text-sm text-zinc-400">
+                    <%= deck_label_for_game_night(night_deck) %>
+                    <% if night_deck.commander_names_snapshot.present? %>
+                      · <%= night_deck.commander_names_snapshot.join(", ") %>
+                    <% end %>
+                  </p>
+                <% end %>
+              </div>
+              <span class="text-xs uppercase tracking-wide text-zinc-500">Seat <%= check_in.position %></span>
             </div>
-            <span class="text-xs uppercase tracking-wide text-zinc-500">Seat <%= check_in.position %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="px-5 py-6 text-sm text-zinc-500">No one's confirmed yet. Add an in-person check-in or invite players below.</p>
+    <% end %>
+  </div>
+
+  <div class="rounded-lg border border-zinc-800 bg-zinc-900">
+    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-800 px-5 py-4">
+      <div>
+        <h2 class="text-lg font-medium text-white">Invitations</h2>
+        <p class="mt-1 text-sm text-zinc-500">Each invitee picks the deck they're bringing. Pending replies don't show up in the roster yet.</p>
+      </div>
+      <% pending_count = @invitations_by_status["pending"]&.size.to_i %>
+      <% accepted_count = @invitations_by_status["accepted"]&.size.to_i %>
+      <% declined_count = @invitations_by_status["declined"]&.size.to_i %>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <% if accepted_count.positive? %>
+          <span class="rounded-md bg-emerald-950/60 px-2 py-1 font-medium text-emerald-200"><%= accepted_count %> accepted</span>
+        <% end %>
+        <% if pending_count.positive? %>
+          <span class="rounded-md bg-zinc-800 px-2 py-1 font-medium text-zinc-300"><%= pending_count %> pending</span>
+        <% end %>
+        <% if declined_count.positive? %>
+          <span class="rounded-md bg-zinc-800/60 px-2 py-1 font-medium text-zinc-400"><%= declined_count %> declined</span>
+        <% end %>
+      </div>
+    </div>
+
+    <% if @invitations.any? %>
+      <ul class="divide-y divide-zinc-800">
+        <% @invitations.each do |invitation| %>
+          <li class="px-5 py-4">
+            <div class="flex flex-wrap items-baseline justify-between gap-3">
+              <div>
+                <p class="text-sm font-medium text-white"><%= invitation.display_label %></p>
+                <p class="mt-1 text-xs text-zinc-500"><%= invitation.email_address %></p>
+                <% if invitation.accepted? && invitation.deck %>
+                  <p class="mt-1 text-sm text-zinc-300">
+                    Bringing
+                    <%= deck_label_for_invitation(invitation) %>
+                    <% if invitation.deck.commander_names.present? %>
+                      · <%= invitation.deck.commander_names.join(", ") %>
+                    <% end %>
+                  </p>
+                <% elsif invitation.declined? %>
+                  <p class="mt-1 text-sm text-zinc-500">
+                    Declined
+                    <% if invitation.responded_at %>· <%= time_ago_in_words(invitation.responded_at) %> ago<% end %>
+                    <% if invitation.response_note.present? %>
+                      <span class="block text-xs text-zinc-500">"<%= invitation.response_note %>"</span>
+                    <% end %>
+                  </p>
+                <% elsif invitation.cancelled? %>
+                  <p class="mt-1 text-sm text-zinc-500">Cancelled</p>
+                <% else %>
+                  <p class="mt-1 text-xs text-zinc-500">
+                    Invited <%= time_ago_in_words(invitation.invited_at) %> ago<% if invitation.reminded_at %> · reminded <%= time_ago_in_words(invitation.reminded_at) %> ago<% end %>
+                  </p>
+                <% end %>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-md px-2 py-1 text-xs font-medium <%= invitation_badge_classes(invitation.status) %>"><%= invitation.status.titleize %></span>
+                <% if invitation.pending? %>
+                  <%= button_to "Resend", resend_game_night_invitation_path(@game_night, invitation), method: :post,
+                                class: "rounded-md border border-zinc-700 px-2 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-800",
+                                form: { data: { offline_disable: true } } %>
+                  <%= button_to "Cancel", game_night_invitation_path(@game_night, invitation), method: :delete,
+                                form: { data: { turbo_confirm: "Cancel this invitation?", offline_disable: true } },
+                                class: "rounded-md border border-red-900 px-2 py-1 text-xs font-medium text-red-200 hover:bg-red-950/50" %>
+                <% end %>
+              </div>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+
+    <div class="border-t border-zinc-800 px-5 py-5">
+      <h3 class="text-sm font-medium text-white">Invite more players</h3>
+      <%= form_with url: game_night_invitations_path(@game_night), method: :post, local: true, class: "mt-3 space-y-3", data: { offline_disable: true } do %>
+        <% 3.times do |index| %>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div>
+              <label for="invitations_rows_<%= index %>_email_address" class="block text-xs font-medium text-zinc-400">Email</label>
+              <%= email_field_tag "invitations[rows][#{index}][email_address]", nil,
+                                  id: "invitations_rows_#{index}_email_address",
+                                  autocomplete: "off",
+                                  placeholder: "podmate@example.com",
+                                  class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+            </div>
+            <div>
+              <label for="invitations_rows_<%= index %>_display_name" class="block text-xs font-medium text-zinc-400">Display name (optional)</label>
+              <%= text_field_tag "invitations[rows][#{index}][display_name]", nil,
+                                 id: "invitations_rows_#{index}_display_name",
+                                 autocomplete: "off",
+                                 placeholder: "First name or nickname",
+                                 class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+            </div>
           </div>
-        </li>
+        <% end %>
+        <div>
+          <label for="invitations_message" class="block text-xs font-medium text-zinc-400">Optional note for invitees</label>
+          <%= text_area_tag "invitations[message]", nil, rows: 2, id: "invitations_message",
+                            placeholder: "Snacks at 7, first deal at 8.",
+                            class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+          <p class="mt-1 text-xs text-zinc-500">Included in every email sent from this batch.</p>
+        </div>
+        <%= submit_tag "Send invitations", class: "rounded-md bg-emerald-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-emerald-500" %>
       <% end %>
-    </ul>
+    </div>
   </div>
 
   <div class="rounded-lg border border-zinc-800 bg-zinc-900">
@@ -159,7 +269,7 @@
                     <div>
                       <p class="text-sm font-medium text-white"><%= seat.player.name %></p>
                       <p class="mt-1 text-xs text-zinc-500">
-                        <%= link_to seat.deck_name_snapshot, deck_path(seat.deck), class: "text-emerald-300 hover:text-emerald-200" %>
+                        <%= deck_label_for_seat(seat) %>
                         <% if seat.commander_names_snapshot.present? %>
                           · <%= seat.commander_names_snapshot.join(", ") %>
                         <% end %>
@@ -188,11 +298,14 @@
               </p>
             <% end %>
 
-            <div>
-              <%= link_to "Add matchup note for pod #{pod_number}",
-                          new_matchup_note_path(game_night_id: @game_night.id, game_night_pod_number: pod_number, deck_id: seats.first&.deck_id),
-                          class: "text-sm font-medium text-emerald-300 hover:text-emerald-200" %>
-            </div>
+            <% host_deck_id = host_owned_deck_id_in_pod(seats) %>
+            <% if host_deck_id %>
+              <div>
+                <%= link_to "Add matchup note for pod #{pod_number}",
+                            new_matchup_note_path(game_night_id: @game_night.id, game_night_pod_number: pod_number, deck_id: host_deck_id),
+                            class: "text-sm font-medium text-emerald-300 hover:text-emerald-200" %>
+              </div>
+            <% end %>
           </section>
         <% end %>
       </div>

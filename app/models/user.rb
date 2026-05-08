@@ -9,6 +9,15 @@ class User < ApplicationRecord
   has_many :pods, dependent: :destroy
   has_many :players, dependent: :destroy
   has_many :game_nights, dependent: :destroy
+  has_many :game_night_invitations,
+           foreign_key: :invited_user_id,
+           inverse_of: :invited_user,
+           dependent: :nullify
+  has_many :responded_game_night_invitations,
+           class_name: "GameNightInvitation",
+           foreign_key: :responded_user_id,
+           inverse_of: :responded_user,
+           dependent: :nullify
   has_many :matchup_notes, dependent: :destroy
   has_many :collection_cards, dependent: :destroy
   has_many :collection_imports, dependent: :destroy

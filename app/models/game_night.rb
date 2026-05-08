@@ -7,6 +7,7 @@ class GameNight < ApplicationRecord
   has_many :game_night_decks, -> { order(:position) }, dependent: :destroy
   has_many :game_night_pod_seats, -> { order(:pod_number, :seat_number) }, dependent: :destroy
   has_many :game_night_pod_results, -> { order(:pod_number) }, dependent: :destroy
+  has_many :game_night_invitations, -> { order(:position) }, dependent: :destroy
   has_many :matchup_notes, dependent: :nullify
   has_many :decks, through: :game_night_decks
   has_many :audit_events, as: :auditable, dependent: :nullify
@@ -28,5 +29,25 @@ class GameNight < ApplicationRecord
 
   def pod_results_by_number
     game_night_pod_results.index_by(&:pod_number)
+  end
+
+  def invitations_by_status
+    game_night_invitations.group_by(&:status)
+  end
+
+  def pending_invitations_for(user)
+    return GameNightInvitation.none unless user
+
+    game_night_invitations
+      .where(status: "pending")
+      .where("LOWER(email_address) = ?", user.email_address.to_s.downcase)
+  end
+
+  def host
+    user
+  end
+
+  def host_name
+    user&.attribution_name
   end
 end

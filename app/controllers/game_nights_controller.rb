@@ -6,6 +6,11 @@ class GameNightsController < ApplicationController
                               .includes(game_night_players: :player, game_night_decks: :deck)
                               .order(played_on: :desc, updated_at: :desc)
                               .limit(50)
+    @pending_invitations = GameNightInvitation
+                              .where(status: "pending")
+                              .where("LOWER(email_address) = ?", current_user.email_address.to_s.downcase)
+                              .includes(game_night: :user)
+                              .order(invited_at: :desc)
   end
 
   def show
@@ -21,6 +26,8 @@ class GameNightsController < ApplicationController
       seating_rows: @seating_rows,
       decks_by_player_id: @decks_by_player_id
     )
+    @invitations = @game_night.game_night_invitations.includes(:invited_user, :responded_user, :deck).to_a
+    @invitations_by_status = @invitations.group_by(&:status)
   end
 
   def seat_pods
@@ -88,6 +95,26 @@ class GameNightsController < ApplicationController
           position: position
         )
       end
+
+      invitation_rows = @form.populated_invitations.each_with_index.map do |row, index|
+        {
+          email_address: row["email_address"],
+          display_name: row["display_name"],
+          message: @form.invitation_message
+        }
+      end
+      if invitation_rows.any?
+        invite_result = GameNights::Inviter.call(game_night, rows: invitation_rows, host: current_user)
+        unless invite_result.success?
+          @form.errors.add(:invitations, invite_result.errors.to_sentence)
+          raise ActiveRecord::Rollback
+        end
+      end
+    end
+
+    if @form.errors.any?
+      render :new, status: :unprocessable_entity
+      return
     end
 
     record_audit("game_night.created", game_night: game_night)
@@ -118,7 +145,11 @@ class GameNightsController < ApplicationController
   end
 
   def game_night_params
-    params.require(:game_night_form).permit(:name, :played_on, :location, :notes, check_ins: %i[player_name deck_id])
+    params.require(:game_night_form).permit(
+      :name, :played_on, :location, :notes, :invitation_message,
+      check_ins: %i[player_name deck_id],
+      invitations: %i[email_address display_name]
+    )
   end
 
   def seating_params

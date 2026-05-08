@@ -46,9 +46,9 @@
       </div>
 
       <fieldset class="space-y-3 rounded-md border border-zinc-800 bg-zinc-950/50 p-4">
-        <legend class="px-1 text-sm font-medium text-zinc-300">Player check-in</legend>
+        <legend class="px-1 text-sm font-medium text-zinc-300">In-person check-in</legend>
         <p class="text-xs text-zinc-500">
-          Player names are saved to your account and reused the next time they show up. Pick one owned deck per player for now.
+          Use this for players already at the table — pick the deck they brought. Player names are reused the next time they show up. Leave the rows blank if you'd rather invite by email below.
         </p>
 
         <div class="space-y-3">
@@ -70,6 +70,45 @@
                                id: "game_night_form_check_ins_#{index}_deck_id",
                                include_blank: "Choose a deck",
                                class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </fieldset>
+
+      <fieldset class="space-y-3 rounded-md border border-zinc-800 bg-zinc-950/50 p-4">
+        <legend class="px-1 text-sm font-medium text-zinc-300">Invite by email</legend>
+        <p class="text-xs text-zinc-500">
+          Email Ideal Magic users so they can RSVP and pick which of their own decks to bring. Each invitee gets a link to accept or decline.
+        </p>
+
+        <div>
+          <label for="game_night_form_invitation_message" class="block text-xs font-medium text-zinc-400">Note for invitees (optional)</label>
+          <%= text_area_tag "game_night_form[invitation_message]", @form.invitation_message, rows: 2, id: "game_night_form_invitation_message",
+                            placeholder: "Snacks at 7, first deal at 8.",
+                            class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+        </div>
+
+        <div class="space-y-3">
+          <% @form.invitation_rows.each_with_index do |row, index| %>
+            <div class="grid gap-3 rounded-md border border-zinc-800 bg-zinc-900 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <div>
+                <label for="game_night_form_invitations_<%= index %>_email_address" class="block text-xs font-medium text-zinc-400">Email</label>
+                <%= email_field_tag "game_night_form[invitations][#{index}][email_address]",
+                                    row["email_address"],
+                                    id: "game_night_form_invitations_#{index}_email_address",
+                                    autocomplete: "off",
+                                    placeholder: "podmate@example.com",
+                                    class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
+              </div>
+              <div>
+                <label for="game_night_form_invitations_<%= index %>_display_name" class="block text-xs font-medium text-zinc-400">Display name (optional)</label>
+                <%= text_field_tag "game_night_form[invitations][#{index}][display_name]",
+                                   row["display_name"],
+                                   id: "game_night_form_invitations_#{index}_display_name",
+                                   autocomplete: "off",
+                                   placeholder: "First name or nickname",
+                                   class: "mt-1 block w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100" %>
               </div>
             </div>
           <% end %>

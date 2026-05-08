@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_07_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_08_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -348,6 +348,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_130000) do
     t.index ["game_night_id", "position"], name: "index_game_night_decks_on_game_night_id_and_position", unique: true
     t.index ["game_night_id"], name: "index_game_night_decks_on_game_night_id"
     t.index ["player_id"], name: "index_game_night_decks_on_player_id"
+  end
+
+  create_table "game_night_invitations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "deck_id"
+    t.string "display_name"
+    t.string "email_address", null: false
+    t.bigint "game_night_id", null: false
+    t.datetime "invited_at", null: false
+    t.bigint "invited_user_id"
+    t.text "message"
+    t.bigint "player_id"
+    t.integer "position", null: false
+    t.datetime "reminded_at"
+    t.datetime "responded_at"
+    t.bigint "responded_user_id"
+    t.text "response_note"
+    t.string "status", default: "pending", null: false
+    t.string "token", null: false
+    t.datetime "updated_at", null: false
+    t.index ["deck_id"], name: "index_game_night_invitations_on_deck_id"
+    t.index ["game_night_id", "email_address"], name: "idx_gn_invitations_on_game_night_and_email", unique: true
+    t.index ["game_night_id", "position"], name: "idx_gn_invitations_on_game_night_and_position", unique: true
+    t.index ["game_night_id"], name: "index_game_night_invitations_on_game_night_id"
+    t.index ["invited_user_id"], name: "index_game_night_invitations_on_invited_user_id"
+    t.index ["player_id"], name: "index_game_night_invitations_on_player_id"
+    t.index ["responded_user_id"], name: "index_game_night_invitations_on_responded_user_id"
+    t.index ["status"], name: "index_game_night_invitations_on_status"
+    t.index ["token"], name: "index_game_night_invitations_on_token", unique: true
   end
 
   create_table "game_night_players", force: :cascade do |t|
@@ -720,6 +749,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_07_130000) do
   add_foreign_key "game_night_decks", "decks"
   add_foreign_key "game_night_decks", "game_nights"
   add_foreign_key "game_night_decks", "players"
+  add_foreign_key "game_night_invitations", "decks"
+  add_foreign_key "game_night_invitations", "game_nights"
+  add_foreign_key "game_night_invitations", "players"
+  add_foreign_key "game_night_invitations", "users", column: "invited_user_id"
+  add_foreign_key "game_night_invitations", "users", column: "responded_user_id"
   add_foreign_key "game_night_players", "game_nights"
   add_foreign_key "game_night_players", "players"
   add_foreign_key "game_night_pod_results", "game_nights"
