@@ -71,7 +71,8 @@
   </head>
 
   <body class="bg-zinc-950 text-zinc-100 antialiased <%= 'pb-16 sm:pb-0' if authenticated? %>"
-        data-controller="pwa-update offline">
+        data-controller="pwa-update offline"
+        data-pwa-update-clear-page-cache-value="<%= flash[:clear_page_cache].present? %>">
     <div data-offline-target="banner" hidden role="status" aria-live="polite"
          class="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-2">
       <div class="flex w-full max-w-md items-center gap-3 rounded-lg border border-amber-700/40 bg-amber-950/95 px-4 py-2 text-sm text-amber-100 shadow-lg backdrop-blur">

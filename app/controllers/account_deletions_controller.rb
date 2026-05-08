@@ -10,7 +10,10 @@ class AccountDeletionsController < ApplicationController
       terminate_session
       Codex::UserHome.purge!(@user)
       @user.destroy
-      redirect_to new_session_path, notice: "Account deleted.", status: :see_other
+      redirect_to new_session_path,
+                  notice: "Account deleted.",
+                  status: :see_other,
+                  flash: { clear_page_cache: true }
     else
       flash.now[:alert] = "Password did not match."
       render :new, status: :unprocessable_entity

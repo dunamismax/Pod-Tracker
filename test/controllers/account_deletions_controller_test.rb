@@ -31,5 +31,9 @@ class AccountDeletionsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil event
     assert_nil event.user_id, "user_id should be nullified after deletion"
     assert_equal @user.email_address, event.metadata["email_address"]
+
+    follow_redirect!
+    assert_response :success
+    assert_select "body[data-pwa-update-clear-page-cache-value='true']"
   end
 end

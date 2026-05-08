@@ -51,6 +51,26 @@ module Collections
       assert_equal 4, @user.collection_cards.find_by!(normalized_name: "arcane signet").quantity
     end
 
+    test "imports quoted CSV card names containing commas" do
+      yuriko = create_oracle_card("Yuriko, the Tiger's Shadow")
+
+      result = Importer.import_text(
+        user: @user,
+        filename: "collection.csv",
+        payload: <<~CSV
+          name,quantity
+          "Yuriko, the Tiger's Shadow",1
+        CSV
+      )
+
+      assert result.success?
+      assert_equal "csv", result.collection_import.source_type
+      assert_equal 0, result.collection_import.unresolved_count
+      collection_card = @user.collection_cards.find_by!(normalized_name: yuriko.normalized_name)
+      assert_equal "Yuriko, the Tiger's Shadow", collection_card.name
+      assert_equal 1, collection_card.quantity
+    end
+
     private
 
       def create_oracle_card(name)

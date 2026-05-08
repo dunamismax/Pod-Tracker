@@ -31,4 +31,17 @@ class SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil user.reload.email_verification_sent_at
     assert_nil cookies[:session_id]
   end
+
+  test "destroy marks private page caches for clearing" do
+    sign_in_as(users(:one))
+
+    delete session_path
+
+    assert_redirected_to new_session_path
+    assert_nil cookies[:session_id].presence
+
+    follow_redirect!
+    assert_response :success
+    assert_select "body[data-pwa-update-clear-page-cache-value='true']"
+  end
 end

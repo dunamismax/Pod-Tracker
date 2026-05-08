@@ -31,6 +31,8 @@ class PwaControllerTest < ActionDispatch::IntegrationTest
     assert_match(/ideal-magic-shell-/, response.body)
     assert_match(/ideal-magic-pages-/, response.body)
     assert_match(/SKIP_WAITING/, response.body)
+    assert_match(/CLEAR_PAGE_CACHE/, response.body)
+    assert_match(/PAGES_CACHE_PREFIX = "ideal-magic-pages-"/, response.body)
   end
 
   test "layout links the manifest so installability is discoverable" do

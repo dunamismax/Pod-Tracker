@@ -1,3 +1,5 @@
+require "csv"
+
 module Collections
   class ImportParser
     LINE_PATTERN = /\A(?:(?<quantity>\d+)\s*[xX]?\s+)?(?<name>.+?)\s*\z/
@@ -21,32 +23,35 @@ module Collections
       end
 
       def parse_csv(text, source_format:)
-        lines = text.to_s.each_line.map(&:strip).reject(&:blank?)
-        headers = lines.shift.to_s.split(",").map { |header| header.strip.downcase }
         entries = []
         unparsed = []
+        table = CSV.parse(text.to_s, headers: true, skip_blanks: true)
+        headers = Array(table.headers).map { |header| header.to_s.strip.downcase }
 
-        lines.each_with_index do |line, index|
-          values = line.split(",", -1).map(&:strip)
+        table.each.with_index(2) do |csv_row, row_number|
+          values = csv_row.fields.map { |value| value.to_s.strip }
           row = headers.zip(values).to_h
           name = csv_value(row, "name", "card", "card name")
           quantity = csv_value(row, "quantity", "qty", "count", "owned").to_i
           quantity = 1 if quantity <= 0
+          raw_line = CSV.generate_line(values).to_s.strip
 
           if name.blank?
-            unparsed << line.presence || "CSV row #{index + 2}"
+            unparsed << raw_line.presence || "CSV row #{row_number}"
             next
           end
 
           entries << Entry.new(
             name: clean_name(name),
             quantity: quantity,
-            raw_line: line,
-            metadata: { "row" => index + 2 }
+            raw_line: raw_line,
+            metadata: { "row" => row_number }
           )
         end
 
         Result.new(entries:, unparsed_lines: unparsed, source_format:)
+      rescue CSV::MalformedCSVError
+        Result.new(entries: [], unparsed_lines: text.to_s.each_line.map(&:strip).reject(&:blank?), source_format:)
       end
 
       def parse_text(text, source_format:)

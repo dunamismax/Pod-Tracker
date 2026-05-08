@@ -6,6 +6,7 @@ import { Controller } from "@hotwired/stimulus"
 // user is not trapped on stale assets.
 export default class extends Controller {
   static targets = ["banner"]
+  static values = { clearPageCache: Boolean }
 
   connect() {
     if (!("serviceWorker" in navigator)) return
@@ -35,6 +36,8 @@ export default class extends Controller {
         })
       })
       .catch(() => { /* registration failed; offline cache is best-effort */ })
+
+    if (this.clearPageCacheValue) this.clearPageCaches()
   }
 
   showBanner() {
@@ -55,5 +58,25 @@ export default class extends Controller {
   dismiss(event) {
     event.preventDefault()
     if (this.hasBannerTarget) this.bannerTarget.hidden = true
+  }
+
+  clearPageCaches() {
+    if ("caches" in window) {
+      caches.keys()
+        .then((names) => Promise.all(names
+          .filter((name) => name.startsWith("ideal-magic-pages-"))
+          .map((name) => caches.delete(name))))
+        .catch(() => {})
+    }
+
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "CLEAR_PAGE_CACHE" })
+    } else {
+      navigator.serviceWorker.ready
+        .then((registration) => {
+          if (registration.active) registration.active.postMessage({ type: "CLEAR_PAGE_CACHE" })
+        })
+        .catch(() => {})
+    }
   }
 }
