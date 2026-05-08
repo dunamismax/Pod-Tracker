@@ -8,6 +8,10 @@ class Deck < ApplicationRecord
   has_many :deck_cards, dependent: :destroy
   has_many :commanders, dependent: :destroy
   has_many :provider_links, dependent: :destroy
+  has_many :pod_slots, dependent: :destroy
+  has_many :game_night_decks, dependent: :destroy
+  has_many :game_night_pod_seats, dependent: :destroy
+  has_many :game_night_invitations, dependent: :nullify
   has_many :analysis_runs, dependent: :destroy
   has_many :matchup_notes, dependent: :destroy
   has_many :audit_events, as: :auditable, dependent: :nullify

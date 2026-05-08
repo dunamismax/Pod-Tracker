@@ -34,6 +34,28 @@ class UserTest < ActiveSupport::TestCase
     assert_nil User.find_by_token_for(:email_verification, token)
   end
 
+  test "destroy removes owned deck references from pods and game nights" do
+    user = users(:one)
+    deck = user.decks.create!(name: "Atraxa", commander_names: [ "Atraxa, Praetors' Voice" ])
+    run = deck.analysis_runs.create!(user: user, rubric_version: "test")
+    player = user.players.create!(name: "Stephen")
+    pod = user.pods.create!(name: "Friday Pod", format: "commander", status: "draft")
+    pod.pod_slots.create!(deck: deck, position: 1)
+    game_night = user.game_nights.create!(name: "Friday Commander", played_on: Date.new(2026, 5, 8))
+    game_night.game_night_decks.create!(player: player, deck: deck, position: 1)
+    game_night.game_night_pod_seats.create!(
+      player: player,
+      deck: deck,
+      analysis_run: run,
+      pod_number: 1,
+      seat_number: 1
+    )
+
+    assert_difference "User.count", -1 do
+      user.destroy!
+    end
+  end
+
   private
     def build_user(attrs = {})
       User.new({

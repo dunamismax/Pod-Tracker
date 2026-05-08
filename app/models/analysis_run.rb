@@ -8,6 +8,7 @@ class AnalysisRun < ApplicationRecord
   belongs_to :user, optional: true
   has_one :scorecard, dependent: :destroy
   has_many :salt_social_friction_evidences, dependent: :destroy
+  has_many :game_night_pod_seats, dependent: :nullify
 
   validates :kind, inclusion: { in: KINDS }
   validates :status, inclusion: { in: STATUSES }

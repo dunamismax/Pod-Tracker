@@ -4,11 +4,11 @@ class User < ApplicationRecord
 
   has_secure_password
   has_many :sessions, dependent: :destroy
-  has_many :decks, dependent: :destroy
-  has_many :analysis_runs, dependent: :nullify
-  has_many :pods, dependent: :destroy
-  has_many :players, dependent: :destroy
   has_many :game_nights, dependent: :destroy
+  has_many :pods, dependent: :destroy
+  has_many :decks, dependent: :destroy
+  has_many :players, dependent: :destroy
+  has_many :analysis_runs, dependent: :nullify
   has_many :game_night_invitations,
            foreign_key: :invited_user_id,
            inverse_of: :invited_user,
