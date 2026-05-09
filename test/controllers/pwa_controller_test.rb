@@ -6,7 +6,7 @@ class PwaControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     body = response.parsed_body
-    assert_equal "Ideal Magic", body["name"]
+    assert_equal "Pod Tracker", body["name"]
     assert_equal "/?source=pwa", body["start_url"]
     assert_equal "standalone", body["display"]
 
@@ -28,11 +28,11 @@ class PwaControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match %r{\bjavascript\b}, response.media_type
     assert_match(/CACHE_VERSION = "[^"]+"/, response.body)
-    assert_match(/ideal-magic-shell-/, response.body)
-    assert_match(/ideal-magic-pages-/, response.body)
+    assert_match(/pod-tracker-shell-/, response.body)
+    assert_match(/pod-tracker-pages-/, response.body)
     assert_match(/SKIP_WAITING/, response.body)
     assert_match(/CLEAR_PAGE_CACHE/, response.body)
-    assert_match(/PAGES_CACHE_PREFIX = "ideal-magic-pages-"/, response.body)
+    assert_match(/PAGES_CACHE_PREFIX = "pod-tracker-pages-"/, response.body)
   end
 
   test "layout links the manifest so installability is discoverable" do
@@ -41,6 +41,6 @@ class PwaControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match %r{<link rel="manifest"[^>]*href="/manifest\.json"}, response.body
     assert_match %r{<meta name="theme-color"[^>]*content="#09090b"}, response.body
-    assert_match %r{<meta name="apple-mobile-web-app-title"[^>]*content="Ideal Magic"}, response.body
+    assert_match %r{<meta name="apple-mobile-web-app-title"[^>]*content="Pod Tracker"}, response.body
   end
 end

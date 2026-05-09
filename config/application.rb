@@ -10,7 +10,7 @@ require_relative "../lib/smtp2go_delivery_method"
 
 ActionMailer::Base.add_delivery_method :smtp2go, Smtp2goDeliveryMethod
 
-module IdealMagic
+module PodTracker
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1

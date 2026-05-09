@@ -2,7 +2,7 @@ require "fileutils"
 require "pathname"
 
 module Codex
-  # Per-user Codex state directory ($CODEX_HOME). Each Ideal Magic user gets
+  # Per-user Codex state directory ($CODEX_HOME). Each Pod Tracker user gets
   # their own isolated CODEX_HOME under CODEX_HOME_ROOT so the codex CLI
   # signs JSON-RPC calls with that user's ChatGPT account, never another
   # user's. The web service must not have read or write access to Stephen's

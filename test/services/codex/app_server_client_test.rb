@@ -37,14 +37,14 @@ module Codex
         "account/login/start" => { "loginId" => "abc", "authUrl" => "https://chatgpt.com/login/abc" }
       })
       client = AppServerClient.new(transport: transport)
-      result = client.start_chatgpt_browser_login(client_label: "ideal-magic")
+      result = client.start_chatgpt_browser_login(client_label: "pod-tracker")
 
       assert_equal "abc", result["loginId"]
       assert_equal "https://chatgpt.com/login/abc", result["loginUrl"]
       method, params = transport.calls.first
       assert_equal "account/login/start", method
       assert_equal "chatgpt", params["type"]
-      assert_equal "ideal-magic", params["serviceName"]
+      assert_equal "pod-tracker", params["serviceName"]
     end
 
     test "start_chatgpt_device_login uses documented device-code login type" do
@@ -291,16 +291,16 @@ module Codex
           "PATH" => "/usr/bin",
           "HOME" => "/home/sawyer",
           "RAILS_SECRET_KEY_BASE" => "do-not-leak",
-          "IDEAL_MAGIC_DATABASE_PASSWORD" => "do-not-leak"
+          "POD_TRACKER_DATABASE_PASSWORD" => "do-not-leak"
         },
-        codex_home: "/var/lib/ideal-magic/codex/42"
+        codex_home: "/var/lib/pod-tracker/codex/42"
       )
 
-      assert_equal "/var/lib/ideal-magic/codex/42", env["CODEX_HOME"]
+      assert_equal "/var/lib/pod-tracker/codex/42", env["CODEX_HOME"]
       assert_equal "/usr/bin", env["PATH"]
       assert_equal "/home/sawyer", env["HOME"]
       refute env.key?("RAILS_SECRET_KEY_BASE"), "must not forward Rails secrets"
-      refute env.key?("IDEAL_MAGIC_DATABASE_PASSWORD"), "must not forward DB password"
+      refute env.key?("POD_TRACKER_DATABASE_PASSWORD"), "must not forward DB password"
     end
 
     test "stdio transport streams a turn that takes longer than the per-request timeout" do

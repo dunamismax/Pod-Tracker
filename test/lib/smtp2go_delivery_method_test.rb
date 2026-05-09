@@ -19,11 +19,11 @@ class Smtp2goDeliveryMethodTest < ActiveSupport::TestCase
     assert_equal "application/json", request["Accept"]
     assert_equal "api-test", request["X-Smtp2go-Api-Key"]
     assert_equal "api-test", body["api_key"]
-    assert_equal "Ideal Magic <no-reply@ideal-magic.com>", body["sender"]
+    assert_equal "Pod Tracker <no-reply@pod-tracker.app>", body["sender"]
     assert_equal [ users(:two).email_address ], body["to"]
-    assert_equal "Verify your Ideal Magic email", body["subject"]
-    assert_includes body["text_body"], "Welcome to Ideal Magic"
-    assert_includes body["html_body"], "Welcome to Ideal Magic"
+    assert_equal "Verify your Pod Tracker email", body["subject"]
+    assert_includes body["text_body"], "Welcome to Pod Tracker"
+    assert_includes body["html_body"], "Welcome to Pod Tracker"
   end
 
   test "raises when SMTP2GO returns a failed delivery response" do

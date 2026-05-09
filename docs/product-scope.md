@@ -1,6 +1,6 @@
 # Product Scope
 
-Ideal Magic is Stephen's primary Magic: The Gathering product, built on Rails and designed to be the operating surface for Commander play.
+Pod Tracker is Stephen's primary Magic: The Gathering product, built on Rails and designed to be the operating surface for Commander play.
 
 The product should become a Commander operating surface, not only a deck checker. The center is still transparent deck and pod evaluation, but the long-term advantage comes from connecting decks, owned cards, game-night history, matchup notes, and real playgroup meta evidence.
 
@@ -79,4 +79,4 @@ Expected durable concepts:
 
 ## Build Direction
 
-Ideal Magic is the single primary Magic project. Every feature in this scope document must be implemented natively on Ideal Magic's Rails stack (see `AGENTS.md` for the operator rules and `README.md` for stack/setup), not adapted from any other architecture.
+Pod Tracker is the single primary Magic project. Every feature in this scope document must be implemented natively on Pod Tracker's Rails stack (see `AGENTS.md` for the operator rules and `README.md` for stack/setup), not adapted from any other architecture.

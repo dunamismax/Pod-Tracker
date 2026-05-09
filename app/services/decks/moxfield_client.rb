@@ -5,7 +5,7 @@ require "uri"
 module Decks
   class MoxfieldClient
     API_HOST = "api2.moxfield.com".freeze
-    USER_AGENT = "IdealMagic/0.1 (+https://ideal-magic.com; github.com/dunamismax/ideal-magic)".freeze
+    USER_AGENT = "PodTracker/0.1 (+https://pod-tracker.app; github.com/dunamismax/pod-tracker)".freeze
     ACCEPT_HEADER = "application/json".freeze
     OPEN_TIMEOUT_SECONDS = 5
     READ_TIMEOUT_SECONDS = 15

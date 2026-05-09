@@ -31,7 +31,7 @@ module Accounts
     def filename
       slug = @user.email_address.to_s.gsub(/[^a-z0-9]+/i, "-").downcase.presence || "account"
       stamp = @generated_at.utc.strftime("%Y%m%dT%H%M%SZ")
-      "ideal-magic-account-#{slug}-#{stamp}.json"
+      "pod-tracker-account-#{slug}-#{stamp}.json"
     end
 
     private

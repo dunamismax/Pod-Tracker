@@ -15,7 +15,7 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   RAILS_ENV: test
-  DATABASE_URL: postgres://postgres:postgres@localhost:5432/ideal_magic_test
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/pod_tracker_test
 
 jobs:
   verify:

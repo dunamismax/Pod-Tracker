@@ -160,7 +160,7 @@ module Decks
 
     test "filename includes deck slug and stamp" do
       filename = AnalysisExporter.new(@deck, run: @run, ai_run: nil, generated_at: Time.utc(2026, 5, 7, 9, 0)).filename("md")
-      assert_equal "ideal-magic-analysis-najeela-5c-20260507T090000Z.md", filename
+      assert_equal "pod-tracker-analysis-najeela-5c-20260507T090000Z.md", filename
     end
   end
 end

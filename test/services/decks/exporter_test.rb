@@ -59,7 +59,7 @@ module Decks
     test "filename slugs the deck name and timestamps" do
       generated_at = Time.utc(2026, 5, 7, 9, 0, 0)
       filename = Exporter.new(@deck, generated_at: generated_at).filename("txt")
-      assert_equal "ideal-magic-deck-atraxa-test-20260507T090000Z.txt", filename
+      assert_equal "pod-tracker-deck-atraxa-test-20260507T090000Z.txt", filename
     end
   end
 end

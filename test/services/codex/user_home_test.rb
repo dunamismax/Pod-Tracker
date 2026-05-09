@@ -50,8 +50,8 @@ module Codex
 
     test "root_path honors CODEX_HOME_ROOT env var" do
       UserHome.reset_root_override!
-      assert_equal Pathname.new("/var/lib/ideal-magic/codex"),
-                   UserHome.root_path(env: { "CODEX_HOME_ROOT" => "/var/lib/ideal-magic/codex" })
+      assert_equal Pathname.new("/var/lib/pod-tracker/codex"),
+                   UserHome.root_path(env: { "CODEX_HOME_ROOT" => "/var/lib/pod-tracker/codex" })
     ensure
       UserHome.root_path_override = @tmp_root
     end

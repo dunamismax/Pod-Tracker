@@ -13,7 +13,7 @@ class DeckAnalysisExportsControllerTest < ActionDispatch::IntegrationTest
     get deck_analysis_export_path(@deck, format: :markdown)
     assert_response :success
     assert_equal "text/markdown", response.media_type
-    assert_match(/ideal-magic-analysis-existing-deck-/, response.headers["Content-Disposition"])
+    assert_match(/pod-tracker-analysis-existing-deck-/, response.headers["Content-Disposition"])
     assert_includes response.body, "# Analysis — Existing deck"
     assert_includes response.body, "## Deterministic analysis"
     assert_includes response.body, "| Power |"

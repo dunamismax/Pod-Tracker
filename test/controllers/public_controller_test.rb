@@ -4,7 +4,7 @@ class PublicControllerTest < ActionDispatch::IntegrationTest
   test "the public home page renders without authentication" do
     get root_path
     assert_response :success
-    assert_select "h1", /Commander companion|Ideal Magic|bracket/i
+    assert_select "h1", /Commander companion|Pod Tracker|bracket/i
   end
 
   test "the brackets page renders the long-form guide and the Game Changers list" do

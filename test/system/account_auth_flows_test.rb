@@ -17,7 +17,7 @@ class AccountAuthFlowsTest < ApplicationSystemTestCase
     visit email_verification_path(token: user.generate_token_for(:email_verification))
 
     assert_text "Email verified."
-    assert_text "Ideal Magic"
+    assert_text "Pod Tracker"
 
     visit account_path
     assert_text "new-player@example.com"
@@ -32,7 +32,7 @@ class AccountAuthFlowsTest < ApplicationSystemTestCase
     fill_in "password", with: "correct horse battery staple"
     click_button "Sign in"
 
-    assert_text "Ideal Magic"
+    assert_text "Pod Tracker"
   end
 
   test "user resets password from reset email token" do
@@ -55,7 +55,7 @@ class AccountAuthFlowsTest < ApplicationSystemTestCase
     fill_in "password", with: "fresh secure password"
     click_button "Sign in"
 
-    assert_text "Ideal Magic"
+    assert_text "Pod Tracker"
   end
 
   test "user deletes account after password confirmation" do
@@ -111,6 +111,6 @@ class AccountAuthFlowsTest < ApplicationSystemTestCase
       fill_in "password", with: password
       click_button "Sign in"
 
-      assert_text "Ideal Magic"
+      assert_text "Pod Tracker"
     end
 end

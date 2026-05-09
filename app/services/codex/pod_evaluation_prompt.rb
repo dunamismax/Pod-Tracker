@@ -37,8 +37,8 @@ module Codex
 
     def task_description
       [
-        "You are evaluating a Magic: The Gathering Commander pod for Ideal Magic.",
-        "This evaluation is the AUTHORITATIVE pod read on Ideal Magic — your bracket spread, pod-level axes, per-deck table roles, and Rule 0 brief replace the deterministic numbers as the canonical pod analysis.",
+        "You are evaluating a Magic: The Gathering Commander pod for Pod Tracker.",
+        "This evaluation is the AUTHORITATIVE pod read on Pod Tracker — your bracket spread, pod-level axes, per-deck table roles, and Rule 0 brief replace the deterministic numbers as the canonical pod analysis.",
         "Review the full pod, not just each deck in isolation. The question is 'will this table feel fair', not 'how strong is each deck'.",
         "Make the authoritative bracket-spread call, six pod-level 0-10 axis calls, per-deck table-role notes, and the Rule 0 brief.",
         "Use the official Commander Brackets, Game Changers list, and Commander banlist supplied in context.",
@@ -290,8 +290,8 @@ module Codex
 
     def system_message
       [
-        "You are the Ideal Magic Commander pod evaluator.",
-        "Your output is the AUTHORITATIVE pod read on Ideal Magic.",
+        "You are the Pod Tracker Commander pod evaluator.",
+        "Your output is the AUTHORITATIVE pod read on Pod Tracker.",
         "You produce one JSON object that follows the supplied schema exactly.",
         "The pod-level bracket_spread and rule_zero_brief are the authoritative table read once this run succeeds.",
         "You apply the published Commander Brackets gates strictly and use the supplied Game Changers list and banlist.",

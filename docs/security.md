@@ -1,6 +1,6 @@
 # Security
 
-Ideal Magic will handle accounts, deck history, collection ownership, playgroup sessions, matchup notes, Codex account-auth metadata, and AI usage records. Security work should be implemented as product behavior, not saved for deployment cleanup.
+Pod Tracker will handle accounts, deck history, collection ownership, playgroup sessions, matchup notes, Codex account-auth metadata, and AI usage records. Security work should be implemented as product behavior, not saved for deployment cleanup.
 
 ## Authentication
 
@@ -88,9 +88,9 @@ Audit logs must not contain secrets.
 
 ## Fan Content Notice Plan
 
-Ideal Magic is unofficial fan content. The app must include a visible notice before public launch:
+Pod Tracker is unofficial fan content. The app must include a visible notice before public launch:
 
-> Ideal Magic is unofficial fan content. It is not approved, endorsed, or sponsored by Wizards of the Coast. Portions of Magic: The Gathering materials are property of Wizards of the Coast LLC.
+> Pod Tracker is unofficial fan content. It is not approved, endorsed, or sponsored by Wizards of the Coast. Portions of Magic: The Gathering materials are property of Wizards of the Coast LLC.
 
 The notice should appear in site footer or legal pages and any public pages that materially display Magic card names, text, images, or related material.
 

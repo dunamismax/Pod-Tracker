@@ -6,7 +6,7 @@ module Codex
   class AccountConnections
     BROWSER_AUTH_MODE = "chatgpt_browser".freeze
     DEVICE_CODE_AUTH_MODE = "chatgpt_device_code".freeze
-    DEFAULT_CLIENT_LABEL = "ideal-magic".freeze
+    DEFAULT_CLIENT_LABEL = "pod-tracker".freeze
 
     Result = Struct.new(:attempt, :codex_account, :state, :detail, keyword_init: true)
 

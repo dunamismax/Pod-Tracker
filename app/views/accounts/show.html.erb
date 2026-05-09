@@ -81,7 +81,7 @@
       <% if @codex_account&.disconnected? %>
         Your Codex account is disconnected. Reconnect to enable AI evaluation.
       <% else %>
-        No Codex account is connected. AI evaluation requires connecting a ChatGPT/Codex account through the documented Codex App Server flow. Ideal Magic never collects ChatGPT passwords or stores OpenAI API keys in your browser.
+        No Codex account is connected. AI evaluation requires connecting a ChatGPT/Codex account through the documented Codex App Server flow. Pod Tracker never collects ChatGPT passwords or stores OpenAI API keys in your browser.
       <% end %>
     </p>
     <%= link_to "Connect Codex account", new_account_codex_login_path, class: "rounded-md px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium" %>
@@ -140,7 +140,7 @@
 
   <h2 class="font-bold text-2xl mt-10">Provider account links</h2>
   <p class="my-3 text-sm text-zinc-400">
-    Public deck-host profile links you have recorded. Ideal Magic does not collect provider passwords; deck import still relies on public deck URLs and pasted lists.
+    Public deck-host profile links you have recorded. Pod Tracker does not collect provider passwords; deck import still relies on public deck URLs and pasted lists.
   </p>
 
   <% if @provider_links.any? %>

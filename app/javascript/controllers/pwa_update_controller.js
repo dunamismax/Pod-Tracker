@@ -64,7 +64,7 @@ export default class extends Controller {
     if ("caches" in window) {
       caches.keys()
         .then((names) => Promise.all(names
-          .filter((name) => name.startsWith("ideal-magic-pages-"))
+          .filter((name) => name.startsWith("pod-tracker-pages-"))
           .map((name) => caches.delete(name))))
         .catch(() => {})
     }

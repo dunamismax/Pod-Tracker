@@ -43,7 +43,7 @@
       <div class="flex flex-col items-end gap-2 text-right">
         <%= link_to "Connect ChatGPT / Codex account", new_account_codex_login_path, class: "rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-medium text-white hover:bg-blue-500" %>
         <p class="max-w-xs text-xs text-zinc-500">
-          Sign in with your existing ChatGPT subscription through Codex App Server. Ideal Magic never sees your password and never holds OpenAI API keys.
+          Sign in with your existing ChatGPT subscription through Codex App Server. Pod Tracker never sees your password and never holds OpenAI API keys.
         </p>
       </div>
     <% elsif enqueue_path.present? && (run.nil? || %w[succeeded failed canceled].include?(run.status)) %>
@@ -53,7 +53,7 @@
 
   <% if needs_codex %>
     <div class="mt-4 rounded-md border border-blue-900/60 bg-blue-950/30 p-4 text-sm text-blue-100">
-      <p class="font-medium">No ChatGPT / Codex account is linked to this Ideal Magic account yet.</p>
+      <p class="font-medium">No ChatGPT / Codex account is linked to this Pod Tracker account yet.</p>
       <p class="mt-1 text-xs text-blue-100/80">
         AI evaluations of decks and pods run through your own ChatGPT subscription using the documented Codex App Server flow. Connect a ChatGPT account on the
         <%= link_to "account page", account_path, class: "underline" %>

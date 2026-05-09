@@ -7,7 +7,7 @@ module Codex
   # Boundary in front of OpenAI's documented Codex App Server JSON-RPC surface.
   #
   # The Codex App Server is responsible for the actual ChatGPT browser-OAuth and
-  # device-code login flows. Ideal Magic never sees the user's ChatGPT password;
+  # device-code login flows. Pod Tracker never sees the user's ChatGPT password;
   # it asks the App Server to start a login, surfaces the resulting URL or user
   # code, and waits for the App Server to confirm the credentials.
   #
@@ -32,8 +32,8 @@ module Codex
     }.freeze
 
     CLIENT_INFO = {
-      "name" => "ideal_magic",
-      "title" => "Ideal Magic",
+      "name" => "pod_tracker",
+      "title" => "Pod Tracker",
       "version" => "0.1.0"
     }.freeze
 
@@ -378,7 +378,7 @@ module Codex
       normalize_auth_status(account_result, rate_limit_result)
     end
 
-    def evaluate_scorecard(prompt, model: nil, client_label: "ideal-magic")
+    def evaluate_scorecard(prompt, model: nil, client_label: "pod-tracker")
       thread_id = nil
       begin
         thread_result = call(:start_thread, compact("serviceName" => client_label))

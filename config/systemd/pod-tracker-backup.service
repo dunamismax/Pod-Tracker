@@ -1,0 +1,33 @@
+[Unit]
+Description=Pod Tracker PostgreSQL backups (pg_dump)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+# Canonical copy of the unit installed at /etc/systemd/system/pod-tracker-backup.service.
+# To install:
+#   sudo install -m 0644 config/systemd/pod-tracker-backup.service /etc/systemd/system/pod-tracker-backup.service
+#   sudo install -m 0644 config/systemd/pod-tracker-backup.timer   /etc/systemd/system/pod-tracker-backup.timer
+#   sudo install -d -o sawyer -g sawyer -m 0750 /var/backups/pod-tracker
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now pod-tracker-backup.timer
+#
+# Manual one-shot run (oncall, before risky migrations, etc.):
+#   sudo systemctl start pod-tracker-backup.service
+
+[Service]
+Type=oneshot
+User=sawyer
+Group=sawyer
+WorkingDirectory=/home/sawyer/github/pod-tracker
+Environment=HOME=/home/sawyer
+Environment=PATH=/home/sawyer/.local/share/mise/installs/ruby/4.0.3/bin:/home/sawyer/.local/share/mise/installs/node/24.13.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/sawyer/github/pod-tracker/bin/backup_db
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/var/backups/pod-tracker
+PrivateTmp=true

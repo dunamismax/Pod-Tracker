@@ -78,7 +78,7 @@ module Decks
     def filename(extension)
       slug = @deck.name.to_s.gsub(/[^a-z0-9]+/i, "-").downcase.gsub(/^-+|-+$/, "").presence || "deck"
       stamp = @generated_at.utc.strftime("%Y%m%dT%H%M%SZ")
-      "ideal-magic-analysis-#{slug}-#{stamp}.#{extension}"
+      "pod-tracker-analysis-#{slug}-#{stamp}.#{extension}"
     end
 
     private

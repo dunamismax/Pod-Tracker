@@ -5,7 +5,7 @@ class UserMailerTest < ActionMailer::TestCase
     user = users(:two)
     email = UserMailer.verify_email(user)
 
-    assert_equal "Verify your Ideal Magic email", email.subject
+    assert_equal "Verify your Pod Tracker email", email.subject
     assert_equal [ user.email_address ], email.to
     assert_match(/email_verifications/, email.body.encoded)
   end

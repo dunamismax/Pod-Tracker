@@ -37,7 +37,7 @@ class CollectionFlowTest < ApplicationSystemTestCase
       fill_in "email_address", with: user.email_address
       fill_in "password", with: password
       click_button "Sign in"
-      assert_text "Ideal Magic"
+      assert_text "Pod Tracker"
     end
 
     def create_oracle_card(name)

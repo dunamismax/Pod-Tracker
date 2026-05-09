@@ -6,12 +6,12 @@
 #   bin/restore_db_drill <backup-run-dir>
 #
 # Where <backup-run-dir> is a directory written by bin/backup_db, e.g.
-#   /var/backups/ideal-magic/2026-05-07/20260507T103000Z
+#   /var/backups/pod-tracker/2026-05-07/20260507T103000Z
 #
 # The script:
 #   1. Verifies the OK marker and re-checks every dump's sha256 against MANIFEST.
-#   2. Creates a throwaway database `ideal_magic_restore_drill_<epoch>`.
-#   3. Runs `pg_restore` against the primary dump (`ideal_magic_production.dump`).
+#   2. Creates a throwaway database `pod_tracker_restore_drill_<epoch>`.
+#   3. Runs `pg_restore` against the primary dump (`pod_tracker_production.dump`).
 #   4. Asserts that `users`, `decks`, and `oracle_cards` exist and have rows.
 #   5. Drops the throwaway database.
 #
@@ -22,7 +22,7 @@
 #      operator can clean it up by hand.
 #
 # Environment:
-#   IDEAL_MAGIC_ENV_FILE    default /etc/ideal-magic-web/env (same source the
+#   POD_TRACKER_ENV_FILE    default /etc/pod-tracker-web/env (same source the
 #                           backup script uses for connection details).
 
 set -euo pipefail
@@ -33,7 +33,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 run_dir="$1"
-ENV_FILE="${IDEAL_MAGIC_ENV_FILE:-/etc/ideal-magic-web/env}"
+ENV_FILE="${POD_TRACKER_ENV_FILE:-/etc/pod-tracker-web/env}"
 
 if [ ! -d "$run_dir" ]; then
   echo "restore_db_drill: $run_dir does not exist" >&2
@@ -52,14 +52,14 @@ if [ ! -r "$ENV_FILE" ]; then
   exit 1
 fi
 
-PGPASSWORD="$(grep -E '^IDEAL_MAGIC_DATABASE_PASSWORD=' "$ENV_FILE" | head -n1 | cut -d= -f2-)"
-PGHOST="$(grep -E '^IDEAL_MAGIC_DATABASE_HOST=' "$ENV_FILE" | head -n1 | cut -d= -f2- || true)"
+PGPASSWORD="$(grep -E '^POD_TRACKER_DATABASE_PASSWORD=' "$ENV_FILE" | head -n1 | cut -d= -f2-)"
+PGHOST="$(grep -E '^POD_TRACKER_DATABASE_HOST=' "$ENV_FILE" | head -n1 | cut -d= -f2- || true)"
 PGHOST="${PGHOST:-localhost}"
-PGPORT="${IDEAL_MAGIC_DATABASE_PORT:-5432}"
-PGUSER="${IDEAL_MAGIC_DATABASE_USER:-ideal_magic}"
+PGPORT="${POD_TRACKER_DATABASE_PORT:-5432}"
+PGUSER="${POD_TRACKER_DATABASE_USER:-pod_tracker}"
 
 if [ -z "$PGPASSWORD" ]; then
-  echo "restore_db_drill: IDEAL_MAGIC_DATABASE_PASSWORD not set in $ENV_FILE" >&2
+  echo "restore_db_drill: POD_TRACKER_DATABASE_PASSWORD not set in $ENV_FILE" >&2
   exit 1
 fi
 export PGPASSWORD PGHOST PGPORT PGUSER
@@ -80,13 +80,13 @@ while read -r db bytes sha; do
   echo "    $db ok ($bytes bytes)"
 done <"$run_dir/MANIFEST"
 
-primary_dump="$run_dir/ideal_magic_production.dump"
+primary_dump="$run_dir/pod_tracker_production.dump"
 if [ ! -f "$primary_dump" ]; then
   echo "restore_db_drill: $primary_dump not found" >&2
   exit 1
 fi
 
-drill_db="ideal_magic_restore_drill_$$_$(date -u +%s)"
+drill_db="pod_tracker_restore_drill_$$_$(date -u +%s)"
 cleanup() {
   set +e
   psql -d postgres -v ON_ERROR_STOP=0 -c "DROP DATABASE IF EXISTS \"$drill_db\";" >/dev/null 2>&1 \

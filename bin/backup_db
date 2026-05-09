@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# bin/backup_db — pg_dump every Ideal Magic production database to a timestamped
+# bin/backup_db — pg_dump every Pod Tracker production database to a timestamped
 # directory. Designed to run from the host (or from a systemd timer) as the
-# `sawyer` user with read access to /etc/ideal-magic-web/env.
+# `sawyer` user with read access to /etc/pod-tracker-web/env.
 #
 # Output layout:
 #   $BACKUP_ROOT/<UTC-date>/<UTC-timestamp>/
-#       ideal_magic_production.dump
-#       ideal_magic_production_cache.dump
-#       ideal_magic_production_queue.dump
-#       ideal_magic_production_cable.dump
+#       pod_tracker_production.dump
+#       pod_tracker_production_cache.dump
+#       pod_tracker_production_queue.dump
+#       pod_tracker_production_cable.dump
 #       MANIFEST            # one line per dump: "<db> <bytes> <sha256>"
 #       OK                  # written last; absence means the run failed
 #
@@ -16,12 +16,12 @@
 # `pg_restore` against an empty database.
 #
 # Environment:
-#   BACKUP_ROOT             default /var/backups/ideal-magic
+#   BACKUP_ROOT             default /var/backups/pod-tracker
 #   BACKUP_RETENTION_DAYS   default 14 — directories under $BACKUP_ROOT older
 #                           than this are pruned after a successful run.
-#   IDEAL_MAGIC_ENV_FILE    default /etc/ideal-magic-web/env. Must define
-#                           IDEAL_MAGIC_DATABASE_PASSWORD; HOST/PORT/USER fall
-#                           back to localhost / 5432 / ideal_magic.
+#   POD_TRACKER_ENV_FILE    default /etc/pod-tracker-web/env. Must define
+#                           POD_TRACKER_DATABASE_PASSWORD; HOST/PORT/USER fall
+#                           back to localhost / 5432 / pod_tracker.
 #
 # Exit codes:
 #   0  every dump succeeded and OK was written.
@@ -30,15 +30,15 @@
 
 set -euo pipefail
 
-ENV_FILE="${IDEAL_MAGIC_ENV_FILE:-/etc/ideal-magic-web/env}"
-BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/ideal-magic}"
+ENV_FILE="${POD_TRACKER_ENV_FILE:-/etc/pod-tracker-web/env}"
+BACKUP_ROOT="${BACKUP_ROOT:-/var/backups/pod-tracker}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 
 DATABASES=(
-  "ideal_magic_production"
-  "ideal_magic_production_cache"
-  "ideal_magic_production_queue"
-  "ideal_magic_production_cable"
+  "pod_tracker_production"
+  "pod_tracker_production_cache"
+  "pod_tracker_production_queue"
+  "pod_tracker_production_cable"
 )
 
 if [ ! -r "$ENV_FILE" ]; then
@@ -49,14 +49,14 @@ fi
 # Pull only the database-related variables from the env file. We deliberately
 # don't `source` the whole file so unrelated production secrets don't leak into
 # this script's environment.
-PGPASSWORD="$(grep -E '^IDEAL_MAGIC_DATABASE_PASSWORD=' "$ENV_FILE" | head -n1 | cut -d= -f2-)"
-PGHOST="$(grep -E '^IDEAL_MAGIC_DATABASE_HOST=' "$ENV_FILE" | head -n1 | cut -d= -f2- || true)"
+PGPASSWORD="$(grep -E '^POD_TRACKER_DATABASE_PASSWORD=' "$ENV_FILE" | head -n1 | cut -d= -f2-)"
+PGHOST="$(grep -E '^POD_TRACKER_DATABASE_HOST=' "$ENV_FILE" | head -n1 | cut -d= -f2- || true)"
 PGHOST="${PGHOST:-localhost}"
-PGPORT="${IDEAL_MAGIC_DATABASE_PORT:-5432}"
-PGUSER="${IDEAL_MAGIC_DATABASE_USER:-ideal_magic}"
+PGPORT="${POD_TRACKER_DATABASE_PORT:-5432}"
+PGUSER="${POD_TRACKER_DATABASE_USER:-pod_tracker}"
 
 if [ -z "$PGPASSWORD" ]; then
-  echo "backup_db: IDEAL_MAGIC_DATABASE_PASSWORD not set in $ENV_FILE" >&2
+  echo "backup_db: POD_TRACKER_DATABASE_PASSWORD not set in $ENV_FILE" >&2
   exit 1
 fi
 export PGPASSWORD PGHOST PGPORT PGUSER

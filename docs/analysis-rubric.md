@@ -1,6 +1,6 @@
 # Analysis Rubric
 
-Ideal Magic scores Commander decks and pods from deterministic evidence first. AI evaluation may refine explanations and judgment later, but every score must remain traceable to stored facts, rubric versions, and source data.
+Pod Tracker scores Commander decks and pods from deterministic evidence first. AI evaluation may refine explanations and judgment later, but every score must remain traceable to stored facts, rubric versions, and source data.
 
 The primary axis is Wizards' official Commander Brackets system (1–5). Six 0–10 sub-axes — power, speed, interaction, consistency, salt, and social friction — sub-band a deck *inside* its bracket and explain Rule 0 friction.
 

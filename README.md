@@ -1,12 +1,12 @@
-# Ideal Magic
+# Pod Tracker
 
 The serious Commander companion: import a deck, get an honest read on it under Wizards' official Commander Brackets system, build pods that actually feel fair, remember every game night, and turn your real playgroup into useful tuning advice.
 
-Ideal Magic is a web app for Magic: The Gathering Commander players who want more than a power level guess. It places decks on the official 1–5 Commander Brackets, scores them from real evidence, compares pods before the cards hit the table, and remembers what happened the last time these commanders met.
+Pod Tracker is a web app for Magic: The Gathering Commander players who want more than a power level guess. It places decks on the official 1–5 Commander Brackets, scores them from real evidence, compares pods before the cards hit the table, and remembers what happened the last time these commanders met.
 
-Live at [ideal-magic.com](https://ideal-magic.com). The bracket guide, Game Changers list, and pregame template are public — no account needed to read them.
+Live at [pod-tracker.app](https://pod-tracker.app). The bracket guide, Game Changers list, and pregame template are public — no account needed to read them.
 
-## What Ideal Magic Does
+## What Pod Tracker Does
 
 - **Place a deck on the Commander Brackets** (1 Exhibition · 2 Core · 3 Upgraded · 4 Optimized · 5 cEDH) with the Game Changers, mass land denial, extra turns, and two-card combos that drove the call.
 - **Import a deck** by paste, text export, or public Archidekt / Moxfield URL.
@@ -23,9 +23,9 @@ Live at [ideal-magic.com](https://ideal-magic.com). The bracket guide, Game Chan
 
 You can read the bracket guide and reference pages without an account:
 
-- [`/brackets`](https://ideal-magic.com/brackets) — the long-form Commander Brackets explanation.
-- [`/brackets/game-changers`](https://ideal-magic.com/brackets/game-changers) — the canonical Game Changers list, grouped by play pattern.
-- [`/brackets/pregame-template`](https://ideal-magic.com/brackets/pregame-template) — the Rule 0 template with worked examples.
+- [`/brackets`](https://pod-tracker.app/brackets) — the long-form Commander Brackets explanation.
+- [`/brackets/game-changers`](https://pod-tracker.app/brackets/game-changers) — the canonical Game Changers list, grouped by play pattern.
+- [`/brackets/pregame-template`](https://pod-tracker.app/brackets/pregame-template) — the Rule 0 template with worked examples.
 
 Importing decks, tracking your collection, building pods, and running analysis still require an account.
 
@@ -41,7 +41,7 @@ Importing decks, tracking your collection, building pods, and running analysis s
 
 ## How It Reads a Deck
 
-The headline output is a **Commander Bracket** placement (1–5) plus a sub-band (`low`, `mid`, `high`) inside that bracket. Once a deck has been imported, Ideal Magic shows a deterministic preliminary read against a source-controlled Game Changers catalog and two-card-combo list. The user can then run an **AI evaluation** against their own ChatGPT/Codex account; the LLM is fed the long-form Commander Brackets rules text, the canonical Game Changers list, the current Commander banlist, and the deck name + decklist, and returns the bracket call, sub-band, and the six 0–10 axes itself. Once the AI evaluation succeeds it becomes the canonical deck read on the show page, with the deterministic numbers tucked behind a "preliminary read" disclosure. Card legality stays deterministic regardless — the AI cannot override the banlist.
+The headline output is a **Commander Bracket** placement (1–5) plus a sub-band (`low`, `mid`, `high`) inside that bracket. Once a deck has been imported, Pod Tracker shows a deterministic preliminary read against a source-controlled Game Changers catalog and two-card-combo list. The user can then run an **AI evaluation** against their own ChatGPT/Codex account; the LLM is fed the long-form Commander Brackets rules text, the canonical Game Changers list, the current Commander banlist, and the deck name + decklist, and returns the bracket call, sub-band, and the six 0–10 axes itself. Once the AI evaluation succeeds it becomes the canonical deck read on the show page, with the deterministic numbers tucked behind a "preliminary read" disclosure. Card legality stays deterministic regardless — the AI cannot override the banlist.
 
 The six 0–10 axes sub-band the bracket — they explain whether a Bracket 3 deck sits at the low end (close to Bracket 2) or pressing against Bracket 4:
 
@@ -60,13 +60,13 @@ Full rubric: [docs/analysis-rubric.md](docs/analysis-rubric.md).
 
 ## Status
 
-Ideal Magic runs live at [ideal-magic.com](https://ideal-magic.com) and the planned build is complete. The Rails foundation, card corpus pipeline, Commander legality engine, account system, deck import, deterministic scoring, collection import, deck gaps, demand pressure, recommendation ownership labels, pods, game-night check-in, pod seating, result recording, matchup note capture/search, post-game prompts, deck/commander meta summaries, revision-level result history, per-user Codex account-auth transport with production-safe device-code sign-in, AI scorecard schema/prompt contracts, queued AI evaluation pipeline, AI-result rendering, plain-text/CSV/JSON deck and Markdown/JSON analysis exports, opt-in revocable public deck and pod share links that mirror the AI Commander Brackets evaluation when one has run (decklist + deterministic + AI analysis; no playgroup notes, table results, collection fit, opponent identity, or audit history leak), the installable PWA shell (manifest, versioned service worker, offline-readable recent pages, reload prompt), the explicit offline write-state banner, mobile bottom nav and responsive deck filters, and the self-hosted deployment shape are all in place. Single-deck AI evaluation is authoritative for bracket placement and the six power-band axes once a Codex run succeeds; pod AI evaluation is authoritative for pod bracket spread, table-fit axes, per-deck table roles, and the Rule 0 brief. Deterministic reads stay as preliminary fallbacks. The Codex deck and pod prompts run on `deck-eval-v3` / `pod-eval-v3` against the unchanged v2 response schemas — each card ships with full oracle text and Ideal Magic role/salt/friction tags, and the prompts walk a structured per-axis evaluation protocol with explicit pitfalls and an evidence quality bar, which is what produces the sub-band six-axis scorecard values on the deck show page.
+Pod Tracker runs live at [pod-tracker.app](https://pod-tracker.app) and the planned build is complete. The Rails foundation, card corpus pipeline, Commander legality engine, account system, deck import, deterministic scoring, collection import, deck gaps, demand pressure, recommendation ownership labels, pods, game-night check-in, pod seating, result recording, matchup note capture/search, post-game prompts, deck/commander meta summaries, revision-level result history, per-user Codex account-auth transport with production-safe device-code sign-in, AI scorecard schema/prompt contracts, queued AI evaluation pipeline, AI-result rendering, plain-text/CSV/JSON deck and Markdown/JSON analysis exports, opt-in revocable public deck and pod share links that mirror the AI Commander Brackets evaluation when one has run (decklist + deterministic + AI analysis; no playgroup notes, table results, collection fit, opponent identity, or audit history leak), the installable PWA shell (manifest, versioned service worker, offline-readable recent pages, reload prompt), the explicit offline write-state banner, mobile bottom nav and responsive deck filters, and the self-hosted deployment shape are all in place. Single-deck AI evaluation is authoritative for bracket placement and the six power-band axes once a Codex run succeeds; pod AI evaluation is authoritative for pod bracket spread, table-fit axes, per-deck table roles, and the Rule 0 brief. Deterministic reads stay as preliminary fallbacks. The Codex deck and pod prompts run on `deck-eval-v3` / `pod-eval-v3` against the unchanged v2 response schemas — each card ships with full oracle text and Pod Tracker role/salt/friction tags, and the prompts walk a structured per-axis evaluation protocol with explicit pitfalls and an evidence quality bar, which is what produces the sub-band six-axis scorecard values on the deck show page.
 
 Operational runbook for the live deployment lives in [docs/deployment.md](docs/deployment.md). Repo-local operator and product rules live in [AGENTS.md](AGENTS.md).
 
 ## Documentation
 
-- [docs/product-scope.md](docs/product-scope.md) — what Ideal Magic does and where it draws the line.
+- [docs/product-scope.md](docs/product-scope.md) — what Pod Tracker does and where it draws the line.
 - [docs/analysis-rubric.md](docs/analysis-rubric.md) — how scores are computed, banded, and explained.
 - [docs/provider-integrations.md](docs/provider-integrations.md) — which deck and collection sources are supported and why.
 - [docs/security.md](docs/security.md) — auth, secret handling, privacy, and fan-content boundaries.
@@ -77,7 +77,7 @@ Operational runbook for the live deployment lives in [docs/deployment.md](docs/d
 
 ## For Developers
 
-Ideal Magic is a Ruby on Rails monolith. To run it locally:
+Pod Tracker is a Ruby on Rails monolith. To run it locally:
 
 ```sh
 bin/setup
@@ -99,19 +99,19 @@ To redeploy the live site after pulling or pushing changes (run on the productio
 bin/redeploy
 ```
 
-`bin/redeploy` pulls, bundles, runs `db:prepare`, precompiles assets, restarts the systemd unit, and then health-checks `https://ideal-magic.com/up`. See [docs/deployment.md](docs/deployment.md) for the full deployment shape.
+`bin/redeploy` pulls, bundles, runs `db:prepare`, precompiles assets, restarts the systemd unit, and then health-checks `https://pod-tracker.app/up`. See [docs/deployment.md](docs/deployment.md) for the full deployment shape.
 
 Use `mise` (or another Ruby version manager that honors `.ruby-version` / `.mise.toml`) to select the pinned Ruby. The stack is a Ruby 4.0.3 / Rails 8.1.3 monolith on PostgreSQL 17, with Hotwire (Turbo + Stimulus), Tailwind CSS v4, ViewComponent, Propshaft, and Solid Queue / Cache / Cable in-Puma. Quality gates run through `bin/verify` (RuboCop, ERB lint, bundler-audit, importmap audit, Brakeman, Rails tests, system tests, seeds replant). See [AGENTS.md](AGENTS.md) for the operator rules and [docs/deployment.md](docs/deployment.md) for the deployment shape.
 
 ## Fan Content Notice
 
-Ideal Magic is unofficial fan content. It is not approved, endorsed, or sponsored by Wizards of the Coast.
+Pod Tracker is unofficial fan content. It is not approved, endorsed, or sponsored by Wizards of the Coast.
 
 Portions of Magic: The Gathering materials are property of Wizards of the Coast LLC. Use of card names, card text, images, and related material follows Wizards' Fan Content Policy and source-specific data terms.
 
 ## License
 
-Ideal Magic is licensed under the GNU General Public License, version 3. See [LICENSE](LICENSE) for the full text.
+Pod Tracker is licensed under the GNU General Public License, version 3. See [LICENSE](LICENSE) for the full text.
 
 ```
 GNU GENERAL PUBLIC LICENSE

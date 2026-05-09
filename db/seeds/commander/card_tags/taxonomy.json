@@ -1,6 +1,6 @@
 {
   "version": "2026-05-04",
-  "notes": "Source-controlled internal card tag taxonomy. Role tags describe deck construction roles. Salt tags describe drivers of resentment, frustration, or Rule 0 concern. Social-friction tags describe table-experience patterns separate from raw power. Salt and social-friction weights are 0-100 scale contributions to Ideal Magic's deterministic salt and social-friction score components.",
+  "notes": "Source-controlled internal card tag taxonomy. Role tags describe deck construction roles. Salt tags describe drivers of resentment, frustration, or Rule 0 concern. Social-friction tags describe table-experience patterns separate from raw power. Salt and social-friction weights are 0-100 scale contributions to Pod Tracker's deterministic salt and social-friction score components.",
   "tags": [
     {
       "slug": "ramp",

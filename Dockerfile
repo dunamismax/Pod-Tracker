@@ -2,8 +2,8 @@
 # check=error=true
 
 # This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
-# docker build -t ideal_magic .
-# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name ideal_magic ideal_magic
+# docker build -t pod_tracker .
+# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name pod_tracker pod_tracker
 
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 

@@ -1,6 +1,6 @@
 # Public marketing site
 
-The public marketing surface lives under `PublicController` and renders without authentication. It is the only part of `ideal-magic.com` that anonymous visitors can read.
+The public marketing surface lives under `PublicController` and renders without authentication. It is the only part of `pod-tracker.app` that anonymous visitors can read.
 
 ## Routes
 
@@ -10,7 +10,7 @@ The public marketing surface lives under `PublicController` and renders without 
 | `/brackets` | `public#brackets` | Long-form Commander Brackets guide. Renders the canonical Game Changers list (`db/seeds/commander/brackets/game_changers.json`) and the current Commander banned list (`LegalitySnapshot.current_commander`). |
 | `/brackets/game-changers` | `public#game_changers` | Dedicated Game Changers list grouped by category. |
 | `/brackets/pregame-template` | `public#pregame_template` | Copy-pasteable Rule 0 template with worked examples for each bracket. |
-| `/about` | `public#about` | What Ideal Magic is, fan-content disclaimer, GitHub link. |
+| `/about` | `public#about` | What Pod Tracker is, fan-content disclaimer, GitHub link. |
 | `/privacy` | `public#privacy` | Privacy policy stub. |
 | `/terms` | `public#terms` | Terms stub. |
 | `/sitemap.xml` | `public#sitemap` | XML sitemap of the public marketing URLs. |

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This is the standalone operating manual for Ideal Magic. Reading this file plus `README.md` is sufficient context to begin work; no other prompt files need to be loaded.
+This is the standalone operating manual for Pod Tracker. Reading this file plus `README.md` is sufficient context to begin work; no other prompt files need to be loaded.
 
 ## Read Order
 
@@ -160,16 +160,16 @@ Three gotchas because the production app and the working tree live on the same m
 
 2. **`ostruct` is no longer a default gem on Ruby 4.0.** `require "ostruct"` will crash a test with `LoadError` (the trace points at bootsnap/zeitwerk and looks like a load-path bug — it isn't). Use `Struct.new` for ad-hoc test doubles instead of pulling `ostruct` into the Gemfile.
 
-3. **The test database has no default role.** `config/database.yml`'s `test:` block omits username/password, so Active Record connects as OS-user `sawyer` and dies with `FATAL: role "sawyer" does not exist`. Export `DATABASE_URL` pointing at the `ideal_magic` role before running anything that touches the DB:
+3. **The test database has no default role.** `config/database.yml`'s `test:` block omits username/password, so Active Record connects as OS-user `sawyer` and dies with `FATAL: role "sawyer" does not exist`. Export `DATABASE_URL` pointing at the `pod_tracker` role before running anything that touches the DB:
 
    ```sh
-   export DATABASE_URL="postgres://ideal_magic:$(. /etc/ideal-magic-web/env; echo "$IDEAL_MAGIC_DATABASE_PASSWORD")@localhost/ideal_magic_test"
+   export DATABASE_URL="postgres://pod_tracker:$(. /etc/pod-tracker-web/env; echo "$POD_TRACKER_DATABASE_PASSWORD")@localhost/pod_tracker_test"
    bin/verify
    ```
 
-   The `ideal_magic_test` database and its `ideal_magic_test_0..N` parallel-worker siblings already exist on the host PostgreSQL cluster.
+   The `pod_tracker_test` database and its `pod_tracker_test_0..N` parallel-worker siblings already exist on the host PostgreSQL cluster.
 
-4. **Do not leave ad-hoc rows in the shared test database.** The `ideal_magic` role can run the app tests, but Rails cannot disable PostgreSQL referential integrity as that role. If a `bin/rails runner` inspection writes rows into `ideal_magic_test` outside a test transaction, the next fixture load can fail with foreign-key errors against `users`. Prefer read-only runners; if you intentionally dirty the test DB, clean it before rerunning tests.
+4. **Do not leave ad-hoc rows in the shared test database.** The `pod_tracker` role can run the app tests, but Rails cannot disable PostgreSQL referential integrity as that role. If a `bin/rails runner` inspection writes rows into `pod_tracker_test` outside a test transaction, the next fixture load can fail with foreign-key errors against `users`. Prefer read-only runners; if you intentionally dirty the test DB, clean it before rerunning tests.
 
 5. **`Decks::FixtureLibrary` does not seed `OracleCard` rows.** The fixture decks under `db/seeds/commander/deck_fixtures/` build `Deck` + `DeckCard` records by name only; the `card_tag_assignments` join is the only thing wired through the test setup's `CommanderFormat::CardTagImporter.new.import!`. Tests that build a fixture deck cannot assert on `oracle_card.oracle_text`, `oracle_card.color_identity`, or any card-tag content sourced through `OracleCard#card_tags` — those fields are nil unless the test seeds OracleCards itself. Test the prompt structure (keys present, arrays well-formed) rather than the prompt content.
 
@@ -179,11 +179,11 @@ Three gotchas because the production app and the working tree live on the same m
 
 These rules don't move:
 
-- Ideal Magic is Commander-first for v1.
+- Pod Tracker is Commander-first for v1.
 - Public deck URLs, pasted decklists, and uploaded text exports are the supported import paths. No scraping authenticated provider data. Private Archidekt or Moxfield account sync requires documented provider support or explicit approval.
 - Card facts and Commander legality come from deterministic source data — Scryfall bulk data plus mtgcommander.net rules and banlist. AI interprets, never rules. Card legality stays deterministic regardless of any AI evaluation outcome.
-- AI must use OpenAI's documented Codex App Server account-auth surface as the exclusive v1 user-facing model path. Users connect ChatGPT/Codex through Codex-managed browser OAuth or device-code login; Ideal Magic rides the resulting Codex account mode and ChatGPT/Codex rate limits instead of app-owned per-token API billing.
-- On the hosted `ideal-magic.com` surface, device-code login is the normal Codex sign-in path. Codex browser OAuth redirects to `localhost` on the app-server host, so it only works when the user's browser is running on the same machine as the Codex app-server (or through an intentional tunnel).
+- AI must use OpenAI's documented Codex App Server account-auth surface as the exclusive v1 user-facing model path. Users connect ChatGPT/Codex through Codex-managed browser OAuth or device-code login; Pod Tracker rides the resulting Codex account mode and ChatGPT/Codex rate limits instead of app-owned per-token API billing.
+- On the hosted `pod-tracker.app` surface, device-code login is the normal Codex sign-in path. Codex browser OAuth redirects to `localhost` on the app-server host, so it only works when the user's browser is running on the same machine as the Codex app-server (or through an intentional tunnel).
 - Do not implement generic "Sign in with OpenAI" API OAuth, ChatGPT password collection, scraping, browser-visible API keys, or hand-rolled refresh-token calls outside the documented Codex App Server flow.
 - Codex credentials are per-user, encrypted at rest, never logged, never rendered to a browser. Each user gets their own `CODEX_HOME=<CODEX_HOME_ROOT>/<user.id>/` (mode 0700), materialized by `Codex::UserHome.ensure!(user)` on first login. Logout / disconnect / account deletion all `UserHome.purge!`.
 - Salt and social-friction scores are conversation aids, not moral judgments. Evidence-backed, neutral language.
@@ -225,39 +225,39 @@ If real-world feedback turns into engineering work, file it in commit history or
 
 ## Production Deployment
 
-`ideal-magic.com` is live and self-hosted on Stephen's Ubuntu VM. Treat it as the canonical production target for v1, not a future deploy.
+`pod-tracker.app` is live and self-hosted on Stephen's Ubuntu VM. Treat it as the canonical production target for v1, not a future deploy.
 
 Production runtime (the v1 deployment shape):
 
-- Native Puma under systemd, not Docker Compose. The other Rails app on this VM (`dunamismax-web.service`) follows the same pattern; Ideal Magic matches it. The Compose-based plan was deferred during the rewrite — only revisit it if a concrete reason emerges.
-- Caddy at the host edge terminates TLS for `ideal-magic.com` and `www.ideal-magic.com` and reverse-proxies to `127.0.0.1:8083`.
-- PostgreSQL 17 from Ubuntu's package, running on the host. Production databases are `ideal_magic_production`, `ideal_magic_production_cache`, `ideal_magic_production_queue`, `ideal_magic_production_cable`, owned by role `ideal_magic`.
+- Native Puma under systemd, not Docker Compose. The other Rails app on this VM (`dunamismax-web.service`) follows the same pattern; Pod Tracker matches it. The Compose-based plan was deferred during the rewrite — only revisit it if a concrete reason emerges.
+- Caddy at the host edge terminates TLS for `pod-tracker.app` and `www.pod-tracker.app` and reverse-proxies to `127.0.0.1:8083`.
+- PostgreSQL 17 from Ubuntu's package, running on the host. Production databases are `pod_tracker_production`, `pod_tracker_production_cache`, `pod_tracker_production_queue`, `pod_tracker_production_cable`, owned by role `pod_tracker`.
 - Solid Queue runs in-Puma via `SOLID_QUEUE_IN_PUMA=true`. No separate worker process for now.
 - Ruby 4.0.3 and Node 24.13.1 come from `mise` installs under `/home/sawyer/.local/share/mise/installs/`.
 
 Production paths to know:
 
-- App tree: `/home/sawyer/github/ideal-magic`
-- Env file: `/etc/ideal-magic-web/env` (root:sawyer 0640) — holds `SECRET_KEY_BASE`, `IDEAL_MAGIC_DATABASE_PASSWORD`, `IDEAL_MAGIC_DATABASE_HOST`, `RAILS_ENV=production`, `PORT=8083`, etc. Add new production env vars here.
-- systemd unit: `/etc/systemd/system/ideal-magic-web.service`
-- Caddy config: `/etc/caddy/Caddyfile` (the `ideal-magic.com` and `www.ideal-magic.com` blocks)
-- Master key: `/home/sawyer/github/ideal-magic/config/master.key` is gitignored. Back it up out-of-band; without it `config/credentials.yml.enc` is unreadable.
-- Sudoers drop-in: `/etc/sudoers.d/ideal-magic-web` grants `sawyer` passwordless `systemctl restart|reload|status ideal-magic-web.service` and `journalctl -u ideal-magic-web*` so `bin/redeploy` runs without prompts.
+- App tree: `/home/sawyer/github/pod-tracker`
+- Env file: `/etc/pod-tracker-web/env` (root:sawyer 0640) — holds `SECRET_KEY_BASE`, `POD_TRACKER_DATABASE_PASSWORD`, `POD_TRACKER_DATABASE_HOST`, `RAILS_ENV=production`, `PORT=8083`, etc. Add new production env vars here.
+- systemd unit: `/etc/systemd/system/pod-tracker-web.service`
+- Caddy config: `/etc/caddy/Caddyfile` (the `pod-tracker.app` and `www.pod-tracker.app` blocks)
+- Master key: `/home/sawyer/github/pod-tracker/config/master.key` is gitignored. Back it up out-of-band; without it `config/credentials.yml.enc` is unreadable.
+- Sudoers drop-in: `/etc/sudoers.d/pod-tracker-web` grants `sawyer` passwordless `systemctl restart|reload|status pod-tracker-web.service` and `journalctl -u pod-tracker-web*` so `bin/redeploy` runs without prompts.
 
 Deploy loop:
 
 - After local edits, push, then on the VM (or already on it): `bin/redeploy`. It pulls, bundles (production groups only), runs `db:prepare`, precompiles assets, restarts the unit, and curls `/up` until it returns 200.
-- For an iteration that does not need a code pull (e.g. testing a config tweak), `sudo systemctl restart ideal-magic-web` is the smallest restart.
-- Logs: `sudo journalctl -u ideal-magic-web -f` (passwordless for `sawyer`).
-- Health: `curl -s -o /dev/null -w '%{http_code}\n' https://ideal-magic.com/up`.
+- For an iteration that does not need a code pull (e.g. testing a config tweak), `sudo systemctl restart pod-tracker-web` is the smallest restart.
+- Logs: `sudo journalctl -u pod-tracker-web -f` (passwordless for `sawyer`).
+- Health: `curl -s -o /dev/null -w '%{http_code}\n' https://pod-tracker.app/up`.
 
 Deployment-shape rules:
 
-- Do not commit `config/master.key`, `/etc/ideal-magic-web/env`, or any rotated database password.
-- `config/database.yml` reads the production primary host from `IDEAL_MAGIC_DATABASE_HOST` (default `localhost`). PostgreSQL on this VM uses peer auth on the default socket, so TCP/`localhost` is required for the `ideal_magic` role.
-- Adding a new production-only env var: update `.env.example` (placeholder), update `/etc/ideal-magic-web/env`, restart the service. Do not bake secrets into the unit file.
-- Adding a new background process (e.g. a separate worker if Solid-in-Puma stops fitting): add a sibling systemd unit (`ideal-magic-worker.service`) modeled on `ideal-magic-web.service`, do not introduce Docker Compose just to add one process.
-- Daily `pg_dump` backups run via `bin/backup_db` + `config/systemd/ideal-magic-backup.{service,timer}` at 03:30 UTC. `bin/restore_db_drill` re-checks sha256 and pg_restores into a throwaway database. Operator runbook: `docs/runbooks/postgres-backups.md`.
+- Do not commit `config/master.key`, `/etc/pod-tracker-web/env`, or any rotated database password.
+- `config/database.yml` reads the production primary host from `POD_TRACKER_DATABASE_HOST` (default `localhost`). PostgreSQL on this VM uses peer auth on the default socket, so TCP/`localhost` is required for the `pod_tracker` role.
+- Adding a new production-only env var: update `.env.example` (placeholder), update `/etc/pod-tracker-web/env`, restart the service. Do not bake secrets into the unit file.
+- Adding a new background process (e.g. a separate worker if Solid-in-Puma stops fitting): add a sibling systemd unit (`pod-tracker-worker.service`) modeled on `pod-tracker-web.service`, do not introduce Docker Compose just to add one process.
+- Daily `pg_dump` backups run via `bin/backup_db` + `config/systemd/pod-tracker-backup.{service,timer}` at 03:30 UTC. `bin/restore_db_drill` re-checks sha256 and pg_restores into a throwaway database. Operator runbook: `docs/runbooks/postgres-backups.md`.
 
 ## Seeded Accounts
 

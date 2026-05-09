@@ -13,4 +13,4 @@ Disallow: /passwords
 Disallow: /email_verifications
 Disallow: /p/
 
-Sitemap: https://ideal-magic.com/sitemap.xml
+Sitemap: https://pod-tracker.app/sitemap.xml

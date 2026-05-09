@@ -3,7 +3,7 @@ module Codex
   # the long-form bracket rules, the canonical Game Changers list, the
   # Commander banlist, the per-axis scoring playbook, and a card-by-card
   # decklist enriched with oracle text, keywords, color identity, and
-  # Ideal Magic's role/salt/friction tag slugs. It is asked to make the
+  # Pod Tracker's role/salt/friction tag slugs. It is asked to make the
   # bracket call, sub-band call, the six 0-10 axis calls, friction
   # drivers, Rule 0 talking points, and concrete recommendations itself.
   #
@@ -45,8 +45,8 @@ module Codex
 
     def task_description
       [
-        "You are evaluating a Magic: The Gathering Commander deck for Ideal Magic.",
-        "This evaluation is the AUTHORITATIVE bracket and power-band read for this deck on Ideal Magic — the user will see your bracket call, your six 0-10 axis values, your evidence, and your Rule 0 talking points as the canonical analysis. Treat this as a careful bracket review, not a quick take.",
+        "You are evaluating a Magic: The Gathering Commander deck for Pod Tracker.",
+        "This evaluation is the AUTHORITATIVE bracket and power-band read for this deck on Pod Tracker — the user will see your bracket call, your six 0-10 axis values, your evidence, and your Rule 0 talking points as the canonical analysis. Treat this as a careful bracket review, not a quick take.",
         "Place this deck on the official Commander Brackets (1 Exhibition · 2 Core · 3 Upgraded · 4 Optimized · 5 cEDH). Sub-band the placement low/mid/high based on how the deck plays inside its bracket.",
         "Score the six 0-10 axes (power, speed, interaction, consistency, salt, social_friction) against the absolute anchor bands provided. A 7 means the same thing across brackets — the bracket only changes how often a deck reaches that band.",
         "Use the Commander banlist for legality. Use the Game Changers list to count GCs. Apply the bracket gates exactly.",
@@ -182,7 +182,7 @@ module Codex
       {
         "available" => true,
         "rubric_version" => run.rubric_version,
-        "summary" => "Deterministic feature counts and tag-driven evidence from Ideal Magic's source-controlled card taxonomy. Treat these as a sanity check — useful for cross-checking what you see in the decklist, not as authority. You make the bracket and the six axis calls.",
+        "summary" => "Deterministic feature counts and tag-driven evidence from Pod Tracker's source-controlled card taxonomy. Treat these as a sanity check — useful for cross-checking what you see in the decklist, not as authority. You make the bracket and the six axis calls.",
         "feature_vector" => feature_vector,
         "deterministic_scorecard" => scorecard ? deterministic_scorecard_payload(scorecard) : nil,
         "legality" => legality,
@@ -425,8 +425,8 @@ module Codex
 
     def system_message
       [
-        "You are the Ideal Magic Commander deck evaluator.",
-        "Your output is the AUTHORITATIVE bracket and power-band read for this deck on Ideal Magic; the user reads your bracket call, your six axes, your evidence, your friction drivers, and your Rule 0 talking points as the canonical analysis. Take the time to do it well.",
+        "You are the Pod Tracker Commander deck evaluator.",
+        "Your output is the AUTHORITATIVE bracket and power-band read for this deck on Pod Tracker; the user reads your bracket call, your six axes, your evidence, your friction drivers, and your Rule 0 talking points as the canonical analysis. Take the time to do it well.",
         "You produce one JSON object that follows the supplied schema exactly — match the response_contract.skeleton key-for-key.",
         "Place game_changers, restrictions, evidence, and uncertainty INSIDE the bracket object, not at the top level. Do not echo deck_id / deck_name / format into the response.",
         "Each of the six axes is an object with exactly value, rationale, evidence, uncertainty. Always include uncertainty as an array (empty is fine).",

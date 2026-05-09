@@ -4,8 +4,8 @@
 # friends; the only meaningful AI ceiling is the upstream Codex rate limit
 # on the linked ChatGPT account, which QuotaPolicy still surfaces.
 Rails.application.config.x.analysis_quota = ActiveSupport::OrderedOptions.new.merge!(
-  per_user_per_day: ENV.fetch("IDEAL_MAGIC_ANALYSIS_PER_USER_PER_DAY", 0).to_i,
-  global_per_day: ENV.fetch("IDEAL_MAGIC_ANALYSIS_GLOBAL_PER_DAY", 0).to_i,
+  per_user_per_day: ENV.fetch("POD_TRACKER_ANALYSIS_PER_USER_PER_DAY", 0).to_i,
+  global_per_day: ENV.fetch("POD_TRACKER_ANALYSIS_GLOBAL_PER_DAY", 0).to_i,
   window: 24.hours,
-  expected_runtime_seconds: ENV.fetch("IDEAL_MAGIC_ANALYSIS_EXPECTED_RUNTIME_SECONDS", 25).to_i
+  expected_runtime_seconds: ENV.fetch("POD_TRACKER_ANALYSIS_EXPECTED_RUNTIME_SECONDS", 25).to_i
 )

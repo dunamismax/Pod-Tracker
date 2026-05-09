@@ -63,7 +63,7 @@ module Accounts
       generated_at = Time.utc(2026, 5, 4, 12, 30, 0)
       filename = Exporter.new(@user, generated_at: generated_at).filename
 
-      assert_match(/^ideal-magic-account-.+-20260504T123000Z\.json$/, filename)
+      assert_match(/^pod-tracker-account-.+-20260504T123000Z\.json$/, filename)
     end
 
     test "includes codex_account metadata without leaking credentials" do

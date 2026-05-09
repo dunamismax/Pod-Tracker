@@ -6,7 +6,7 @@ module Scryfall
     API_BASE_URI = URI("https://api.scryfall.com")
     ACCEPT_HEADER = "application/json;q=0.9,*/*;q=0.8"
     MINIMUM_API_INTERVAL = 0.11
-    USER_AGENT = "IdealMagic/0.1 (+https://ideal-magic.com; github.com/dunamismax/ideal-magic)"
+    USER_AGENT = "PodTracker/0.1 (+https://pod-tracker.app; github.com/dunamismax/pod-tracker)"
 
     class Error < StandardError; end
     class RateLimitedError < Error

@@ -65,7 +65,7 @@ Rails.application.configure do
   # Deterministic Active Record encryption keys for the test environment.
   # Production reads keys from encrypted credentials; tests need stable values
   # so encrypted columns survive fixture loads and round-trip through models.
-  config.active_record.encryption.primary_key = "ideal_magic_test_primary_key_padding_xxxxxx"
-  config.active_record.encryption.deterministic_key = "ideal_magic_test_deterministic_key_padding_xx"
-  config.active_record.encryption.key_derivation_salt = "ideal_magic_test_key_derivation_salt_padding"
+  config.active_record.encryption.primary_key = "pod_tracker_test_primary_key_padding_xxxxxx"
+  config.active_record.encryption.deterministic_key = "pod_tracker_test_deterministic_key_padding_xx"
+  config.active_record.encryption.key_derivation_salt = "pod_tracker_test_key_derivation_salt_padding"
 end

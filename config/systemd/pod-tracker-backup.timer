@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily Ideal Magic PostgreSQL backups
+Description=Daily Pod Tracker PostgreSQL backups
 
 [Timer]
 # 03:30 UTC daily. The Scryfall corpus refresh runs at 10:30 UTC, so a 03:30 UTC
@@ -7,7 +7,7 @@ Description=Daily Ideal Magic PostgreSQL backups
 OnCalendar=*-*-* 03:30:00 UTC
 Persistent=true
 RandomizedDelaySec=5min
-Unit=ideal-magic-backup.service
+Unit=pod-tracker-backup.service
 
 [Install]
 WantedBy=timers.target

@@ -10,8 +10,8 @@ module Codex
     def self.to_h
       {
         "$schema" => "https://json-schema.org/draft/2020-12/schema",
-        "$id" => "https://ideal-magic.com/schemas/#{VERSION}.json",
-        "title" => "Ideal Magic Codex pod evaluation",
+        "$id" => "https://pod-tracker.app/schemas/#{VERSION}.json",
+        "title" => "Pod Tracker Codex pod evaluation",
         "type" => "object",
         "additionalProperties" => false,
         "required" => %w[schema_version summary bracket_spread rule_zero_brief axes decks],

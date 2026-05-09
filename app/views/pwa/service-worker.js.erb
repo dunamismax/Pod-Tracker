@@ -1,5 +1,5 @@
 <%#
-  Ideal Magic service worker.
+  Pod Tracker service worker.
 
   Strategy:
     - App shell (CSS/JS/icon/manifest): cache-first with background revalidate.
@@ -26,8 +26,8 @@
   ]
 %>
 const CACHE_VERSION = <%== cache_version.to_json %>;
-const SHELL_CACHE = `ideal-magic-shell-${CACHE_VERSION}`;
-const PAGES_CACHE_PREFIX = "ideal-magic-pages-";
+const SHELL_CACHE = `pod-tracker-shell-${CACHE_VERSION}`;
+const PAGES_CACHE_PREFIX = "pod-tracker-pages-";
 const PAGES_CACHE = `${PAGES_CACHE_PREFIX}${CACHE_VERSION}`;
 const SHELL_PATHS = <%== shell_paths.to_json %>;
 const PAGE_ALLOWLIST = [
@@ -55,7 +55,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const names = await caches.keys();
     await Promise.all(names.map((name) => {
-      if (name !== SHELL_CACHE && name !== PAGES_CACHE && name.startsWith("ideal-magic-")) {
+      if (name !== SHELL_CACHE && name !== PAGES_CACHE && name.startsWith("pod-tracker-")) {
         return caches.delete(name);
       }
       return null;
@@ -134,7 +134,7 @@ async function networkFirstPage(request) {
     const cached = await cache.match(request);
     if (cached) {
       const headers = new Headers(cached.headers);
-      headers.set("X-Ideal-Magic-Offline", "1");
+      headers.set("X-Pod-Tracker-Offline", "1");
       return new Response(await cached.blob(), {
         status: cached.status,
         statusText: cached.statusText,

@@ -1,6 +1,6 @@
 # Provider Integrations
 
-Ideal Magic imports Commander decks from public and user-provided sources. Provider integrations must be isolated behind adapters so provider changes do not leak into deck storage, analysis, or UI logic.
+Pod Tracker imports Commander decks from public and user-provided sources. Provider integrations must be isolated behind adapters so provider changes do not leak into deck storage, analysis, or UI logic.
 
 ## Allowed V1 Sources
 
@@ -29,7 +29,7 @@ Each provider adapter should expose clear methods for:
 - Validating whether a URL or export belongs to the provider.
 - Fetching public data with polite headers and timeouts.
 - Parsing provider-specific payloads or page data.
-- Normalizing cards into Ideal Magic's internal deck representation.
+- Normalizing cards into Pod Tracker's internal deck representation.
 - Returning source attribution.
 - Reporting actionable errors.
 - Refreshing imported decks with backoff and cache discipline.
@@ -81,6 +81,6 @@ Public session and pod links should follow the same attribution and privacy post
 
 ## Scryfall
 
-Scryfall bulk data is the primary source for card facts. Ideal Magic should use bulk downloads for card corpus refreshes and avoid per-card API calls for normal analysis workloads.
+Scryfall bulk data is the primary source for card facts. Pod Tracker should use bulk downloads for card corpus refreshes and avoid per-card API calls for normal analysis workloads.
 
 Scryfall usage must include polite request behavior and should stay below Scryfall's published rate guidance.

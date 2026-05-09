@@ -13,7 +13,7 @@ class DeckExportsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal "text/plain", response.media_type
     assert_match(/^attachment;/, response.headers["Content-Disposition"])
-    assert_match(/ideal-magic-deck-existing-deck-/, response.headers["Content-Disposition"])
+    assert_match(/pod-tracker-deck-existing-deck-/, response.headers["Content-Disposition"])
     assert_includes response.body, "1 Sol Ring"
   end
 

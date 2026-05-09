@@ -111,7 +111,7 @@ module Codex
       assert_includes payload.dig("input", "response_contract", "rules").join(" "), "pod-level values"
 
       # Pod prompt v3 enriches each seated deck's cards with oracle text
-      # and Ideal Magic tag slugs so the AI can reason about table fit,
+      # and Pod Tracker tag slugs so the AI can reason about table fit,
       # not just commander names. The structural assertions hold even
       # when test DBs do not link OracleCards.
       first_slot_cards = Array(payload.dig("input", "pod", "slots", 0, "cards"))

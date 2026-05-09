@@ -57,7 +57,7 @@ Rails.application.configure do
   config.action_mailer.raise_delivery_errors = true
 
   # Set host to be used by links generated in mailer templates.
-  app_host = ENV.fetch("APP_HOST", "ideal-magic.com")
+  app_host = ENV.fetch("APP_HOST", "pod-tracker.app")
   config.action_mailer.default_url_options = { host: app_host, protocol: "https" }
 
   if ENV["SMTP2GO_API_KEY"].present?
@@ -91,7 +91,7 @@ Rails.application.configure do
   config.active_record.dump_schema_after_migration = false
 
   # Encrypted attributes, including Codex account metadata, need explicit
-  # production keys. Values live in /etc/ideal-magic-web/env, not in git.
+  # production keys. Values live in /etc/pod-tracker-web/env, not in git.
   if ENV["ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY"].present?
     config.active_record.encryption.primary_key = ENV["ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY"]
   end

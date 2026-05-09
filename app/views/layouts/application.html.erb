@@ -1,23 +1,23 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title><%= content_for(:title) || "Ideal Magic" %></title>
+    <title><%= content_for(:title) || "Pod Tracker" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="theme-color" content="#09090b">
     <meta name="color-scheme" content="dark">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="Ideal Magic">
+    <meta name="apple-mobile-web-app-title" content="Pod Tracker">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="application-name" content="Ideal Magic">
+    <meta name="application-name" content="Pod Tracker">
     <meta name="mobile-web-app-capable" content="yes">
     <% if content_for?(:meta_description) %>
       <meta name="description" content="<%= strip_tags(content_for(:meta_description)) %>">
       <meta property="og:description" content="<%= strip_tags(content_for(:meta_description)) %>">
     <% else %>
-      <meta name="description" content="Ideal Magic — the serious Commander companion. Bracket-aware deck and pod analysis, source-backed, evidence-first.">
+      <meta name="description" content="Pod Tracker — the serious Commander companion. Bracket-aware deck and pod analysis, source-backed, evidence-first.">
     <% end %>
-    <meta property="og:title" content="<%= content_for(:title) || 'Ideal Magic' %>">
-    <meta property="og:site_name" content="Ideal Magic">
+    <meta property="og:title" content="<%= content_for(:title) || 'Pod Tracker' %>">
+    <meta property="og:site_name" content="Pod Tracker">
     <meta property="og:type" content="website">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -32,13 +32,13 @@
     <meta property="og:url" content="<%= canonical_url %>">
     <% og_image = "#{request.protocol}#{request.host_with_port}/hero-screens.png" %>
     <meta property="og:image" content="<%= og_image %>">
-    <meta property="og:image:alt" content="Ideal Magic — Commander Brackets, six-axis sub-band, and Rule 0 pregame template">
+    <meta property="og:image:alt" content="Pod Tracker — Commander Brackets, six-axis sub-band, and Rule 0 pregame template">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="<%= content_for(:title) || 'Ideal Magic' %>">
+    <meta name="twitter:title" content="<%= content_for(:title) || 'Pod Tracker' %>">
     <% if content_for?(:meta_description) %>
       <meta name="twitter:description" content="<%= strip_tags(content_for(:meta_description)) %>">
     <% else %>
-      <meta name="twitter:description" content="Ideal Magic — the serious Commander companion. Bracket-aware deck and pod analysis, source-backed, evidence-first.">
+      <meta name="twitter:description" content="Pod Tracker — the serious Commander companion. Bracket-aware deck and pod analysis, source-backed, evidence-first.">
     <% end %>
     <meta name="twitter:image" content="<%= og_image %>">
     <% site_origin = "#{request.protocol}#{request.host_with_port}" %>
@@ -48,16 +48,16 @@
         {
           "@type": "Organization",
           "@id": "#{site_origin}/#organization",
-          "name": "Ideal Magic",
+          "name": "Pod Tracker",
           "url": "#{site_origin}/",
           "logo": "#{site_origin}/icon.png",
-          "sameAs": [ "https://github.com/dunamismax/ideal-magic" ]
+          "sameAs": [ "https://github.com/dunamismax/pod-tracker" ]
         },
         {
           "@type": "WebSite",
           "@id": "#{site_origin}/#website",
           "url": "#{site_origin}/",
-          "name": "Ideal Magic",
+          "name": "Pod Tracker",
           "description": "Bracket-aware Commander companion: deterministic deck analysis, pod Rule 0 briefs, evidence-first scoring.",
           "publisher": { "@id": "#{site_origin}/#organization" }
         }
@@ -85,7 +85,7 @@
     <div data-pwa-update-target="banner" hidden role="status" aria-live="polite"
          class="fixed inset-x-0 bottom-16 z-50 flex justify-center px-4 pb-4 sm:bottom-4">
       <div class="flex w-full max-w-md items-center gap-3 rounded-lg border border-emerald-700/40 bg-zinc-900/95 px-4 py-3 text-sm text-zinc-100 shadow-lg backdrop-blur">
-        <span class="grow">A new version of Ideal Magic is ready.</span>
+        <span class="grow">A new version of Pod Tracker is ready.</span>
         <button type="button" data-action="pwa-update#reload"
                 class="rounded-md bg-emerald-600 px-3 py-1.5 font-medium text-white hover:bg-emerald-500">
           Reload
@@ -101,7 +101,7 @@
       <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <%= link_to root_path, class: "flex items-center gap-2 text-sm font-semibold text-white" do %>
           <span class="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
-          <span>Ideal Magic</span>
+          <span>Pod Tracker</span>
         <% end %>
 
         <nav class="hidden items-center gap-5 text-sm text-zinc-300 sm:flex">
@@ -150,14 +150,14 @@
     <footer class="border-t border-zinc-900">
       <div class="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-6 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
         <div>
-          <p>Ideal Magic is unofficial fan content. Not approved or endorsed by Wizards of the Coast.</p>
+          <p>Pod Tracker is unofficial fan content. Not approved or endorsed by Wizards of the Coast.</p>
           <p class="mt-1">Card data via <a href="https://scryfall.com" class="underline hover:text-zinc-300">Scryfall</a>. Commander rules via <a href="https://mtgcommander.net" class="underline hover:text-zinc-300">mtgcommander.net</a>. Brackets reference Wizards' published Commander Brackets system.</p>
         </div>
         <nav class="flex flex-wrap gap-4">
           <%= link_to "About", about_path, class: "hover:text-zinc-300" %>
           <%= link_to "Privacy", privacy_path, class: "hover:text-zinc-300" %>
           <%= link_to "Terms", terms_path, class: "hover:text-zinc-300" %>
-          <a href="https://github.com/dunamismax/ideal-magic" class="hover:text-zinc-300">GitHub</a>
+          <a href="https://github.com/dunamismax/pod-tracker" class="hover:text-zinc-300">GitHub</a>
         </nav>
       </div>
     </footer>

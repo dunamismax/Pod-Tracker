@@ -33,7 +33,7 @@ production:
     schedule: every day at 10:30 UTC
 ```
 
-Solid Queue runs in-Puma (`SOLID_QUEUE_IN_PUMA=true`), so the recurring schedule fires from the `ideal-magic-web.service` process. Restarting the service is enough to pick up changes to `config/recurring.yml`.
+Solid Queue runs in-Puma (`SOLID_QUEUE_IN_PUMA=true`), so the recurring schedule fires from the `pod-tracker-web.service` process. Restarting the service is enough to pick up changes to `config/recurring.yml`.
 
 10:30 UTC was chosen to land after Scryfall's daily bulk file rotates (Scryfall regenerates `default_cards` at roughly 09:00 UTC) and before North-American evening usage.
 
@@ -80,7 +80,7 @@ A failed entry preserves `error_code` (`Scryfall::Client::RateLimitedError`, `Sc
 Live job log:
 
 ```sh
-sudo journalctl -u ideal-magic-web -f --grep 'Scryfall::CardCorpusRefreshJob'
+sudo journalctl -u pod-tracker-web -f --grep 'Scryfall::CardCorpusRefreshJob'
 ```
 
 ## Failure modes
