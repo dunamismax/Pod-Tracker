@@ -58,9 +58,13 @@ Production env vars live in `/etc/pod-tracker-web/env` and are loaded by the sys
 | `RAILS_MAX_THREADS` | recommended | Puma threads per worker. Currently `5`. Keep `database.yml` `max_connections` ≥ this. |
 | `SOLID_QUEUE_IN_PUMA` | recommended | `true` until jobs need a separate process. |
 | `APP_HOST` | yes | `pod-tracker.app`. Used for mailer URLs and similar. |
-| `MAIL_FROM` | yes | Sender address for account verification and password reset mail, for example `"Pod Tracker <no-reply@pod-tracker.app>"`. |
-| `SMTP_ADDRESS` | yes | SMTP host. Without this, Rails falls back to localhost SMTP and account mail will fail unless a local MTA is installed. |
-| `SMTP_PORT` | yes | Usually `587` for STARTTLS submission. |
+| `MAIL_FROM` | yes | Sender address for account verification, password reset, and game-night invitation mail, for example `"Pod Tracker <no-reply@pod-tracker.app>"`. |
+| `SMTP2GO_API_KEY` | provider-dependent | Preferred hosted-mail path when using SMTP2GO API delivery. If present, Rails uses the custom `:smtp2go` delivery method. |
+| `SMTP2GO_ENDPOINT` | recommended with SMTP2GO | Defaults to `https://api.smtp2go.com/v3/email/send`. |
+| `SMTP2GO_OPEN_TIMEOUT` | recommended with SMTP2GO | Defaults to `5` seconds. |
+| `SMTP2GO_READ_TIMEOUT` | recommended with SMTP2GO | Defaults to `10` seconds. |
+| `SMTP_ADDRESS` | provider-dependent | Fallback SMTP host when `SMTP2GO_API_KEY` is absent. Without SMTP2GO or SMTP settings, account mail will fail unless a local MTA is installed. |
+| `SMTP_PORT` | provider-dependent | Usually `587` for STARTTLS submission. |
 | `SMTP_DOMAIN` | recommended | HELO domain. Defaults to `APP_HOST`. |
 | `SMTP_USERNAME` | provider-dependent | SMTP username when the provider requires authentication. |
 | `SMTP_PASSWORD` | provider-dependent | SMTP password or app password. Never commit it. |

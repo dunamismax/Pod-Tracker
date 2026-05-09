@@ -1,10 +1,10 @@
 # Security
 
-Pod Tracker will handle accounts, deck history, collection ownership, playgroup sessions, matchup notes, Codex account-auth metadata, and AI usage records. Security work should be implemented as product behavior, not saved for deployment cleanup.
+Pod Tracker handles accounts, deck history, collection ownership, playgroup sessions, matchup notes, Codex account-auth metadata, and AI usage records. Security work belongs in product behavior and operational runbooks, not only in deployment cleanup.
 
 ## Authentication
 
-V1 should use Rails-native email/password authentication as the baseline. Account flows must include:
+Pod Tracker uses Rails-native email/password authentication as the baseline. Account flows include:
 
 - Secure session handling.
 - Email verification.
@@ -12,11 +12,11 @@ V1 should use Rails-native email/password authentication as the baseline. Accoun
 - Account deletion.
 - Data export.
 
-Passkeys or external auth providers are future hardening options after the baseline is stable.
+Passkeys or external auth providers remain future hardening options.
 
 ## AI Auth And Secrets
 
-OpenAI API keys must never be exposed to browsers. V1 user-facing AI usage should not use app-owned API keys or bring-your-own API keys as the operating model.
+OpenAI API keys must never be exposed to browsers. User-facing AI usage does not use app-owned API keys or bring-your-own API keys as the operating model.
 
 Supported v1 mode:
 
@@ -38,7 +38,7 @@ Blocked modes:
 - Hand-rolled ChatGPT token refresh or token exchange code outside Codex's documented flow.
 - Claiming ChatGPT billing pays for arbitrary OpenAI API calls.
 
-Codex account login, logout, token-cache creation, refresh failure, and deletion should be audit logged without logging credential values.
+Codex account login, logout, token-cache creation, refresh failure, and deletion are audit logged without logging credential values.
 
 Implemented credential-handling review as of 2026-05-04:
 
@@ -50,7 +50,7 @@ Implemented credential-handling review as of 2026-05-04:
 
 ## Privacy
 
-Users should control whether deck analyses, decks, pods, sessions, and public summaries are private, shared by link, or public. Defaults should favor privacy until the sharing model is implemented and visible.
+Users control whether deck analyses, decks, pods, sessions, and public summaries stay private or are shared by link. Defaults favor privacy. Share links are opt-in, unlisted, and revocable.
 
 Do not store provider passwords or private provider session cookies. Do not exfiltrate private deck data to providers or AI services beyond the explicit analysis workflow.
 
@@ -60,15 +60,14 @@ Collection inventory, matchup notes, player names, and session history are priva
 
 ## Abuse Controls
 
-Before public launch, add rate limits for:
+Current controls:
 
-- Signups and login attempts.
-- Password resets.
-- Deck imports.
-- Analysis creation.
-- Public share pages.
+- Analysis jobs have user/global quota wiring, plus upstream Codex rate limits from the linked account.
+- Text-file imports enforce size limits.
+- Archidekt and Moxfield adapters translate provider rate limits into user-facing retry errors.
+- Audit events cover authentication, deck import, analysis, sharing, and Codex account changes.
 
-Analysis jobs should have user and global quotas so account rate limits and server resources are bounded.
+Remaining hardening work before opening signups broadly: request-level throttles for signups, login attempts, password resets, import endpoints, analysis creation, and public share pages.
 
 ## Audit Events
 
@@ -86,22 +85,22 @@ Audit events should cover:
 
 Audit logs must not contain secrets.
 
-## Fan Content Notice Plan
+## Fan Content Notice
 
-Pod Tracker is unofficial fan content. The app must include a visible notice before public launch:
+Pod Tracker is unofficial fan content. The app includes this notice in public/user-facing surfaces:
 
 > Pod Tracker is unofficial fan content. It is not approved, endorsed, or sponsored by Wizards of the Coast. Portions of Magic: The Gathering materials are property of Wizards of the Coast LLC.
-
-The notice should appear in site footer or legal pages and any public pages that materially display Magic card names, text, images, or related material.
 
 Do not place core access to WotC IP-backed fan content behind payment without legal review.
 
 ## Security Checks
 
-The planned Rails foundation should include:
+`bin/verify` runs the baseline security and quality checks:
 
 - Brakeman.
-- RuboCop security-oriented rules where practical.
-- Bundle audit tooling.
-- Tests for key handling and auth flows.
-- Review of CSRF, CSP, secure cookies, CORS, and security headers before public launch.
+- RuboCop.
+- Bundle audit.
+- Importmap audit.
+- Rails unit/controller/system tests for auth, exports, credential handling, public shares, and related flows.
+
+Production also sets secure headers and cookie/SSL behavior through Rails and Caddy; see [deployment.md](deployment.md) for the live process shape.

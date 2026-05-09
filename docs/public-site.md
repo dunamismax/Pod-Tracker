@@ -1,8 +1,8 @@
-# Public marketing site
+# Public Site
 
-The public marketing surface lives under `PublicController` and renders without authentication. It is the only part of `pod-tracker.app` that anonymous visitors can read.
+The public marketing surface lives under `PublicController` and renders without authentication. Explicit deck and pod share links also render without authentication when a signed-in user enables them. Everything else on `pod-tracker.app` requires an account.
 
-## Routes
+## Marketing Routes
 
 | Path | Controller action | Purpose |
 | --- | --- | --- |
@@ -15,7 +15,18 @@ The public marketing surface lives under `PublicController` and renders without 
 | `/terms` | `public#terms` | Terms stub. |
 | `/sitemap.xml` | `public#sitemap` | XML sitemap of the public marketing URLs. |
 
-`PublicController` declares `allow_unauthenticated_access` once at the top; every action inherits it. The rest of the app sits behind the global `Authentication#require_authentication` before-action.
+`PublicController` declares `allow_unauthenticated_access` once at the top; every action inherits it.
+
+## Share Routes
+
+| Path | Controller action | Purpose |
+| --- | --- | --- |
+| `/d/:token` | `public_decks#show` | Anonymous-readable deck share by opaque token. |
+| `/d/:token/export` | `public_decks#export` | Text or JSON decklist export for a shared deck. |
+| `/d/:token/analysis` | `public_decks#analysis` | Markdown or JSON analysis export for a shared deck. |
+| `/p/:token` | `public_pods#show` | Anonymous-readable pod share by opaque token. |
+
+Share routes are opt-in, revocable, and unlisted. They expose the decklist and Commander Brackets analysis for the shared object; they do not expose playgroup notes, table results, collection fit, opponent identity, or audit history.
 
 The signed-in dashboard lives at `/app` (`dashboard#show`). The root path was historically a redirect to `/session/new`; it now renders the marketing landing for everyone.
 
@@ -67,6 +78,7 @@ What is intentionally **not** done yet:
 ## Auth gating
 
 - The controllers listed above explicitly opt out of the auth before-action via `allow_unauthenticated_access`.
+- `PublicDecksController` and `PublicPodsController` also opt out of auth, but only return records with active share tokens.
 - Every other controller in the app stays behind `require_authentication` (defined in `Authentication` concern).
 - The header and footer adapt based on `authenticated?`; no auth-required data is rendered on the public surface.
 
