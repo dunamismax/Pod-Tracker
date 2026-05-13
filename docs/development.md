@@ -1,7 +1,7 @@
 # Local Development
 
-Pod Tracker uses the installed macOS PostgreSQL service. Do not use
-Docker PostgreSQL for local development.
+Pod Tracker uses an installed PostgreSQL service. Do not use Docker
+PostgreSQL for local development.
 
 ## Toolchain
 
@@ -13,13 +13,16 @@ psql --version
 just --version
 ```
 
-Expected:
+Original project-start baseline:
 
 ```text
 go1.26.3 darwin/arm64
 PostgreSQL 17.9 Homebrew
 just 1.51.0
 ```
+
+On the Ubuntu VM, use the system PostgreSQL packages and the same
+database URLs from `.env.example`.
 
 ## Environment
 
@@ -42,10 +45,18 @@ to a local admin connection string if the app role cannot create it.
 
 ## PostgreSQL
 
-Start the Homebrew PostgreSQL service if it is not already running:
+Start PostgreSQL if it is not already running.
+
+On macOS with Homebrew:
 
 ```sh
 brew services start postgresql@17
+```
+
+On Ubuntu:
+
+```sh
+sudo systemctl start postgresql
 ```
 
 Create the app role once:
@@ -92,8 +103,10 @@ just migrate-smoke
 ```
 
 `just migrate-smoke` creates a timestamped local smoke-test database,
-applies all migrations with the current macOS user, checks required
-extensions, and drops the smoke database on exit.
+applies all migrations with the current OS user, checks required
+extensions, and drops the smoke database on exit. On Ubuntu, create a
+matching PostgreSQL role for the OS user or adapt the recipe to a local
+admin role before running it.
 
 ## SQL Generation
 

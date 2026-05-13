@@ -16,13 +16,18 @@ import (
 
 type contextKey string
 
-const requestIDKey contextKey = "request_id"
+const (
+	requestIDKey        contextKey = "request_id"
+	currentUserKey      contextKey = "current_user"
+	sessionTokenHashKey contextKey = "session_token_hash"
+)
 
 type Server struct {
 	cfg             config.Config
 	logger          *slog.Logger
 	readinessChecks []ReadinessCheck
 	templates       *template.Template
+	store           Store
 }
 
 type ReadinessCheck struct {
@@ -41,8 +46,14 @@ func WithReadinessCheck(name string, check func(context.Context) error) Option {
 	}
 }
 
+func WithStore(store Store) Option {
+	return func(s *Server) {
+		s.store = store
+	}
+}
+
 func New(cfg config.Config, logger *slog.Logger, opts ...Option) (*Server, error) {
-	templates, err := template.ParseGlob(filepath.Join(cfg.TemplateDir, "*.html"))
+	templates, err := template.ParseFiles(filepath.Join(cfg.TemplateDir, "base.html"))
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
 	}
@@ -63,10 +74,19 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir(s.cfg.StaticDir))))
 	mux.HandleFunc("GET /", s.home)
+	mux.HandleFunc("GET /home", s.dashboard)
+	mux.HandleFunc("GET /signup", s.signupForm)
+	mux.HandleFunc("POST /signup", s.signup)
+	mux.HandleFunc("GET /login", s.loginForm)
+	mux.HandleFunc("POST /login", s.login)
+	mux.HandleFunc("POST /logout", s.logout)
+	mux.HandleFunc("GET /settings", s.settings)
+	mux.HandleFunc("GET /playgroups", s.playgroups)
+	mux.HandleFunc("POST /playgroups", s.createPlaygroup)
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /readyz", s.readyz)
 
-	return s.requestID(s.logRequests(mux))
+	return s.requestID(s.logRequests(s.loadSession(s.csrfProtection(mux))))
 }
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
@@ -76,16 +96,8 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	data := struct {
-		Environment string
-		RequestID   string
-	}{
-		Environment: s.cfg.Environment,
-		RequestID:   RequestID(r.Context()),
-	}
-	if err := s.templates.ExecuteTemplate(w, "base", data); err != nil {
-		s.logger.Error("render home", "err", err, "request_id", RequestID(r.Context()))
-	}
+	data := s.newTemplateData(w, r)
+	s.render(w, r, http.StatusOK, "home.html", data)
 }
 
 func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
@@ -153,6 +165,16 @@ func RequestID(ctx context.Context) string {
 	return ""
 }
 
+func CurrentUser(ctx context.Context) (User, bool) {
+	user, ok := ctx.Value(currentUserKey).(User)
+	return user, ok
+}
+
+func SessionTokenHash(ctx context.Context) ([]byte, bool) {
+	hash, ok := ctx.Value(sessionTokenHashKey).([]byte)
+	return hash, ok
+}
+
 func newRequestID() string {
 	var bytes [16]byte
 	if _, err := rand.Read(bytes[:]); err != nil {
@@ -169,4 +191,24 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(status int) {
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
+}
+
+func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page string, data any) {
+	tmpl, err := s.templates.Clone()
+	if err != nil {
+		s.logger.Error("clone templates", "err", err, "request_id", RequestID(r.Context()))
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
+	if _, err := tmpl.ParseFiles(filepath.Join(s.cfg.TemplateDir, page)); err != nil {
+		s.logger.Error("parse page template", "page", page, "err", err, "request_id", RequestID(r.Context()))
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
+		s.logger.Error("render template", "page", page, "err", err, "request_id", RequestID(r.Context()))
+	}
 }

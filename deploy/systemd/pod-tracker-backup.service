@@ -1,0 +1,20 @@
+[Unit]
+Description=Pod Tracker PostgreSQL backup
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pod-tracker
+Group=pod-tracker
+WorkingDirectory=/opt/pod-tracker/current
+EnvironmentFile=/etc/pod-tracker/env
+ExecStart=/opt/pod-tracker/current/deploy/scripts/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/pod-tracker

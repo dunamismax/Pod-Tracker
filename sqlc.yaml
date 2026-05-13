@@ -5,6 +5,7 @@ sql:
     queries:
       - internal/db/queries
       - internal/auth/queries.sql
+      - internal/playgroups/queries.sql
     gen:
       go:
         package: dbsql

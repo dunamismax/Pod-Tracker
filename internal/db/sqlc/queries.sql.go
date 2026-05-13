@@ -12,6 +12,65 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createDefaultPlaygroupSettings = `-- name: CreateDefaultPlaygroupSettings :exec
+insert into core.playgroup_settings (playgroup_id)
+values ($1)
+`
+
+func (q *Queries) CreateDefaultPlaygroupSettings(ctx context.Context, playgroupID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, createDefaultPlaygroupSettings, playgroupID)
+	return err
+}
+
+const createPlaygroup = `-- name: CreatePlaygroup :one
+insert into core.playgroups (name, slug, description, created_by)
+values ($1, $2, $3, $4)
+returning id, name, slug, description, created_by, created_at, updated_at
+`
+
+type CreatePlaygroupParams struct {
+	Name        string
+	Slug        string
+	Description string
+	CreatedBy   pgtype.UUID
+}
+
+func (q *Queries) CreatePlaygroup(ctx context.Context, arg CreatePlaygroupParams) (CorePlaygroup, error) {
+	row := q.db.QueryRow(ctx, createPlaygroup,
+		arg.Name,
+		arg.Slug,
+		arg.Description,
+		arg.CreatedBy,
+	)
+	var i CorePlaygroup
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.Description,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createPlaygroupMembership = `-- name: CreatePlaygroupMembership :exec
+insert into core.playgroup_memberships (playgroup_id, user_id, role)
+values ($1, $2, $3)
+`
+
+type CreatePlaygroupMembershipParams struct {
+	PlaygroupID pgtype.UUID
+	UserID      pgtype.UUID
+	Role        string
+}
+
+func (q *Queries) CreatePlaygroupMembership(ctx context.Context, arg CreatePlaygroupMembershipParams) error {
+	_, err := q.db.Exec(ctx, createPlaygroupMembership, arg.PlaygroupID, arg.UserID, arg.Role)
+	return err
+}
+
 const createSession = `-- name: CreateSession :one
 insert into core.sessions (user_id, token_hash, user_agent, ip_address, expires_at)
 values ($1, $2, $3, $4, $5)
@@ -138,6 +197,53 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (CoreUser, er
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listPlaygroupsForUser = `-- name: ListPlaygroupsForUser :many
+select
+  p.id,
+  p.name,
+  p.slug,
+  p.description,
+  m.role
+from core.playgroups p
+join core.playgroup_memberships m on m.playgroup_id = p.id
+where m.user_id = $1
+order by p.name
+`
+
+type ListPlaygroupsForUserRow struct {
+	ID          pgtype.UUID
+	Name        string
+	Slug        string
+	Description string
+	Role        string
+}
+
+func (q *Queries) ListPlaygroupsForUser(ctx context.Context, userID pgtype.UUID) ([]ListPlaygroupsForUserRow, error) {
+	rows, err := q.db.Query(ctx, listPlaygroupsForUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPlaygroupsForUserRow
+	for rows.Next() {
+		var i ListPlaygroupsForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.Description,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const revokeSession = `-- name: RevokeSession :exec

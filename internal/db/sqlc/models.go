@@ -10,6 +10,61 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type CoreHouseRule struct {
+	ID              pgtype.UUID
+	PlaygroupID     pgtype.UUID
+	Title           string
+	Body            string
+	VisibleToGuests bool
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type CorePlaygroup struct {
+	ID          pgtype.UUID
+	Name        string
+	Slug        string
+	Description string
+	CreatedBy   pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type CorePlaygroupInvite struct {
+	ID          pgtype.UUID
+	PlaygroupID pgtype.UUID
+	TokenHash   []byte
+	Role        string
+	Email       pgtype.Text
+	MaxUses     pgtype.Int4
+	UsedCount   int32
+	ExpiresAt   pgtype.Timestamptz
+	RevokedAt   pgtype.Timestamptz
+	CreatedBy   pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
+}
+
+type CorePlaygroupMembership struct {
+	ID          pgtype.UUID
+	PlaygroupID pgtype.UUID
+	UserID      pgtype.UUID
+	Role        string
+	DisplayName pgtype.Text
+	JoinedAt    pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type CorePlaygroupSetting struct {
+	PlaygroupID            pgtype.UUID
+	DefaultEventVisibility string
+	AllowGuestRsvps        bool
+	ShowMemberDecklists    bool
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
 type CoreSession struct {
 	ID         pgtype.UUID
 	UserID     pgtype.UUID

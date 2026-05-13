@@ -16,7 +16,9 @@ Treat unchecked boxes as plan. Move stable material into `docs/`,
 - Public production domain is [https://pod-tracker.app/](https://pod-tracker.app/).
 - The old idea document has been distilled into `README.md`,
   `BUILD.md`, and `AGENTS.md`.
-- No application skeleton exists yet.
+- Go web and worker skeleton exists with local HTMX/plain CSS,
+  PostgreSQL migrations, sqlc typed queries, identity/session schema,
+  signup/login/logout, CSRF-protected forms, and basic playgroups.
 
 ---
 
@@ -282,14 +284,14 @@ state where documented verification passes on a clean checkout.
 
 - [x] Add users and sessions schema.
 - [x] Add secure password hashing.
-- [ ] Add signup, login, logout, and settings.
-- [ ] Add secure, HttpOnly, same-site session cookies.
-- [ ] Add CSRF protection for state-changing forms.
-- [ ] Add playgroups, memberships, invites, roles, settings, and house
+- [x] Add signup, login, logout, and settings.
+- [x] Add secure, HttpOnly, same-site session cookies.
+- [x] Add CSRF protection for state-changing forms.
+- [x] Add playgroups, memberships, invites, roles, settings, and house
       rules.
-- [ ] Add owner/admin/member/host/guest/viewer role checks.
-- [ ] Add basic authenticated dashboard.
-- [ ] Add tests for auth, sessions, and playgroup access.
+- [x] Add owner/admin/member/host/guest/viewer role checks.
+- [x] Add basic authenticated dashboard.
+- [x] Add tests for auth, sessions, and playgroup access.
 
 ### Phase 4 - Events, Hosts, RSVPs, And Calendar
 
@@ -399,14 +401,14 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 13 - Operations And Deployment
 
-- [ ] Add Caddy config for `pod-tracker.app`.
-- [ ] Add systemd units for web and worker binaries.
-- [ ] Add deployment script for the Ubuntu VM.
-- [ ] Add production environment template without secrets.
-- [ ] Add database migration step for deploy.
-- [ ] Add `pg_dump` backup script.
-- [ ] Add restore script and restore drill documentation.
-- [ ] Add operations runbook in `docs/operations.md`.
+- [x] Add Caddy config for `pod-tracker.app`.
+- [x] Add systemd units for web and worker binaries.
+- [x] Add deployment script for the Ubuntu VM.
+- [x] Add production environment template without secrets.
+- [x] Add database migration step for deploy.
+- [x] Add `pg_dump` backup script.
+- [x] Add restore script and restore drill documentation.
+- [x] Add operations runbook in `docs/operations.md`.
 - [ ] Add readiness checks for DB, migrations, jobs, and email.
 
 ### Phase 14 - Hardening
@@ -500,3 +502,17 @@ Trust current primary docs over this file.
   frontend foundation, local PostgreSQL migration workflow, sqlc typed
   SQL generation, pgx database package, identity/session schema, and
   bcrypt password hashing.
+- 2026-05-13 - Added signup, login, logout, settings, HttpOnly
+  SameSite session cookies, CSRF-protected forms, playgroup schema and
+  creation flow, role helpers, authenticated dashboard, and focused
+  auth/playgroup handler tests.
+- 2026-05-13 - Added Ubuntu self-hosting assets for the Go stack:
+  Caddy site config, systemd units, production env template, deploy
+  script with migration step, backup/restore scripts, and
+  `docs/operations.md`.
+- 2026-05-13 - Deployed the Go stack on the Ubuntu VM at
+  `https://pod-tracker.app/`: installed release
+  `/opt/pod-tracker/releases/20260513T210200Z`, migrated production
+  PostgreSQL to goose version 3, replaced the Rails Puma unit with the
+  Go web service on `127.0.0.1:8083`, started the Go worker, and updated
+  the backup timer to use the new `pg_dump` script.

@@ -1,0 +1,22 @@
+[Unit]
+Description=Pod Tracker web service
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pod-tracker
+Group=pod-tracker
+WorkingDirectory=/opt/pod-tracker/current
+EnvironmentFile=/etc/pod-tracker/env
+ExecStart=/opt/pod-tracker/current/bin/pod-tracker-web
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pod-tracker /var/log/pod-tracker
+
+[Install]
+WantedBy=multi-user.target

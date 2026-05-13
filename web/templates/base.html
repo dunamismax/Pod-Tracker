@@ -9,6 +9,23 @@
     <script src="/static/vendor/htmx-2.0.10.min.js" defer></script>
   </head>
   <body>
+    <header class="topbar">
+      <a class="brand" href="/">Pod Tracker</a>
+      <nav class="nav" aria-label="Primary">
+        {{if .CurrentUser}}
+          <a href="/home">Home</a>
+          <a href="/playgroups">Playgroups</a>
+          <a href="/settings">Settings</a>
+          <form action="/logout" method="post">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <button class="link-button" type="submit">Log out</button>
+          </form>
+        {{else}}
+          <a href="/login">Log in</a>
+          <a class="nav-button" href="/signup">Sign up</a>
+        {{end}}
+      </nav>
+    </header>
     {{block "content" .}}{{end}}
   </body>
 </html>

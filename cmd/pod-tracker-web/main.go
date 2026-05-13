@@ -32,6 +32,7 @@ func main() {
 
 	options := []httpserver.Option{}
 	if pool != nil {
+		options = append(options, httpserver.WithStore(httpserver.NewPGStore(pool)))
 		options = append(options, httpserver.WithReadinessCheck("database", func(ctx context.Context) error {
 			return db.Check(ctx, pool)
 		}))
