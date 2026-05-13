@@ -1,5 +1,0 @@
----
-EnableDefaultLinters: true
-exclude:
-  - "vendor/**/*"
-  - "tmp/**/*"

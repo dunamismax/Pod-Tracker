@@ -1,4 +1,0 @@
-#!/usr/bin/env sh
-set -eu
-
-bin/rails assets:precompile

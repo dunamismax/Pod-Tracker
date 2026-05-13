@@ -1,5 +1,0 @@
-#!/usr/bin/env sh
-set -eu
-
-bin/rubocop
-bin/erb_lint --lint-all

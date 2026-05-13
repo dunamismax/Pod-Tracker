@@ -1,6 +1,0 @@
-#!/usr/bin/env sh
-set -eu
-
-bin/bundler-audit
-bin/importmap audit
-bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error
