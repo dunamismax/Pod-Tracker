@@ -111,6 +111,9 @@ Default against:
 - Test migrations against real PostgreSQL.
 - Schema changes that touch production data require a plan before
   execution.
+- Extension migrations such as `pg_stat_statements` may require an
+  admin/superuser migration URL. Keep app runtime credentials separate
+  from migration credentials.
 
 ---
 

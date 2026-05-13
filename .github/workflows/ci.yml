@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+
+      - name: SQL generation
+        run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0 generate
+
+      - name: Go tests
+        run: go test ./...
+
+      - name: Docs and whitespace check
+        run: git diff --check
+
+      - name: SQL placeholder check
+        run: test -f migrations/001_extensions.sql
+
+      - name: Frontend asset placeholder check
+        run: test -f web/static/vendor/htmx-2.0.10.min.js

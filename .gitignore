@@ -1,0 +1,38 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Go build and test outputs
+/bin/
+/dist/
+/build/
+*.test
+*.out
+coverage.*
+
+# Logs and runtime files
+*.log
+*.pid
+/tmp/
+
+# Database dumps and local data
+*.dump
+*.sql.gz
+*.psql
+*.sqlite
+*.sqlite3
+/data/
+/backups/
+
+# Frontend dependencies and generated assets
+node_modules/
+.npm/
+
+# IDE and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

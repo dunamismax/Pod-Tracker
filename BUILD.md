@@ -244,44 +244,44 @@ state where documented verification passes on a clean checkout.
 - [x] Write `README.md` with live URL and product positioning.
 - [x] Write this `BUILD.md` as the active build checklist.
 - [x] Write repo-local `AGENTS.md`.
-- [ ] Add `.gitignore` for Go, local env files, logs, build outputs,
+- [x] Add `.gitignore` for Go, local env files, logs, build outputs,
       database dumps, IDE files, and OS files.
-- [ ] Add `.editorconfig`.
-- [ ] Add top-level `justfile`.
-- [ ] Add `.env.example` without secrets.
-- [ ] Add CI placeholder for docs, Go, SQL, and frontend checks.
-- [ ] Confirm or normalize dual-push GitHub and Codeberg remote setup.
+- [x] Add `.editorconfig`.
+- [x] Add top-level `justfile`.
+- [x] Add `.env.example` without secrets.
+- [x] Add CI placeholder for docs, Go, SQL, and frontend checks.
+- [x] Confirm or normalize dual-push GitHub and Codeberg remote setup.
 
 ### Phase 1 - Go Web Skeleton
 
-- [ ] Create Go module.
-- [ ] Add `cmd/pod-tracker-web` HTTP server.
-- [ ] Add `cmd/pod-tracker-worker` placeholder.
-- [ ] Add config loading from environment.
-- [ ] Add structured logging and request IDs.
-- [ ] Add `/healthz` and `/readyz`.
-- [ ] Add server-rendered base layout.
-- [ ] Add HTMX as a pinned local static asset or locked dependency.
-- [ ] Add CSS pipeline decision and first compiled stylesheet.
-- [ ] Add public home page at `/`.
-- [ ] Add `just run`, `just worker`, `just fmt`, `just check`,
+- [x] Create Go module.
+- [x] Add `cmd/pod-tracker-web` HTTP server.
+- [x] Add `cmd/pod-tracker-worker` placeholder.
+- [x] Add config loading from environment.
+- [x] Add structured logging and request IDs.
+- [x] Add `/healthz` and `/readyz`.
+- [x] Add server-rendered base layout.
+- [x] Add HTMX as a pinned local static asset or locked dependency.
+- [x] Add CSS pipeline decision and first compiled stylesheet.
+- [x] Add public home page at `/`.
+- [x] Add `just run`, `just worker`, `just fmt`, `just check`,
       `just test`.
 
 ### Phase 2 - Local PostgreSQL And Migrations
 
-- [ ] Document local Homebrew PostgreSQL setup in `docs/development.md`.
-- [ ] Add database creation and reset commands.
-- [ ] Choose and wire the migration tool.
-- [ ] Add `001_extensions.sql` for required extensions.
-- [ ] Add database connection pool.
-- [ ] Add migration smoke test against local or ephemeral PostgreSQL.
-- [ ] Add typed SQL generation with sqlc or chosen equivalent.
-- [ ] Add initial database package and transaction helper.
+- [x] Document local Homebrew PostgreSQL setup in `docs/development.md`.
+- [x] Add database creation and reset commands.
+- [x] Choose and wire the migration tool.
+- [x] Add `001_extensions.sql` for required extensions.
+- [x] Add database connection pool.
+- [x] Add migration smoke test against local or ephemeral PostgreSQL.
+- [x] Add typed SQL generation with sqlc or chosen equivalent.
+- [x] Add initial database package and transaction helper.
 
 ### Phase 3 - Identity, Sessions, And Playgroups
 
-- [ ] Add users and sessions schema.
-- [ ] Add secure password hashing.
+- [x] Add users and sessions schema.
+- [x] Add secure password hashing.
 - [ ] Add signup, login, logout, and settings.
 - [ ] Add secure, HttpOnly, same-site session cookies.
 - [ ] Add CSRF protection for state-changing forms.
@@ -496,3 +496,7 @@ Trust current primary docs over this file.
   `README.md`, `BUILD.md`, and `AGENTS.md`; set the stack direction to
   Go, PostgreSQL, server-rendered HTML, HTMX, Caddy, systemd, and
   non-Docker PostgreSQL.
+- 2026-05-13 - Added the Go web and worker skeleton, local HTMX/plain CSS
+  frontend foundation, local PostgreSQL migration workflow, sqlc typed
+  SQL generation, pgx database package, identity/session schema, and
+  bcrypt password hashing.
