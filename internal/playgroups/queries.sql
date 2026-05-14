@@ -11,6 +11,17 @@ values ($1);
 insert into core.playgroup_memberships (playgroup_id, user_id, role)
 values ($1, $2, $3);
 
+-- name: GetPlaygroupBySlugAndUser :one
+select
+  p.id,
+  p.name,
+  p.slug,
+  p.description,
+  m.role
+from core.playgroups p
+join core.playgroup_memberships m on m.playgroup_id = p.id
+where p.slug = $1 and m.user_id = $2;
+
 -- name: ListPlaygroupsForUser :many
 select
   p.id,

@@ -1,0 +1,29 @@
+{{define "title"}}{{.Event.Title}}{{end}}
+
+{{define "content"}}
+<div class="max-w-4xl mx-auto space-y-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight text-gray-900">{{.Event.Title}}</h1>
+      <p class="mt-2 text-gray-600">{{.Event.StartTime.Format "Jan 02, 2006 at 3:04 PM"}}</p>
+    </div>
+    <div class="flex gap-x-4">
+      <span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">{{.Event.Visibility}}</span>
+      <a href="/events/{{.Event.ID.Value | printf "%v"}}/edit" class="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Edit</a>
+    </div>
+  </div>
+
+  <div class="bg-white shadow sm:rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-base font-semibold leading-6 text-gray-900">Event Details</h3>
+      <div class="mt-2 text-sm text-gray-500">
+        {{if .Event.Description}}
+          <p>{{.Event.Description}}</p>
+        {{else}}
+          <p>No description provided.</p>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

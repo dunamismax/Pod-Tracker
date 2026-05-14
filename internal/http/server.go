@@ -83,6 +83,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings", s.settings)
 	mux.HandleFunc("GET /playgroups", s.playgroups)
 	mux.HandleFunc("POST /playgroups", s.createPlaygroup)
+	mux.HandleFunc("GET /playgroups/{slug}", s.playgroupView)
+	mux.HandleFunc("GET /playgroups/{slug}/events/new", s.newEventForm)
+	mux.HandleFunc("POST /playgroups/{slug}/events", s.createEvent)
+	mux.HandleFunc("GET /events/{id}", s.eventView)
+	mux.HandleFunc("GET /events/{id}/edit", s.editEventForm)
+	mux.HandleFunc("POST /events/{id}/edit", s.updateEvent)
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /readyz", s.readyz)
 

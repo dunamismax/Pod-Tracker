@@ -45,9 +45,8 @@ Pod Tracker is built around the game-night loop:
 - **No Docker PostgreSQL** for local development or production.
 
 Local development uses the installed macOS PostgreSQL service. At project
-start, this machine has Homebrew PostgreSQL 17.9 available at
-`/opt/homebrew/opt/postgresql@17`. Prefer PostgreSQL 18 once installed
-and practical, but do not block the skeleton on it.
+start, this machine has Homebrew PostgreSQL 18 available at
+`/opt/homebrew/opt/postgresql@18`.
 
 Production target:
 

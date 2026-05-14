@@ -93,6 +93,31 @@ func (s *Server) createPlaygroup(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/playgroups", http.StatusSeeOther)
 }
 
+func (s *Server) playgroupView(w http.ResponseWriter, r *http.Request) {
+	if !s.requireUser(w, r) {
+		return
+	}
+
+	slug := r.PathValue("slug")
+	user, _ := CurrentUser(r.Context())
+
+	playgroup, err := s.store.GetPlaygroupBySlugAndUser(r.Context(), slug, user.ID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	events, err := s.store.ListEventsForPlaygroup(r.Context(), playgroup.ID)
+	if err != nil {
+		s.logger.Error("list playgroup events", "err", err, "request_id", RequestID(r.Context()))
+	}
+
+	data := s.newTemplateData(w, r)
+	data.Playgroup = &playgroup
+	data.Events = events
+	s.render(w, r, http.StatusOK, "playgroup_view.html", data)
+}
+
 func slugify(value string) string {
 	slug := strings.ToLower(strings.TrimSpace(value))
 	slug = slugUnsafe.ReplaceAllString(slug, "-")

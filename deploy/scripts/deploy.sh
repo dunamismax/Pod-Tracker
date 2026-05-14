@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export PATH=$PATH:/usr/local/go/bin
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 release_root="${POD_TRACKER_RELEASE_ROOT:-/opt/pod-tracker/releases}"
 current_link="${POD_TRACKER_CURRENT_LINK:-/opt/pod-tracker/current}"

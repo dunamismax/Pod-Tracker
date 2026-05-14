@@ -47,12 +47,11 @@ Current local baseline observed on 2026-05-13:
 
 ```text
 Go: go1.26.3 darwin/arm64
-PostgreSQL: 17.9 Homebrew
-psql: /opt/homebrew/opt/postgresql@17/bin/psql
+PostgreSQL: 18 Homebrew
+psql: /opt/homebrew/opt/postgresql@18/bin/psql
 ```
 
-Prefer PostgreSQL 18 once it is installed and practical. PostgreSQL 17 is
-acceptable for the first skeleton if every required extension is present.
+The skeleton uses PostgreSQL 18.
 
 ---
 
@@ -295,8 +294,8 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 4 - Events, Hosts, RSVPs, And Calendar
 
-- [ ] Add event, host, location, RSVP, guest, and reminder tables.
-- [ ] Add event creation and edit flow.
+- [x] Add event, host, location, RSVP, guest, and reminder tables.
+- [x] Add event creation and edit flow.
 - [ ] Add host address visibility rules.
 - [ ] Add RSVP states: yes, maybe, no, waitlist.
 - [ ] Capture arrival time, leaving time, guest count, travel buffer, and
@@ -515,4 +514,6 @@ Trust current primary docs over this file.
   `/opt/pod-tracker/releases/20260513T210200Z`, migrated production
   PostgreSQL to goose version 3, replaced the Rails Puma unit with the
   Go web service on `127.0.0.1:8083`, started the Go worker, and updated
+  the backup timer to use the new `pg_dump` script.
+vice on `127.0.0.1:8083`, started the Go worker, and updated
   the backup timer to use the new `pg_dump` script.

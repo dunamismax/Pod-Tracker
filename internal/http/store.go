@@ -23,6 +23,11 @@ type Store interface {
 	RevokeSession(context.Context, []byte) error
 	ListPlaygroupsForUser(context.Context, pgtype.UUID) ([]Playgroup, error)
 	CreatePlaygroup(context.Context, CreatePlaygroupParams) (Playgroup, error)
+	GetPlaygroupBySlugAndUser(context.Context, string, pgtype.UUID) (Playgroup, error)
+	CreateEvent(context.Context, CreateEventParams) (Event, error)
+	GetEventByID(context.Context, pgtype.UUID) (Event, error)
+	ListEventsForPlaygroup(context.Context, pgtype.UUID) ([]Event, error)
+	UpdateEvent(context.Context, UpdateEventParams) (Event, error)
 }
 
 type User struct {
@@ -67,6 +72,35 @@ type CreatePlaygroupParams struct {
 	Name        string
 	Slug        string
 	Description string
+}
+
+type Event struct {
+	ID          pgtype.UUID
+	PlaygroupID pgtype.UUID
+	Title       string
+	Description string
+	StartTime   time.Time
+	EndTime     *time.Time
+	Visibility  string
+}
+
+type CreateEventParams struct {
+	PlaygroupID pgtype.UUID
+	Title       string
+	Description string
+	StartTime   time.Time
+	EndTime     *time.Time
+	Visibility  string
+	CreatedBy   pgtype.UUID
+}
+
+type UpdateEventParams struct {
+	ID          pgtype.UUID
+	Title       string
+	Description string
+	StartTime   time.Time
+	EndTime     *time.Time
+	Visibility  string
 }
 
 type PGStore struct {
@@ -184,6 +218,99 @@ func (s *PGStore) CreatePlaygroup(ctx context.Context, params CreatePlaygroupPar
 		return Playgroup{}, err
 	}
 	return playgroup, nil
+}
+
+func (s *PGStore) GetPlaygroupBySlugAndUser(ctx context.Context, slug string, userID pgtype.UUID) (Playgroup, error) {
+	row, err := dbsql.New(s.pool).GetPlaygroupBySlugAndUser(ctx, dbsql.GetPlaygroupBySlugAndUserParams{
+		Slug:   slug,
+		UserID: userID,
+	})
+	if err != nil {
+		return Playgroup{}, err
+	}
+	return Playgroup{
+		ID:          row.ID,
+		Name:        row.Name,
+		Slug:        row.Slug,
+		Description: row.Description,
+		Role:        row.Role,
+	}, nil
+}
+
+func (s *PGStore) CreateEvent(ctx context.Context, params CreateEventParams) (Event, error) {
+	var endTime pgtype.Timestamptz
+	if params.EndTime != nil {
+		endTime = pgtype.Timestamptz{Time: *params.EndTime, Valid: true}
+	}
+	row, err := dbsql.New(s.pool).CreateEvent(ctx, dbsql.CreateEventParams{
+		PlaygroupID: params.PlaygroupID,
+		Title:       params.Title,
+		Description: params.Description,
+		StartTime:   pgtype.Timestamptz{Time: params.StartTime, Valid: true},
+		EndTime:     endTime,
+		Visibility:  params.Visibility,
+		CreatedBy:   params.CreatedBy,
+	})
+	if err != nil {
+		return Event{}, err
+	}
+	return eventFromSQL(row), nil
+}
+
+func (s *PGStore) GetEventByID(ctx context.Context, id pgtype.UUID) (Event, error) {
+	row, err := dbsql.New(s.pool).GetEvent(ctx, id)
+	if err != nil {
+		return Event{}, err
+	}
+	return eventFromSQL(row), nil
+}
+
+func (s *PGStore) ListEventsForPlaygroup(ctx context.Context, playgroupID pgtype.UUID) ([]Event, error) {
+	rows, err := dbsql.New(s.pool).ListEventsForPlaygroup(ctx, playgroupID)
+	if err != nil {
+		return nil, err
+	}
+	events := make([]Event, 0, len(rows))
+	for _, row := range rows {
+		events = append(events, eventFromSQL(row))
+	}
+	return events, nil
+}
+
+func (s *PGStore) UpdateEvent(ctx context.Context, params UpdateEventParams) (Event, error) {
+	var endTime pgtype.Timestamptz
+	if params.EndTime != nil {
+		endTime = pgtype.Timestamptz{Time: *params.EndTime, Valid: true}
+	}
+	row, err := dbsql.New(s.pool).UpdateEvent(ctx, dbsql.UpdateEventParams{
+		ID:          params.ID,
+		Title:       params.Title,
+		Description: params.Description,
+		StartTime:   pgtype.Timestamptz{Time: params.StartTime, Valid: true},
+		EndTime:     endTime,
+		Visibility:  params.Visibility,
+	})
+	if err != nil {
+		return Event{}, err
+	}
+	return eventFromSQL(row), nil
+}
+
+func eventFromSQL(row dbsql.CoreEvent) Event {
+	var endTime *time.Time
+	if row.EndTime.Valid {
+		t := row.EndTime.Time
+		endTime = &t
+	}
+	return Event{
+		ID:          row.ID,
+		PlaygroupID: row.PlaygroupID,
+		Title:       row.Title,
+		Description: row.Description,
+		StartTime:   row.StartTime.Time,
+		EndTime:     endTime,
+		Visibility:  row.Visibility,
+	}
 }
 
 func userFromSQL(user dbsql.CoreUser) User {

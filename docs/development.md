@@ -50,7 +50,7 @@ Start PostgreSQL if it is not already running.
 On macOS with Homebrew:
 
 ```sh
-brew services start postgresql@17
+brew services start postgresql@18
 ```
 
 On Ubuntu:

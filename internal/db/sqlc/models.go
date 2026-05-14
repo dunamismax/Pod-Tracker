@@ -10,6 +10,80 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type CoreEvent struct {
+	ID          pgtype.UUID
+	PlaygroupID pgtype.UUID
+	Title       string
+	Description string
+	StartTime   pgtype.Timestamptz
+	EndTime     pgtype.Timestamptz
+	LocationID  pgtype.UUID
+	Visibility  string
+	InviteToken pgtype.Text
+	CreatedBy   pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type CoreEventGuest struct {
+	ID        pgtype.UUID
+	EventID   pgtype.UUID
+	RsvpID    pgtype.UUID
+	Name      string
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+type CoreEventHost struct {
+	ID                pgtype.UUID
+	EventID           pgtype.UUID
+	UserID            pgtype.UUID
+	AddressVisibility string
+	CreatedAt         pgtype.Timestamptz
+}
+
+type CoreEventLocation struct {
+	ID            pgtype.UUID
+	PlaygroupID   pgtype.UUID
+	Name          string
+	AddressLine1  pgtype.Text
+	AddressLine2  pgtype.Text
+	City          pgtype.Text
+	StateProvince pgtype.Text
+	PostalCode    pgtype.Text
+	Country       pgtype.Text
+	Notes         string
+	CreatedBy     pgtype.UUID
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
+type CoreEventReminder struct {
+	ID           pgtype.UUID
+	EventID      pgtype.UUID
+	ScheduledFor pgtype.Timestamptz
+	ReminderType string
+	Status       string
+	CreatedBy    pgtype.UUID
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
+type CoreEventRsvp struct {
+	ID                  pgtype.UUID
+	EventID             pgtype.UUID
+	UserID              pgtype.UUID
+	GuestName           pgtype.Text
+	Status              string
+	ArrivalTime         pgtype.Timestamptz
+	LeavingTime         pgtype.Timestamptz
+	GuestCount          int32
+	TravelBufferMinutes pgtype.Int4
+	Notes               string
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+}
+
 type CoreHouseRule struct {
 	ID              pgtype.UUID
 	PlaygroupID     pgtype.UUID
@@ -82,6 +156,34 @@ type CoreUser struct {
 	Email        string
 	DisplayName  string
 	PasswordHash string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
+type OpsBackgroundJob struct {
+	ID          pgtype.UUID
+	Queue       string
+	JobType     string
+	Payload     []byte
+	RunAt       pgtype.Timestamptz
+	LockedAt    pgtype.Timestamptz
+	LockedBy    pgtype.Text
+	Attempts    int32
+	MaxAttempts int32
+	LastError   pgtype.Text
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type OpsEmailDelivery struct {
+	ID           pgtype.UUID
+	ToAddress    string
+	Subject      string
+	BodyText     pgtype.Text
+	BodyHtml     pgtype.Text
+	Status       string
+	ErrorMessage pgtype.Text
+	SentAt       pgtype.Timestamptz
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz
 }

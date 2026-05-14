@@ -22,6 +22,252 @@ func (q *Queries) CreateDefaultPlaygroupSettings(ctx context.Context, playgroupI
 	return err
 }
 
+const createEvent = `-- name: CreateEvent :one
+insert into core.events (
+  playgroup_id, title, description, start_time, end_time, location_id, visibility, invite_token, created_by
+) values (
+  $1, $2, $3, $4, $5, $6, $7, $8, $9
+) returning id, playgroup_id, title, description, start_time, end_time, location_id, visibility, invite_token, created_by, created_at, updated_at
+`
+
+type CreateEventParams struct {
+	PlaygroupID pgtype.UUID
+	Title       string
+	Description string
+	StartTime   pgtype.Timestamptz
+	EndTime     pgtype.Timestamptz
+	LocationID  pgtype.UUID
+	Visibility  string
+	InviteToken pgtype.Text
+	CreatedBy   pgtype.UUID
+}
+
+func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (CoreEvent, error) {
+	row := q.db.QueryRow(ctx, createEvent,
+		arg.PlaygroupID,
+		arg.Title,
+		arg.Description,
+		arg.StartTime,
+		arg.EndTime,
+		arg.LocationID,
+		arg.Visibility,
+		arg.InviteToken,
+		arg.CreatedBy,
+	)
+	var i CoreEvent
+	err := row.Scan(
+		&i.ID,
+		&i.PlaygroupID,
+		&i.Title,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.LocationID,
+		&i.Visibility,
+		&i.InviteToken,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createEventGuest = `-- name: CreateEventGuest :one
+insert into core.event_guests (
+  event_id, rsvp_id, name
+) values (
+  $1, $2, $3
+) returning id, event_id, rsvp_id, name, created_at, updated_at
+`
+
+type CreateEventGuestParams struct {
+	EventID pgtype.UUID
+	RsvpID  pgtype.UUID
+	Name    string
+}
+
+func (q *Queries) CreateEventGuest(ctx context.Context, arg CreateEventGuestParams) (CoreEventGuest, error) {
+	row := q.db.QueryRow(ctx, createEventGuest, arg.EventID, arg.RsvpID, arg.Name)
+	var i CoreEventGuest
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.RsvpID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createEventHost = `-- name: CreateEventHost :one
+insert into core.event_hosts (
+  event_id, user_id, address_visibility
+) values (
+  $1, $2, $3
+) returning id, event_id, user_id, address_visibility, created_at
+`
+
+type CreateEventHostParams struct {
+	EventID           pgtype.UUID
+	UserID            pgtype.UUID
+	AddressVisibility string
+}
+
+func (q *Queries) CreateEventHost(ctx context.Context, arg CreateEventHostParams) (CoreEventHost, error) {
+	row := q.db.QueryRow(ctx, createEventHost, arg.EventID, arg.UserID, arg.AddressVisibility)
+	var i CoreEventHost
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.UserID,
+		&i.AddressVisibility,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createEventLocation = `-- name: CreateEventLocation :one
+insert into core.event_locations (
+  playgroup_id, name, address_line1, address_line2, city, state_province, postal_code, country, notes, created_by
+) values (
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+) returning id, playgroup_id, name, address_line1, address_line2, city, state_province, postal_code, country, notes, created_by, created_at, updated_at
+`
+
+type CreateEventLocationParams struct {
+	PlaygroupID   pgtype.UUID
+	Name          string
+	AddressLine1  pgtype.Text
+	AddressLine2  pgtype.Text
+	City          pgtype.Text
+	StateProvince pgtype.Text
+	PostalCode    pgtype.Text
+	Country       pgtype.Text
+	Notes         string
+	CreatedBy     pgtype.UUID
+}
+
+func (q *Queries) CreateEventLocation(ctx context.Context, arg CreateEventLocationParams) (CoreEventLocation, error) {
+	row := q.db.QueryRow(ctx, createEventLocation,
+		arg.PlaygroupID,
+		arg.Name,
+		arg.AddressLine1,
+		arg.AddressLine2,
+		arg.City,
+		arg.StateProvince,
+		arg.PostalCode,
+		arg.Country,
+		arg.Notes,
+		arg.CreatedBy,
+	)
+	var i CoreEventLocation
+	err := row.Scan(
+		&i.ID,
+		&i.PlaygroupID,
+		&i.Name,
+		&i.AddressLine1,
+		&i.AddressLine2,
+		&i.City,
+		&i.StateProvince,
+		&i.PostalCode,
+		&i.Country,
+		&i.Notes,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createEventRSVP = `-- name: CreateEventRSVP :one
+insert into core.event_rsvps (
+  event_id, user_id, guest_name, status, arrival_time, leaving_time, guest_count, travel_buffer_minutes, notes
+) values (
+  $1, $2, $3, $4, $5, $6, $7, $8, $9
+) returning id, event_id, user_id, guest_name, status, arrival_time, leaving_time, guest_count, travel_buffer_minutes, notes, created_at, updated_at
+`
+
+type CreateEventRSVPParams struct {
+	EventID             pgtype.UUID
+	UserID              pgtype.UUID
+	GuestName           pgtype.Text
+	Status              string
+	ArrivalTime         pgtype.Timestamptz
+	LeavingTime         pgtype.Timestamptz
+	GuestCount          int32
+	TravelBufferMinutes pgtype.Int4
+	Notes               string
+}
+
+func (q *Queries) CreateEventRSVP(ctx context.Context, arg CreateEventRSVPParams) (CoreEventRsvp, error) {
+	row := q.db.QueryRow(ctx, createEventRSVP,
+		arg.EventID,
+		arg.UserID,
+		arg.GuestName,
+		arg.Status,
+		arg.ArrivalTime,
+		arg.LeavingTime,
+		arg.GuestCount,
+		arg.TravelBufferMinutes,
+		arg.Notes,
+	)
+	var i CoreEventRsvp
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.UserID,
+		&i.GuestName,
+		&i.Status,
+		&i.ArrivalTime,
+		&i.LeavingTime,
+		&i.GuestCount,
+		&i.TravelBufferMinutes,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createEventReminder = `-- name: CreateEventReminder :one
+insert into core.event_reminders (
+  event_id, scheduled_for, reminder_type, status, created_by
+) values (
+  $1, $2, $3, $4, $5
+) returning id, event_id, scheduled_for, reminder_type, status, created_by, created_at, updated_at
+`
+
+type CreateEventReminderParams struct {
+	EventID      pgtype.UUID
+	ScheduledFor pgtype.Timestamptz
+	ReminderType string
+	Status       string
+	CreatedBy    pgtype.UUID
+}
+
+func (q *Queries) CreateEventReminder(ctx context.Context, arg CreateEventReminderParams) (CoreEventReminder, error) {
+	row := q.db.QueryRow(ctx, createEventReminder,
+		arg.EventID,
+		arg.ScheduledFor,
+		arg.ReminderType,
+		arg.Status,
+		arg.CreatedBy,
+	)
+	var i CoreEventReminder
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.ScheduledFor,
+		&i.ReminderType,
+		&i.Status,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createPlaygroup = `-- name: CreatePlaygroup :one
 insert into core.playgroups (name, slug, description, created_by)
 values ($1, $2, $3, $4)
@@ -134,6 +380,171 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CoreUse
 	return i, err
 }
 
+const getEvent = `-- name: GetEvent :one
+select id, playgroup_id, title, description, start_time, end_time, location_id, visibility, invite_token, created_by, created_at, updated_at from core.events where id = $1
+`
+
+func (q *Queries) GetEvent(ctx context.Context, id pgtype.UUID) (CoreEvent, error) {
+	row := q.db.QueryRow(ctx, getEvent, id)
+	var i CoreEvent
+	err := row.Scan(
+		&i.ID,
+		&i.PlaygroupID,
+		&i.Title,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.LocationID,
+		&i.Visibility,
+		&i.InviteToken,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEventHost = `-- name: GetEventHost :one
+select id, event_id, user_id, address_visibility, created_at from core.event_hosts
+where event_id = $1 and user_id = $2
+`
+
+type GetEventHostParams struct {
+	EventID pgtype.UUID
+	UserID  pgtype.UUID
+}
+
+func (q *Queries) GetEventHost(ctx context.Context, arg GetEventHostParams) (CoreEventHost, error) {
+	row := q.db.QueryRow(ctx, getEventHost, arg.EventID, arg.UserID)
+	var i CoreEventHost
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.UserID,
+		&i.AddressVisibility,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getEventLocation = `-- name: GetEventLocation :one
+select id, playgroup_id, name, address_line1, address_line2, city, state_province, postal_code, country, notes, created_by, created_at, updated_at from core.event_locations where id = $1
+`
+
+func (q *Queries) GetEventLocation(ctx context.Context, id pgtype.UUID) (CoreEventLocation, error) {
+	row := q.db.QueryRow(ctx, getEventLocation, id)
+	var i CoreEventLocation
+	err := row.Scan(
+		&i.ID,
+		&i.PlaygroupID,
+		&i.Name,
+		&i.AddressLine1,
+		&i.AddressLine2,
+		&i.City,
+		&i.StateProvince,
+		&i.PostalCode,
+		&i.Country,
+		&i.Notes,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEventRSVP = `-- name: GetEventRSVP :one
+select id, event_id, user_id, guest_name, status, arrival_time, leaving_time, guest_count, travel_buffer_minutes, notes, created_at, updated_at from core.event_rsvps
+where event_id = $1 and user_id = $2
+`
+
+type GetEventRSVPParams struct {
+	EventID pgtype.UUID
+	UserID  pgtype.UUID
+}
+
+func (q *Queries) GetEventRSVP(ctx context.Context, arg GetEventRSVPParams) (CoreEventRsvp, error) {
+	row := q.db.QueryRow(ctx, getEventRSVP, arg.EventID, arg.UserID)
+	var i CoreEventRsvp
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.UserID,
+		&i.GuestName,
+		&i.Status,
+		&i.ArrivalTime,
+		&i.LeavingTime,
+		&i.GuestCount,
+		&i.TravelBufferMinutes,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEventRSVPByID = `-- name: GetEventRSVPByID :one
+select id, event_id, user_id, guest_name, status, arrival_time, leaving_time, guest_count, travel_buffer_minutes, notes, created_at, updated_at from core.event_rsvps
+where id = $1
+`
+
+func (q *Queries) GetEventRSVPByID(ctx context.Context, id pgtype.UUID) (CoreEventRsvp, error) {
+	row := q.db.QueryRow(ctx, getEventRSVPByID, id)
+	var i CoreEventRsvp
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.UserID,
+		&i.GuestName,
+		&i.Status,
+		&i.ArrivalTime,
+		&i.LeavingTime,
+		&i.GuestCount,
+		&i.TravelBufferMinutes,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPlaygroupBySlugAndUser = `-- name: GetPlaygroupBySlugAndUser :one
+select
+  p.id,
+  p.name,
+  p.slug,
+  p.description,
+  m.role
+from core.playgroups p
+join core.playgroup_memberships m on m.playgroup_id = p.id
+where p.slug = $1 and m.user_id = $2
+`
+
+type GetPlaygroupBySlugAndUserParams struct {
+	Slug   string
+	UserID pgtype.UUID
+}
+
+type GetPlaygroupBySlugAndUserRow struct {
+	ID          pgtype.UUID
+	Name        string
+	Slug        string
+	Description string
+	Role        string
+}
+
+func (q *Queries) GetPlaygroupBySlugAndUser(ctx context.Context, arg GetPlaygroupBySlugAndUserParams) (GetPlaygroupBySlugAndUserRow, error) {
+	row := q.db.QueryRow(ctx, getPlaygroupBySlugAndUser, arg.Slug, arg.UserID)
+	var i GetPlaygroupBySlugAndUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.Description,
+		&i.Role,
+	)
+	return i, err
+}
+
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
 select id, user_id, token_hash, user_agent, ip_address, created_at, last_seen_at, expires_at, revoked_at
 from core.sessions
@@ -199,6 +610,146 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (CoreUser, er
 	return i, err
 }
 
+const listEventGuests = `-- name: ListEventGuests :many
+select id, event_id, rsvp_id, name, created_at, updated_at from core.event_guests
+where event_id = $1
+`
+
+func (q *Queries) ListEventGuests(ctx context.Context, eventID pgtype.UUID) ([]CoreEventGuest, error) {
+	rows, err := q.db.Query(ctx, listEventGuests, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CoreEventGuest
+	for rows.Next() {
+		var i CoreEventGuest
+		if err := rows.Scan(
+			&i.ID,
+			&i.EventID,
+			&i.RsvpID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEventHosts = `-- name: ListEventHosts :many
+select id, event_id, user_id, address_visibility, created_at from core.event_hosts
+where event_id = $1
+`
+
+func (q *Queries) ListEventHosts(ctx context.Context, eventID pgtype.UUID) ([]CoreEventHost, error) {
+	rows, err := q.db.Query(ctx, listEventHosts, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CoreEventHost
+	for rows.Next() {
+		var i CoreEventHost
+		if err := rows.Scan(
+			&i.ID,
+			&i.EventID,
+			&i.UserID,
+			&i.AddressVisibility,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEventRSVPs = `-- name: ListEventRSVPs :many
+select id, event_id, user_id, guest_name, status, arrival_time, leaving_time, guest_count, travel_buffer_minutes, notes, created_at, updated_at from core.event_rsvps
+where event_id = $1
+`
+
+func (q *Queries) ListEventRSVPs(ctx context.Context, eventID pgtype.UUID) ([]CoreEventRsvp, error) {
+	rows, err := q.db.Query(ctx, listEventRSVPs, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CoreEventRsvp
+	for rows.Next() {
+		var i CoreEventRsvp
+		if err := rows.Scan(
+			&i.ID,
+			&i.EventID,
+			&i.UserID,
+			&i.GuestName,
+			&i.Status,
+			&i.ArrivalTime,
+			&i.LeavingTime,
+			&i.GuestCount,
+			&i.TravelBufferMinutes,
+			&i.Notes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEventsForPlaygroup = `-- name: ListEventsForPlaygroup :many
+select id, playgroup_id, title, description, start_time, end_time, location_id, visibility, invite_token, created_by, created_at, updated_at from core.events
+where playgroup_id = $1
+order by start_time asc
+`
+
+func (q *Queries) ListEventsForPlaygroup(ctx context.Context, playgroupID pgtype.UUID) ([]CoreEvent, error) {
+	rows, err := q.db.Query(ctx, listEventsForPlaygroup, playgroupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CoreEvent
+	for rows.Next() {
+		var i CoreEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.PlaygroupID,
+			&i.Title,
+			&i.Description,
+			&i.StartTime,
+			&i.EndTime,
+			&i.LocationID,
+			&i.Visibility,
+			&i.InviteToken,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPlaygroupsForUser = `-- name: ListPlaygroupsForUser :many
 select
   p.id,
@@ -256,4 +807,105 @@ where token_hash = $1
 func (q *Queries) RevokeSession(ctx context.Context, tokenHash []byte) error {
 	_, err := q.db.Exec(ctx, revokeSession, tokenHash)
 	return err
+}
+
+const updateEvent = `-- name: UpdateEvent :one
+update core.events
+set 
+  title = $2,
+  description = $3,
+  start_time = $4,
+  end_time = $5,
+  visibility = $6,
+  updated_at = now()
+where id = $1
+returning id, playgroup_id, title, description, start_time, end_time, location_id, visibility, invite_token, created_by, created_at, updated_at
+`
+
+type UpdateEventParams struct {
+	ID          pgtype.UUID
+	Title       string
+	Description string
+	StartTime   pgtype.Timestamptz
+	EndTime     pgtype.Timestamptz
+	Visibility  string
+}
+
+func (q *Queries) UpdateEvent(ctx context.Context, arg UpdateEventParams) (CoreEvent, error) {
+	row := q.db.QueryRow(ctx, updateEvent,
+		arg.ID,
+		arg.Title,
+		arg.Description,
+		arg.StartTime,
+		arg.EndTime,
+		arg.Visibility,
+	)
+	var i CoreEvent
+	err := row.Scan(
+		&i.ID,
+		&i.PlaygroupID,
+		&i.Title,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.LocationID,
+		&i.Visibility,
+		&i.InviteToken,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateEventRSVP = `-- name: UpdateEventRSVP :one
+update core.event_rsvps
+set 
+  status = $2,
+  arrival_time = $3,
+  leaving_time = $4,
+  guest_count = $5,
+  travel_buffer_minutes = $6,
+  notes = $7,
+  updated_at = now()
+where id = $1
+returning id, event_id, user_id, guest_name, status, arrival_time, leaving_time, guest_count, travel_buffer_minutes, notes, created_at, updated_at
+`
+
+type UpdateEventRSVPParams struct {
+	ID                  pgtype.UUID
+	Status              string
+	ArrivalTime         pgtype.Timestamptz
+	LeavingTime         pgtype.Timestamptz
+	GuestCount          int32
+	TravelBufferMinutes pgtype.Int4
+	Notes               string
+}
+
+func (q *Queries) UpdateEventRSVP(ctx context.Context, arg UpdateEventRSVPParams) (CoreEventRsvp, error) {
+	row := q.db.QueryRow(ctx, updateEventRSVP,
+		arg.ID,
+		arg.Status,
+		arg.ArrivalTime,
+		arg.LeavingTime,
+		arg.GuestCount,
+		arg.TravelBufferMinutes,
+		arg.Notes,
+	)
+	var i CoreEventRsvp
+	err := row.Scan(
+		&i.ID,
+		&i.EventID,
+		&i.UserID,
+		&i.GuestName,
+		&i.Status,
+		&i.ArrivalTime,
+		&i.LeavingTime,
+		&i.GuestCount,
+		&i.TravelBufferMinutes,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

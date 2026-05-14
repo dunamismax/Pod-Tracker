@@ -341,6 +341,26 @@ func (s *fakeStore) CreatePlaygroup(_ context.Context, params CreatePlaygroupPar
 	return playgroup, nil
 }
 
+func (s *fakeStore) GetPlaygroupBySlugAndUser(ctx context.Context, slug string, userID pgtype.UUID) (Playgroup, error) {
+	return Playgroup{}, nil
+}
+
+func (s *fakeStore) CreateEvent(ctx context.Context, params CreateEventParams) (Event, error) {
+	return Event{}, nil
+}
+
+func (s *fakeStore) GetEventByID(ctx context.Context, id pgtype.UUID) (Event, error) {
+	return Event{}, nil
+}
+
+func (s *fakeStore) ListEventsForPlaygroup(ctx context.Context, playgroupID pgtype.UUID) ([]Event, error) {
+	return nil, nil
+}
+
+func (s *fakeStore) UpdateEvent(ctx context.Context, params UpdateEventParams) (Event, error) {
+	return Event{}, nil
+}
+
 func (s *fakeStore) nextUUID() pgtype.UUID {
 	s.nextID++
 	var bytes [16]byte
