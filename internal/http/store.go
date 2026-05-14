@@ -32,6 +32,7 @@ type Store interface {
 	ListEventRSVPs(context.Context, pgtype.UUID) ([]EventRSVP, error)
 	CreateEventRSVP(context.Context, CreateEventRSVPParams) (EventRSVP, error)
 	UpdateEventRSVP(context.Context, UpdateEventRSVPParams) (EventRSVP, error)
+	EnqueueEmailDelivery(context.Context, EnqueueEmailParams) error
 }
 
 type User struct {
@@ -142,12 +143,50 @@ type UpdateEventRSVPParams struct {
 	Notes               string
 }
 
+type EnqueueEmailParams struct {
+	ToAddress string
+	Subject   string
+	TextBody  string
+	HTMLBody  string
+}
+
 type PGStore struct {
 	pool *pgxpool.Pool
 }
 
 func NewPGStore(pool *pgxpool.Pool) *PGStore {
 	return &PGStore{pool: pool}
+}
+
+func (s *PGStore) EnqueueEmailDelivery(ctx context.Context, params EnqueueEmailParams) error {
+	return db.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		queries := dbsql.New(tx)
+		delivery, err := queries.InsertEmailDelivery(ctx, dbsql.InsertEmailDeliveryParams{
+			ToAddress: params.ToAddress,
+			Subject:   params.Subject,
+			BodyText:  pgtype.Text{String: params.TextBody, Valid: params.TextBody != ""},
+			BodyHtml:  pgtype.Text{String: params.HTMLBody, Valid: params.HTMLBody != ""},
+		})
+		if err != nil {
+			return err
+		}
+
+		// Enqueue the job.
+		var payload []byte
+		var idStr string
+		if b, err := delivery.ID.Value(); err == nil && b != nil {
+			idStr = b.(string)
+		}
+		payload = []byte(fmt.Sprintf(`{"email_delivery_id": "%s"}`, idStr))
+
+		_, err = queries.InsertBackgroundJob(ctx, dbsql.InsertBackgroundJobParams{
+			Queue:   "default",
+			JobType: "send_email",
+			Payload: payload,
+			RunAt:   pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		})
+		return err
+	})
 }
 
 func (s *PGStore) CreateUser(ctx context.Context, params CreateUserParams) (User, error) {

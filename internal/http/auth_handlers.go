@@ -87,6 +87,20 @@ func (s *Server) signup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Queue welcome email
+	go func() {
+		// Ideally this uses a background context, since request context will cancel
+		ctx := context.Background()
+		err := s.store.EnqueueEmailDelivery(ctx, EnqueueEmailParams{
+			ToAddress: email,
+			Subject:   "Welcome to Pod Tracker",
+			TextBody:  "Welcome to Pod Tracker, " + displayName + "!\n\nYour account has been created successfully. You can now join playgroups and RSVP to events.",
+		})
+		if err != nil {
+			s.logger.Error("enqueue welcome email", "err", err)
+		}
+	}()
+
 	if err := s.startSession(w, r, user.ID); err != nil {
 		s.logger.Error("start signup session", "err", err, "request_id", RequestID(r.Context()))
 		http.Error(w, "signup failed", http.StatusInternalServerError)

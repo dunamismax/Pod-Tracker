@@ -377,6 +377,10 @@ func (s *fakeStore) UpdateEventRSVP(ctx context.Context, params UpdateEventRSVPP
 	return EventRSVP{}, nil
 }
 
+func (s *fakeStore) EnqueueEmailDelivery(ctx context.Context, params EnqueueEmailParams) error {
+	return nil
+}
+
 func (s *fakeStore) nextUUID() pgtype.UUID {
 	s.nextID++
 	var bytes [16]byte
