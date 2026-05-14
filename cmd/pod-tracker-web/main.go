@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/dunamismax/pod-tracker/internal/config"
 	"github.com/dunamismax/pod-tracker/internal/db"
+	"github.com/dunamismax/pod-tracker/internal/db/sqlc"
 	httpserver "github.com/dunamismax/pod-tracker/internal/http"
 )
 
@@ -35,6 +37,39 @@ func main() {
 		options = append(options, httpserver.WithStore(httpserver.NewPGStore(pool)))
 		options = append(options, httpserver.WithReadinessCheck("database", func(ctx context.Context) error {
 			return db.Check(ctx, pool)
+		}))
+		options = append(options, httpserver.WithReadinessCheck("migrations", func(ctx context.Context) error {
+			ready, err := dbsql.New(pool).CheckMigrationsReady(ctx)
+			if err != nil {
+				return err
+			}
+			if !ready {
+				return errors.New("required migration tables are missing")
+			}
+			return nil
+		}))
+		options = append(options, httpserver.WithReadinessCheck("jobs", func(ctx context.Context) error {
+			ready, err := dbsql.New(pool).CheckBackgroundJobsReady(ctx)
+			if err != nil {
+				return err
+			}
+			if !ready {
+				return errors.New("background jobs table is missing")
+			}
+			return nil
+		}))
+		options = append(options, httpserver.WithReadinessCheck("email", func(ctx context.Context) error {
+			if cfg.SMTPSender == "" {
+				return errors.New("email sender is not configured")
+			}
+			ready, err := dbsql.New(pool).CheckEmailDeliveriesReady(ctx)
+			if err != nil {
+				return err
+			}
+			if !ready {
+				return errors.New("email deliveries table is missing")
+			}
+			return nil
 		}))
 	}
 

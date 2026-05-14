@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -181,6 +182,110 @@ func TestAuthenticatedUserCanCreateAndListPlaygroups(t *testing.T) {
 	}
 }
 
+func TestPublicEventPageHidesRSVPOnlyAddress(t *testing.T) {
+	store := newFakeStore()
+	server := newTestServerWithOptions(t, WithStore(store))
+	event := store.seedEvent("public-token-for-test", "public_safe", "rsvps")
+
+	req := httptest.NewRequest(http.MethodGet, "/e/"+event.InviteToken, nil)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("public event returned status %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "Kitchen Table") {
+		t.Fatalf("public event did not show public location name")
+	}
+	if strings.Contains(body, "Hidden Address Sentinel") {
+		t.Fatalf("public event exposed rsvp-scoped address")
+	}
+}
+
+func TestMemberRSVPCanSeeRSVPOnlyAddress(t *testing.T) {
+	store := newFakeStore()
+	server := newTestServerWithOptions(t, WithStore(store))
+	csrfCookie, csrf := getCSRF(t, server, "/signup")
+	sessionCookie := signupForTest(t, server, csrfCookie, csrf)
+	user := store.usersByEmail["player@example.com"].User
+	event := store.seedEvent("member-token-for-test", "members", "rsvps")
+	store.rsvps[uuidKey(event.ID)] = []EventRSVP{{
+		ID:      store.nextUUID(),
+		EventID: event.ID,
+		UserID:  user.ID,
+		Status:  "yes",
+	}}
+
+	req := httptest.NewRequest(http.MethodGet, "/events/"+uuidString(t, event.ID), nil)
+	req.AddCookie(csrfCookie)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("event view returned status %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Hidden Address Sentinel") {
+		t.Fatalf("confirmed member rsvp did not see rsvp-scoped address")
+	}
+}
+
+func TestGuestInviteRSVPCreatesGuestScopedRSVP(t *testing.T) {
+	store := newFakeStore()
+	server := newTestServerWithOptions(t, WithStore(store))
+	event := store.seedEvent("invite-token-for-test", "invite_only", "hidden")
+	csrfCookie, csrf := getCSRF(t, server, "/rsvp/"+event.InviteToken)
+
+	form := url.Values{}
+	form.Set("csrf_token", csrf)
+	form.Set("guest_name", "Guest Player")
+	form.Set("status", "maybe")
+	req := httptest.NewRequest(http.MethodPost, "/rsvp/"+event.InviteToken, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(csrfCookie)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("guest rsvp returned status %d", rec.Code)
+	}
+	rsvps := store.rsvps[uuidKey(event.ID)]
+	if len(rsvps) != 1 || rsvps[0].GuestName == nil || *rsvps[0].GuestName != "Guest Player" {
+		t.Fatalf("guest rsvp was not stored with guest scope: %#v", rsvps)
+	}
+}
+
+func TestAuthenticatedCalendarFeedIncludesEvents(t *testing.T) {
+	store := newFakeStore()
+	server := newTestServerWithOptions(t, WithStore(store))
+	csrfCookie, csrf := getCSRF(t, server, "/signup")
+	sessionCookie := signupForTest(t, server, csrfCookie, csrf)
+	playgroup := Playgroup{ID: store.nextUUID(), Name: "Calendar Crew", Slug: "calendar-crew", Role: "member"}
+	store.playgroups = append(store.playgroups, playgroup)
+	event := store.seedEvent("calendar-token-for-test", "members", "members")
+	event.PlaygroupID = playgroup.ID
+	store.events[uuidKey(event.ID)] = event
+	store.eventsByToken[event.InviteToken] = event
+
+	req := httptest.NewRequest(http.MethodGet, "/calendar.ics", nil)
+	req.AddCookie(csrfCookie)
+	req.AddCookie(sessionCookie)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("calendar returned status %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "BEGIN:VCALENDAR") || !strings.Contains(body, "SUMMARY:Commander Night") {
+		t.Fatalf("calendar feed did not include event: %s", body)
+	}
+	if strings.Contains(body, "Hidden Address Sentinel") {
+		t.Fatalf("calendar feed exposed private address")
+	}
+}
+
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 
@@ -261,18 +366,28 @@ func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
 }
 
 type fakeStore struct {
-	nextID       byte
-	usersByID    map[string]UserWithPassword
-	usersByEmail map[string]UserWithPassword
-	sessions     map[string]Session
-	playgroups   []Playgroup
+	nextID        byte
+	usersByID     map[string]UserWithPassword
+	usersByEmail  map[string]UserWithPassword
+	sessions      map[string]Session
+	playgroups    []Playgroup
+	events        map[string]Event
+	eventsByToken map[string]Event
+	locations     map[string]EventLocation
+	hosts         map[string][]EventHost
+	rsvps         map[string][]EventRSVP
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
-		usersByID:    map[string]UserWithPassword{},
-		usersByEmail: map[string]UserWithPassword{},
-		sessions:     map[string]Session{},
+		usersByID:     map[string]UserWithPassword{},
+		usersByEmail:  map[string]UserWithPassword{},
+		sessions:      map[string]Session{},
+		events:        map[string]Event{},
+		eventsByToken: map[string]Event{},
+		locations:     map[string]EventLocation{},
+		hosts:         map[string][]EventHost{},
+		rsvps:         map[string][]EventRSVP{},
 	}
 }
 
@@ -341,36 +456,134 @@ func (s *fakeStore) CreatePlaygroup(_ context.Context, params CreatePlaygroupPar
 	return playgroup, nil
 }
 
-func (s *fakeStore) GetPlaygroupBySlugAndUser(ctx context.Context, slug string, userID pgtype.UUID) (Playgroup, error) {
-	return Playgroup{}, nil
+func (s *fakeStore) GetPlaygroupBySlugAndUser(_ context.Context, slug string, _ pgtype.UUID) (Playgroup, error) {
+	for _, playgroup := range s.playgroups {
+		if playgroup.Slug == slug {
+			return playgroup, nil
+		}
+	}
+	return Playgroup{}, pgx.ErrNoRows
 }
 
-func (s *fakeStore) CreateEvent(ctx context.Context, params CreateEventParams) (Event, error) {
-	return Event{}, nil
+func (s *fakeStore) CreateEvent(_ context.Context, params CreateEventParams) (Event, error) {
+	event := Event{
+		ID:          s.nextUUID(),
+		PlaygroupID: params.PlaygroupID,
+		Title:       params.Title,
+		Description: params.Description,
+		StartTime:   params.StartTime,
+		EndTime:     params.EndTime,
+		Visibility:  params.Visibility,
+		InviteToken: params.InviteToken,
+		MemberRole:  "owner",
+	}
+	if params.Location != nil {
+		location := EventLocation{
+			ID:            s.nextUUID(),
+			Name:          params.Location.Name,
+			AddressLine1:  params.Location.AddressLine1,
+			AddressLine2:  params.Location.AddressLine2,
+			City:          params.Location.City,
+			StateProvince: params.Location.StateProvince,
+			PostalCode:    params.Location.PostalCode,
+			Country:       params.Location.Country,
+			Notes:         params.Location.Notes,
+		}
+		event.LocationID = location.ID
+		s.locations[uuidKey(event.ID)] = location
+	}
+	if params.AddressVisibility != "" {
+		s.hosts[uuidKey(event.ID)] = []EventHost{{
+			UserID:            params.CreatedBy,
+			AddressVisibility: params.AddressVisibility,
+		}}
+	}
+	s.events[uuidKey(event.ID)] = event
+	s.eventsByToken[event.InviteToken] = event
+	return event, nil
 }
 
-func (s *fakeStore) GetEventByID(ctx context.Context, id pgtype.UUID) (Event, error) {
-	return Event{}, nil
+func (s *fakeStore) GetEventByID(_ context.Context, id pgtype.UUID) (Event, error) {
+	event, ok := s.events[uuidKey(id)]
+	if !ok {
+		return Event{}, pgx.ErrNoRows
+	}
+	return event, nil
 }
 
-func (s *fakeStore) ListEventsForPlaygroup(ctx context.Context, playgroupID pgtype.UUID) ([]Event, error) {
-	return nil, nil
+func (s *fakeStore) GetEventForUser(_ context.Context, id pgtype.UUID, _ pgtype.UUID) (Event, error) {
+	event, ok := s.events[uuidKey(id)]
+	if !ok {
+		return Event{}, pgx.ErrNoRows
+	}
+	if event.MemberRole == "" {
+		event.MemberRole = "member"
+	}
+	return event, nil
+}
+
+func (s *fakeStore) GetEventByToken(_ context.Context, token string) (Event, error) {
+	event, ok := s.eventsByToken[token]
+	if !ok {
+		return Event{}, pgx.ErrNoRows
+	}
+	return event, nil
+}
+
+func (s *fakeStore) GetEventLocationForEvent(_ context.Context, eventID pgtype.UUID) (EventLocation, error) {
+	location, ok := s.locations[uuidKey(eventID)]
+	if !ok {
+		return EventLocation{}, pgx.ErrNoRows
+	}
+	return location, nil
+}
+
+func (s *fakeStore) ListEventHosts(_ context.Context, eventID pgtype.UUID) ([]EventHost, error) {
+	return append([]EventHost(nil), s.hosts[uuidKey(eventID)]...), nil
+}
+
+func (s *fakeStore) ListEventsForPlaygroup(_ context.Context, playgroupID pgtype.UUID) ([]Event, error) {
+	events := []Event{}
+	for _, event := range s.events {
+		if event.PlaygroupID == playgroupID {
+			events = append(events, event)
+		}
+	}
+	return events, nil
 }
 
 func (s *fakeStore) UpdateEvent(ctx context.Context, params UpdateEventParams) (Event, error) {
 	return Event{}, nil
 }
 
-func (s *fakeStore) GetEventRSVP(ctx context.Context, eventID pgtype.UUID, userID pgtype.UUID) (EventRSVP, error) {
+func (s *fakeStore) GetEventRSVP(_ context.Context, eventID pgtype.UUID, userID pgtype.UUID) (EventRSVP, error) {
+	for _, rsvp := range s.rsvps[uuidKey(eventID)] {
+		if rsvp.UserID == userID {
+			return rsvp, nil
+		}
+	}
 	return EventRSVP{}, pgx.ErrNoRows
 }
 
-func (s *fakeStore) ListEventRSVPs(ctx context.Context, eventID pgtype.UUID) ([]EventRSVP, error) {
-	return nil, nil
+func (s *fakeStore) ListEventRSVPs(_ context.Context, eventID pgtype.UUID) ([]EventRSVP, error) {
+	return append([]EventRSVP(nil), s.rsvps[uuidKey(eventID)]...), nil
 }
 
-func (s *fakeStore) CreateEventRSVP(ctx context.Context, params CreateEventRSVPParams) (EventRSVP, error) {
-	return EventRSVP{}, nil
+func (s *fakeStore) CreateEventRSVP(_ context.Context, params CreateEventRSVPParams) (EventRSVP, error) {
+	rsvp := EventRSVP{
+		ID:                  s.nextUUID(),
+		EventID:             params.EventID,
+		UserID:              params.UserID,
+		GuestName:           params.GuestName,
+		Status:              params.Status,
+		ArrivalTime:         params.ArrivalTime,
+		LeavingTime:         params.LeavingTime,
+		GuestCount:          params.GuestCount,
+		TravelBufferMinutes: params.TravelBufferMinutes,
+		Notes:               params.Notes,
+	}
+	s.rsvps[uuidKey(params.EventID)] = append(s.rsvps[uuidKey(params.EventID)], rsvp)
+	return rsvp, nil
 }
 
 func (s *fakeStore) UpdateEventRSVP(ctx context.Context, params UpdateEventRSVPParams) (EventRSVP, error) {
@@ -379,6 +592,37 @@ func (s *fakeStore) UpdateEventRSVP(ctx context.Context, params UpdateEventRSVPP
 
 func (s *fakeStore) EnqueueEmailDelivery(ctx context.Context, params EnqueueEmailParams) error {
 	return nil
+}
+
+func (s *fakeStore) seedEvent(token string, visibility string, addressVisibility string) Event {
+	playgroup := Playgroup{ID: s.nextUUID(), Name: "Test Crew", Slug: "test-crew", Role: "owner"}
+	s.playgroups = append(s.playgroups, playgroup)
+	event := Event{
+		ID:          s.nextUUID(),
+		PlaygroupID: playgroup.ID,
+		Title:       "Commander Night",
+		Description: "Bring two decks.",
+		StartTime:   time.Date(2026, 5, 20, 19, 0, 0, 0, time.UTC),
+		Visibility:  visibility,
+		InviteToken: token,
+		MemberRole:  "member",
+	}
+	location := EventLocation{
+		ID:           s.nextUUID(),
+		Name:         "Kitchen Table",
+		AddressLine1: "Hidden Address Sentinel",
+		City:         "Nashville",
+		PostalCode:   "37201",
+	}
+	event.LocationID = location.ID
+	s.events[uuidKey(event.ID)] = event
+	s.eventsByToken[token] = event
+	s.locations[uuidKey(event.ID)] = location
+	s.hosts[uuidKey(event.ID)] = []EventHost{{
+		UserID:            s.nextUUID(),
+		AddressVisibility: addressVisibility,
+	}}
+	return event
 }
 
 func (s *fakeStore) nextUUID() pgtype.UUID {
@@ -390,4 +634,17 @@ func (s *fakeStore) nextUUID() pgtype.UUID {
 
 func uuidKey(id pgtype.UUID) string {
 	return string(id.Bytes[:])
+}
+
+func uuidString(t *testing.T, id pgtype.UUID) string {
+	t.Helper()
+	value, err := id.Value()
+	if err != nil {
+		t.Fatalf("uuid value: %v", err)
+	}
+	text, ok := value.(string)
+	if !ok {
+		t.Fatalf("uuid value was %T", value)
+	}
+	return text
 }

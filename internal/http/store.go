@@ -26,6 +26,10 @@ type Store interface {
 	GetPlaygroupBySlugAndUser(context.Context, string, pgtype.UUID) (Playgroup, error)
 	CreateEvent(context.Context, CreateEventParams) (Event, error)
 	GetEventByID(context.Context, pgtype.UUID) (Event, error)
+	GetEventForUser(context.Context, pgtype.UUID, pgtype.UUID) (Event, error)
+	GetEventByToken(context.Context, string) (Event, error)
+	GetEventLocationForEvent(context.Context, pgtype.UUID) (EventLocation, error)
+	ListEventHosts(context.Context, pgtype.UUID) ([]EventHost, error)
 	ListEventsForPlaygroup(context.Context, pgtype.UUID) ([]Event, error)
 	UpdateEvent(context.Context, UpdateEventParams) (Event, error)
 	GetEventRSVP(context.Context, pgtype.UUID, pgtype.UUID) (EventRSVP, error)
@@ -86,17 +90,23 @@ type Event struct {
 	Description string
 	StartTime   time.Time
 	EndTime     *time.Time
+	LocationID  pgtype.UUID
 	Visibility  string
+	InviteToken string
+	MemberRole  string
 }
 
 type CreateEventParams struct {
-	PlaygroupID pgtype.UUID
-	Title       string
-	Description string
-	StartTime   time.Time
-	EndTime     *time.Time
-	Visibility  string
-	CreatedBy   pgtype.UUID
+	PlaygroupID       pgtype.UUID
+	Title             string
+	Description       string
+	StartTime         time.Time
+	EndTime           *time.Time
+	Visibility        string
+	InviteToken       string
+	Location          *CreateEventLocationParams
+	AddressVisibility string
+	CreatedBy         pgtype.UUID
 }
 
 type UpdateEventParams struct {
@@ -119,6 +129,34 @@ type EventRSVP struct {
 	GuestCount          int32
 	TravelBufferMinutes *int32
 	Notes               string
+}
+
+type EventLocation struct {
+	ID            pgtype.UUID
+	Name          string
+	AddressLine1  string
+	AddressLine2  string
+	City          string
+	StateProvince string
+	PostalCode    string
+	Country       string
+	Notes         string
+}
+
+type EventHost struct {
+	UserID            pgtype.UUID
+	AddressVisibility string
+}
+
+type CreateEventLocationParams struct {
+	Name          string
+	AddressLine1  string
+	AddressLine2  string
+	City          string
+	StateProvince string
+	PostalCode    string
+	Country       string
+	Notes         string
 }
 
 type CreateEventRSVPParams struct {
@@ -316,23 +354,63 @@ func (s *PGStore) GetPlaygroupBySlugAndUser(ctx context.Context, slug string, us
 }
 
 func (s *PGStore) CreateEvent(ctx context.Context, params CreateEventParams) (Event, error) {
-	var endTime pgtype.Timestamptz
-	if params.EndTime != nil {
-		endTime = pgtype.Timestamptz{Time: *params.EndTime, Valid: true}
-	}
-	row, err := dbsql.New(s.pool).CreateEvent(ctx, dbsql.CreateEventParams{
-		PlaygroupID: params.PlaygroupID,
-		Title:       params.Title,
-		Description: params.Description,
-		StartTime:   pgtype.Timestamptz{Time: params.StartTime, Valid: true},
-		EndTime:     endTime,
-		Visibility:  params.Visibility,
-		CreatedBy:   params.CreatedBy,
+	var event Event
+	err := db.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		queries := dbsql.New(tx)
+		var locationID pgtype.UUID
+		if params.Location != nil && params.Location.Name != "" {
+			location, err := queries.CreateEventLocation(ctx, dbsql.CreateEventLocationParams{
+				PlaygroupID:   params.PlaygroupID,
+				Name:          params.Location.Name,
+				AddressLine1:  nullableText(params.Location.AddressLine1),
+				AddressLine2:  nullableText(params.Location.AddressLine2),
+				City:          nullableText(params.Location.City),
+				StateProvince: nullableText(params.Location.StateProvince),
+				PostalCode:    nullableText(params.Location.PostalCode),
+				Country:       nullableText(params.Location.Country),
+				Notes:         params.Location.Notes,
+				CreatedBy:     params.CreatedBy,
+			})
+			if err != nil {
+				return fmt.Errorf("create event location: %w", err)
+			}
+			locationID = location.ID
+		}
+
+		var endTime pgtype.Timestamptz
+		if params.EndTime != nil {
+			endTime = pgtype.Timestamptz{Time: *params.EndTime, Valid: true}
+		}
+		row, err := queries.CreateEvent(ctx, dbsql.CreateEventParams{
+			PlaygroupID: params.PlaygroupID,
+			Title:       params.Title,
+			Description: params.Description,
+			StartTime:   pgtype.Timestamptz{Time: params.StartTime, Valid: true},
+			EndTime:     endTime,
+			LocationID:  locationID,
+			Visibility:  params.Visibility,
+			InviteToken: nullableText(params.InviteToken),
+			CreatedBy:   params.CreatedBy,
+		})
+		if err != nil {
+			return fmt.Errorf("create event: %w", err)
+		}
+		if params.AddressVisibility != "" {
+			if _, err := queries.CreateEventHost(ctx, dbsql.CreateEventHostParams{
+				EventID:           row.ID,
+				UserID:            params.CreatedBy,
+				AddressVisibility: params.AddressVisibility,
+			}); err != nil {
+				return fmt.Errorf("create event host: %w", err)
+			}
+		}
+		event = eventFromSQL(row)
+		return nil
 	})
 	if err != nil {
 		return Event{}, err
 	}
-	return eventFromSQL(row), nil
+	return event, nil
 }
 
 func (s *PGStore) GetEventByID(ctx context.Context, id pgtype.UUID) (Event, error) {
@@ -341,6 +419,50 @@ func (s *PGStore) GetEventByID(ctx context.Context, id pgtype.UUID) (Event, erro
 		return Event{}, err
 	}
 	return eventFromSQL(row), nil
+}
+
+func (s *PGStore) GetEventForUser(ctx context.Context, id pgtype.UUID, userID pgtype.UUID) (Event, error) {
+	row, err := dbsql.New(s.pool).GetEventForUser(ctx, dbsql.GetEventForUserParams{
+		ID:     id,
+		UserID: userID,
+	})
+	if err != nil {
+		return Event{}, err
+	}
+	event := eventFromUserRow(row)
+	event.MemberRole = row.MemberRole
+	return event, nil
+}
+
+func (s *PGStore) GetEventByToken(ctx context.Context, token string) (Event, error) {
+	row, err := dbsql.New(s.pool).GetEventByToken(ctx, pgtype.Text{String: token, Valid: token != ""})
+	if err != nil {
+		return Event{}, err
+	}
+	return eventFromSQL(row), nil
+}
+
+func (s *PGStore) GetEventLocationForEvent(ctx context.Context, eventID pgtype.UUID) (EventLocation, error) {
+	row, err := dbsql.New(s.pool).GetEventLocationForEvent(ctx, eventID)
+	if err != nil {
+		return EventLocation{}, err
+	}
+	return eventLocationFromSQL(row), nil
+}
+
+func (s *PGStore) ListEventHosts(ctx context.Context, eventID pgtype.UUID) ([]EventHost, error) {
+	rows, err := dbsql.New(s.pool).ListEventHosts(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+	hosts := make([]EventHost, 0, len(rows))
+	for _, row := range rows {
+		hosts = append(hosts, EventHost{
+			UserID:            row.UserID,
+			AddressVisibility: row.AddressVisibility,
+		})
+	}
+	return hosts, nil
 }
 
 func (s *PGStore) ListEventsForPlaygroup(ctx context.Context, playgroupID pgtype.UUID) ([]Event, error) {
@@ -492,13 +614,17 @@ func eventRSVPFromSQL(row dbsql.CoreEventRsvp) EventRSVP {
 		TravelBufferMinutes: travelBuffer,
 		Notes:               row.Notes,
 	}
-	}
+}
 
-	func eventFromSQL(row dbsql.CoreEvent) Event {
+func eventFromSQL(row dbsql.CoreEvent) Event {
 	var endTime *time.Time
 	if row.EndTime.Valid {
 		t := row.EndTime.Time
 		endTime = &t
+	}
+	inviteToken := ""
+	if row.InviteToken.Valid {
+		inviteToken = row.InviteToken.String
 	}
 	return Event{
 		ID:          row.ID,
@@ -507,8 +633,59 @@ func eventRSVPFromSQL(row dbsql.CoreEventRsvp) EventRSVP {
 		Description: row.Description,
 		StartTime:   row.StartTime.Time,
 		EndTime:     endTime,
+		LocationID:  row.LocationID,
 		Visibility:  row.Visibility,
+		InviteToken: inviteToken,
 	}
+}
+
+func eventFromUserRow(row dbsql.GetEventForUserRow) Event {
+	var endTime *time.Time
+	if row.EndTime.Valid {
+		t := row.EndTime.Time
+		endTime = &t
+	}
+	inviteToken := ""
+	if row.InviteToken.Valid {
+		inviteToken = row.InviteToken.String
+	}
+	return Event{
+		ID:          row.ID,
+		PlaygroupID: row.PlaygroupID,
+		Title:       row.Title,
+		Description: row.Description,
+		StartTime:   row.StartTime.Time,
+		EndTime:     endTime,
+		LocationID:  row.LocationID,
+		Visibility:  row.Visibility,
+		InviteToken: inviteToken,
+		MemberRole:  row.MemberRole,
+	}
+}
+
+func eventLocationFromSQL(row dbsql.CoreEventLocation) EventLocation {
+	return EventLocation{
+		ID:            row.ID,
+		Name:          row.Name,
+		AddressLine1:  textValue(row.AddressLine1),
+		AddressLine2:  textValue(row.AddressLine2),
+		City:          textValue(row.City),
+		StateProvince: textValue(row.StateProvince),
+		PostalCode:    textValue(row.PostalCode),
+		Country:       textValue(row.Country),
+		Notes:         row.Notes,
+	}
+}
+
+func nullableText(value string) pgtype.Text {
+	return pgtype.Text{String: value, Valid: value != ""}
+}
+
+func textValue(value pgtype.Text) string {
+	if !value.Valid {
+		return ""
+	}
+	return value.String
 }
 
 func userFromSQL(user dbsql.CoreUser) User {

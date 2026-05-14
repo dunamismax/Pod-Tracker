@@ -18,6 +18,35 @@ insert into core.events (
 -- name: GetEvent :one
 select * from core.events where id = $1;
 
+-- name: GetEventForUser :one
+select
+  e.id,
+  e.playgroup_id,
+  e.title,
+  e.description,
+  e.start_time,
+  e.end_time,
+  e.location_id,
+  e.visibility,
+  e.invite_token,
+  e.created_by,
+  e.created_at,
+  e.updated_at,
+  m.role as member_role
+from core.events e
+join core.playgroup_memberships m on m.playgroup_id = e.playgroup_id
+where e.id = $1 and m.user_id = $2;
+
+-- name: GetEventByToken :one
+select * from core.events
+where invite_token = $1 and visibility in ('invite_only', 'public_safe');
+
+-- name: GetEventLocationForEvent :one
+select l.*
+from core.event_locations l
+join core.events e on e.location_id = l.id
+where e.id = $1;
+
 -- name: UpdateEvent :one
 update core.events
 set 

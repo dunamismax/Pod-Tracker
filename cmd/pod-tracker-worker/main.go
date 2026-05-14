@@ -68,7 +68,7 @@ func processJobs(ctx context.Context, logger *slog.Logger, pool *pgxpool.Pool, e
 		}
 
 		queries := dbsql.New(pool)
-		
+
 		// Attempt to acquire a job
 		job, err := queries.AcquireNextBackgroundJob(ctx, pgtype.Text{String: workerID, Valid: true})
 		if err != nil {
@@ -124,7 +124,7 @@ func processSendEmailJob(ctx context.Context, logger *slog.Logger, queries *dbsq
 	}
 
 	err = emailClient.Send(ctx, delivery.ToAddress, delivery.Subject, delivery.BodyText.String, delivery.BodyHtml.String)
-	
+
 	status := "sent"
 	var errMsg pgtype.Text
 	if err != nil {

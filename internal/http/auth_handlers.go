@@ -32,8 +32,12 @@ type templateData struct {
 	PlaygroupDescription string
 	Events               []Event
 	Event                *Event
+	EventLocation        *EventLocation
 	RSVPs                []EventRSVP
 	UserRSVP             *EventRSVP
+	ShowEventAddress     bool
+	CanEditEvent         bool
+	PublicEventURL       string
 }
 
 func (s *Server) signupForm(w http.ResponseWriter, r *http.Request) {

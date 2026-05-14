@@ -404,6 +404,93 @@ func (q *Queries) GetEvent(ctx context.Context, id pgtype.UUID) (CoreEvent, erro
 	return i, err
 }
 
+const getEventByToken = `-- name: GetEventByToken :one
+select id, playgroup_id, title, description, start_time, end_time, location_id, visibility, invite_token, created_by, created_at, updated_at from core.events
+where invite_token = $1 and visibility in ('invite_only', 'public_safe')
+`
+
+func (q *Queries) GetEventByToken(ctx context.Context, inviteToken pgtype.Text) (CoreEvent, error) {
+	row := q.db.QueryRow(ctx, getEventByToken, inviteToken)
+	var i CoreEvent
+	err := row.Scan(
+		&i.ID,
+		&i.PlaygroupID,
+		&i.Title,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.LocationID,
+		&i.Visibility,
+		&i.InviteToken,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEventForUser = `-- name: GetEventForUser :one
+select
+  e.id,
+  e.playgroup_id,
+  e.title,
+  e.description,
+  e.start_time,
+  e.end_time,
+  e.location_id,
+  e.visibility,
+  e.invite_token,
+  e.created_by,
+  e.created_at,
+  e.updated_at,
+  m.role as member_role
+from core.events e
+join core.playgroup_memberships m on m.playgroup_id = e.playgroup_id
+where e.id = $1 and m.user_id = $2
+`
+
+type GetEventForUserParams struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+type GetEventForUserRow struct {
+	ID          pgtype.UUID
+	PlaygroupID pgtype.UUID
+	Title       string
+	Description string
+	StartTime   pgtype.Timestamptz
+	EndTime     pgtype.Timestamptz
+	LocationID  pgtype.UUID
+	Visibility  string
+	InviteToken pgtype.Text
+	CreatedBy   pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	MemberRole  string
+}
+
+func (q *Queries) GetEventForUser(ctx context.Context, arg GetEventForUserParams) (GetEventForUserRow, error) {
+	row := q.db.QueryRow(ctx, getEventForUser, arg.ID, arg.UserID)
+	var i GetEventForUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.PlaygroupID,
+		&i.Title,
+		&i.Description,
+		&i.StartTime,
+		&i.EndTime,
+		&i.LocationID,
+		&i.Visibility,
+		&i.InviteToken,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.MemberRole,
+	)
+	return i, err
+}
+
 const getEventHost = `-- name: GetEventHost :one
 select id, event_id, user_id, address_visibility, created_at from core.event_hosts
 where event_id = $1 and user_id = $2
@@ -433,6 +520,34 @@ select id, playgroup_id, name, address_line1, address_line2, city, state_provinc
 
 func (q *Queries) GetEventLocation(ctx context.Context, id pgtype.UUID) (CoreEventLocation, error) {
 	row := q.db.QueryRow(ctx, getEventLocation, id)
+	var i CoreEventLocation
+	err := row.Scan(
+		&i.ID,
+		&i.PlaygroupID,
+		&i.Name,
+		&i.AddressLine1,
+		&i.AddressLine2,
+		&i.City,
+		&i.StateProvince,
+		&i.PostalCode,
+		&i.Country,
+		&i.Notes,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getEventLocationForEvent = `-- name: GetEventLocationForEvent :one
+select l.id, l.playgroup_id, l.name, l.address_line1, l.address_line2, l.city, l.state_province, l.postal_code, l.country, l.notes, l.created_by, l.created_at, l.updated_at
+from core.event_locations l
+join core.events e on e.location_id = l.id
+where e.id = $1
+`
+
+func (q *Queries) GetEventLocationForEvent(ctx context.Context, id pgtype.UUID) (CoreEventLocation, error) {
+	row := q.db.QueryRow(ctx, getEventLocationForEvent, id)
 	var i CoreEventLocation
 	err := row.Scan(
 		&i.ID,

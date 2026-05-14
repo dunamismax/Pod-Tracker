@@ -58,6 +58,71 @@
           </div>
         </div>
 
+        <div class="col-span-full border-t border-gray-200 pt-6">
+          <h2 class="text-base font-semibold leading-7 text-gray-900">Location</h2>
+        </div>
+
+        <div class="col-span-full">
+          <label for="location_name" class="block text-sm font-medium leading-6 text-gray-900">Location Name</label>
+          <div class="mt-2">
+            <input type="text" name="location_name" id="location_name" placeholder="e.g., Stephen's table" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+          </div>
+        </div>
+
+        <div class="col-span-full">
+          <label for="address_line1" class="block text-sm font-medium leading-6 text-gray-900">Address Line 1</label>
+          <div class="mt-2">
+            <input type="text" name="address_line1" id="address_line1" autocomplete="address-line1" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+          </div>
+        </div>
+
+        <div class="col-span-full">
+          <label for="address_line2" class="block text-sm font-medium leading-6 text-gray-900">Address Line 2</label>
+          <div class="mt-2">
+            <input type="text" name="address_line2" id="address_line2" autocomplete="address-line2" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+          </div>
+        </div>
+
+        <div class="sm:col-span-2">
+          <label for="city" class="block text-sm font-medium leading-6 text-gray-900">City</label>
+          <div class="mt-2">
+            <input type="text" name="city" id="city" autocomplete="address-level2" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+          </div>
+        </div>
+
+        <div class="sm:col-span-2">
+          <label for="state_province" class="block text-sm font-medium leading-6 text-gray-900">State</label>
+          <div class="mt-2">
+            <input type="text" name="state_province" id="state_province" autocomplete="address-level1" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+          </div>
+        </div>
+
+        <div class="sm:col-span-2">
+          <label for="postal_code" class="block text-sm font-medium leading-6 text-gray-900">Postal Code</label>
+          <div class="mt-2">
+            <input type="text" name="postal_code" id="postal_code" autocomplete="postal-code" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+          </div>
+        </div>
+
+        <div class="sm:col-span-3">
+          <label for="country" class="block text-sm font-medium leading-6 text-gray-900">Country</label>
+          <div class="mt-2">
+            <input type="text" name="country" id="country" autocomplete="country-name" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+          </div>
+        </div>
+
+        <div class="sm:col-span-3">
+          <label for="address_visibility" class="block text-sm font-medium leading-6 text-gray-900">Address Visibility</label>
+          <div class="mt-2">
+            <select id="address_visibility" name="address_visibility" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+              <option value="rsvps">Confirmed RSVPs</option>
+              <option value="members">Playgroup Members</option>
+              <option value="hidden">Hosts and Admins</option>
+              <option value="public">Public</option>
+            </select>
+          </div>
+        </div>
+
       </div>
     </div>
     <div class="flex items-center justify-end gap-x-6 border-t border-gray-900/10 px-4 py-4 sm:px-8">

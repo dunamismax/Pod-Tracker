@@ -9,6 +9,17 @@ import (
 	"context"
 )
 
+const checkBackgroundJobsReady = `-- name: CheckBackgroundJobsReady :one
+select (to_regclass('ops.background_jobs') is not null)::boolean as ready
+`
+
+func (q *Queries) CheckBackgroundJobsReady(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, checkBackgroundJobsReady)
+	var ready bool
+	err := row.Scan(&ready)
+	return ready, err
+}
+
 const checkDatabase = `-- name: CheckDatabase :one
 select 1::int as ok
 `
@@ -18,4 +29,30 @@ func (q *Queries) CheckDatabase(ctx context.Context) (int32, error) {
 	var ok int32
 	err := row.Scan(&ok)
 	return ok, err
+}
+
+const checkEmailDeliveriesReady = `-- name: CheckEmailDeliveriesReady :one
+select (to_regclass('ops.email_deliveries') is not null)::boolean as ready
+`
+
+func (q *Queries) CheckEmailDeliveriesReady(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, checkEmailDeliveriesReady)
+	var ready bool
+	err := row.Scan(&ready)
+	return ready, err
+}
+
+const checkMigrationsReady = `-- name: CheckMigrationsReady :one
+select (
+  to_regclass('core.users') is not null and
+  to_regclass('core.playgroups') is not null and
+  to_regclass('core.events') is not null
+)::boolean as ready
+`
+
+func (q *Queries) CheckMigrationsReady(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, checkMigrationsReady)
+	var ready bool
+	err := row.Scan(&ready)
+	return ready, err
 }

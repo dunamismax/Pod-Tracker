@@ -296,13 +296,13 @@ state where documented verification passes on a clean checkout.
 
 - [x] Add event, host, location, RSVP, guest, and reminder tables.
 - [x] Add event creation and edit flow.
-- [ ] Add host address visibility rules.
+- [x] Add host address visibility rules.
 - [x] Add RSVP states: yes, maybe, no, waitlist.
 - [x] Capture arrival time, leaving time, guest count, travel buffer, and notes.
-- [ ] Add public-safe event page and invite-token RSVP flow.
-- [ ] Add iCalendar export/feed per user.
+- [x] Add public-safe event page and invite-token RSVP flow.
+- [x] Add iCalendar export/feed per user.
 - [x] Add reminder job skeleton and email delivery log.
-- [ ] Add tests proving address visibility and guest scoping.
+- [x] Add tests proving address visibility and guest scoping.
 
 ### Phase 5 - Deck Registry And Event Declarations
 
@@ -407,7 +407,7 @@ state where documented verification passes on a clean checkout.
 - [x] Add `pg_dump` backup script.
 - [x] Add restore script and restore drill documentation.
 - [x] Add operations runbook in `docs/operations.md`.
-- [ ] Add readiness checks for DB, migrations, jobs, and email.
+- [x] Add readiness checks for DB, migrations, jobs, and email.
 
 ### Phase 14 - Hardening
 
@@ -514,5 +514,9 @@ Trust current primary docs over this file.
   PostgreSQL to goose version 3, replaced the Rails Puma unit with the
   Go web service on `127.0.0.1:8083`, started the Go worker, and updated
   the backup timer to use the new `pg_dump` script.
-vice on `127.0.0.1:8083`, started the Go worker, and updated
-  the backup timer to use the new `pg_dump` script.
+- 2026-05-14 - Completed the remaining Phase 4 event privacy surface:
+  location and host address visibility capture, member-scoped event
+  access, public-safe event pages, invite-token guest RSVP flow,
+  authenticated iCalendar feed, and focused tests for address visibility
+  and guest scoping. Added readiness checks for migrations, jobs, and
+  email tables.

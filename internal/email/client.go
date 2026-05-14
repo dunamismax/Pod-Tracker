@@ -26,12 +26,12 @@ func NewClient(apiKey, sender string) *Client {
 }
 
 type smtp2goPayload struct {
-	APIKey string      `json:"api_key"`
-	To     []string    `json:"to"`
-	Sender string      `json:"sender"`
-	Subject string     `json:"subject"`
-	TextBody string    `json:"text_body"`
-	HTMLBody string    `json:"html_body,omitempty"`
+	APIKey   string   `json:"api_key"`
+	To       []string `json:"to"`
+	Sender   string   `json:"sender"`
+	Subject  string   `json:"subject"`
+	TextBody string   `json:"text_body"`
+	HTMLBody string   `json:"html_body,omitempty"`
 }
 
 func (c *Client) Send(ctx context.Context, to, subject, textBody, htmlBody string) error {
