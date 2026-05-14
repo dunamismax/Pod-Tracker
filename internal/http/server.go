@@ -87,6 +87,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /playgroups/{slug}/events/new", s.newEventForm)
 	mux.HandleFunc("POST /playgroups/{slug}/events", s.createEvent)
 	mux.HandleFunc("GET /events/{id}", s.eventView)
+	mux.HandleFunc("POST /events/{id}/rsvp", s.rsvpEvent)
 	mux.HandleFunc("GET /events/{id}/edit", s.editEventForm)
 	mux.HandleFunc("POST /events/{id}/edit", s.updateEvent)
 	mux.HandleFunc("GET /healthz", s.healthz)

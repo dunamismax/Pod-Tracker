@@ -28,6 +28,10 @@ type Store interface {
 	GetEventByID(context.Context, pgtype.UUID) (Event, error)
 	ListEventsForPlaygroup(context.Context, pgtype.UUID) ([]Event, error)
 	UpdateEvent(context.Context, UpdateEventParams) (Event, error)
+	GetEventRSVP(context.Context, pgtype.UUID, pgtype.UUID) (EventRSVP, error)
+	ListEventRSVPs(context.Context, pgtype.UUID) ([]EventRSVP, error)
+	CreateEventRSVP(context.Context, CreateEventRSVPParams) (EventRSVP, error)
+	UpdateEventRSVP(context.Context, UpdateEventRSVPParams) (EventRSVP, error)
 }
 
 type User struct {
@@ -101,6 +105,41 @@ type UpdateEventParams struct {
 	StartTime   time.Time
 	EndTime     *time.Time
 	Visibility  string
+}
+
+type EventRSVP struct {
+	ID                  pgtype.UUID
+	EventID             pgtype.UUID
+	UserID              pgtype.UUID
+	GuestName           *string
+	Status              string
+	ArrivalTime         *time.Time
+	LeavingTime         *time.Time
+	GuestCount          int32
+	TravelBufferMinutes *int32
+	Notes               string
+}
+
+type CreateEventRSVPParams struct {
+	EventID             pgtype.UUID
+	UserID              pgtype.UUID
+	GuestName           *string
+	Status              string
+	ArrivalTime         *time.Time
+	LeavingTime         *time.Time
+	GuestCount          int32
+	TravelBufferMinutes *int32
+	Notes               string
+}
+
+type UpdateEventRSVPParams struct {
+	ID                  pgtype.UUID
+	Status              string
+	ArrivalTime         *time.Time
+	LeavingTime         *time.Time
+	GuestCount          int32
+	TravelBufferMinutes *int32
+	Notes               string
 }
 
 type PGStore struct {
@@ -296,7 +335,127 @@ func (s *PGStore) UpdateEvent(ctx context.Context, params UpdateEventParams) (Ev
 	return eventFromSQL(row), nil
 }
 
-func eventFromSQL(row dbsql.CoreEvent) Event {
+func (s *PGStore) GetEventRSVP(ctx context.Context, eventID pgtype.UUID, userID pgtype.UUID) (EventRSVP, error) {
+	row, err := dbsql.New(s.pool).GetEventRSVP(ctx, dbsql.GetEventRSVPParams{
+		EventID: eventID,
+		UserID:  userID,
+	})
+	if err != nil {
+		return EventRSVP{}, err
+	}
+	return eventRSVPFromSQL(row), nil
+}
+
+func (s *PGStore) ListEventRSVPs(ctx context.Context, eventID pgtype.UUID) ([]EventRSVP, error) {
+	rows, err := dbsql.New(s.pool).ListEventRSVPs(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+	rsvps := make([]EventRSVP, 0, len(rows))
+	for _, row := range rows {
+		rsvps = append(rsvps, eventRSVPFromSQL(row))
+	}
+	return rsvps, nil
+}
+
+func (s *PGStore) CreateEventRSVP(ctx context.Context, params CreateEventRSVPParams) (EventRSVP, error) {
+	var arrivalTime, leavingTime pgtype.Timestamptz
+	if params.ArrivalTime != nil {
+		arrivalTime = pgtype.Timestamptz{Time: *params.ArrivalTime, Valid: true}
+	}
+	if params.LeavingTime != nil {
+		leavingTime = pgtype.Timestamptz{Time: *params.LeavingTime, Valid: true}
+	}
+	var travelBuffer pgtype.Int4
+	if params.TravelBufferMinutes != nil {
+		travelBuffer = pgtype.Int4{Int32: *params.TravelBufferMinutes, Valid: true}
+	}
+	var guestName pgtype.Text
+	if params.GuestName != nil {
+		guestName = pgtype.Text{String: *params.GuestName, Valid: true}
+	}
+
+	row, err := dbsql.New(s.pool).CreateEventRSVP(ctx, dbsql.CreateEventRSVPParams{
+		EventID:             params.EventID,
+		UserID:              params.UserID,
+		GuestName:           guestName,
+		Status:              params.Status,
+		ArrivalTime:         arrivalTime,
+		LeavingTime:         leavingTime,
+		GuestCount:          params.GuestCount,
+		TravelBufferMinutes: travelBuffer,
+		Notes:               params.Notes,
+	})
+	if err != nil {
+		return EventRSVP{}, err
+	}
+	return eventRSVPFromSQL(row), nil
+}
+
+func (s *PGStore) UpdateEventRSVP(ctx context.Context, params UpdateEventRSVPParams) (EventRSVP, error) {
+	var arrivalTime, leavingTime pgtype.Timestamptz
+	if params.ArrivalTime != nil {
+		arrivalTime = pgtype.Timestamptz{Time: *params.ArrivalTime, Valid: true}
+	}
+	if params.LeavingTime != nil {
+		leavingTime = pgtype.Timestamptz{Time: *params.LeavingTime, Valid: true}
+	}
+	var travelBuffer pgtype.Int4
+	if params.TravelBufferMinutes != nil {
+		travelBuffer = pgtype.Int4{Int32: *params.TravelBufferMinutes, Valid: true}
+	}
+
+	row, err := dbsql.New(s.pool).UpdateEventRSVP(ctx, dbsql.UpdateEventRSVPParams{
+		ID:                  params.ID,
+		Status:              params.Status,
+		ArrivalTime:         arrivalTime,
+		LeavingTime:         leavingTime,
+		GuestCount:          params.GuestCount,
+		TravelBufferMinutes: travelBuffer,
+		Notes:               params.Notes,
+	})
+	if err != nil {
+		return EventRSVP{}, err
+	}
+	return eventRSVPFromSQL(row), nil
+}
+
+func eventRSVPFromSQL(row dbsql.CoreEventRsvp) EventRSVP {
+	var arrivalTime, leavingTime *time.Time
+	if row.ArrivalTime.Valid {
+		t := row.ArrivalTime.Time
+		arrivalTime = &t
+	}
+	if row.LeavingTime.Valid {
+		t := row.LeavingTime.Time
+		leavingTime = &t
+	}
+	var travelBuffer *int32
+	if row.TravelBufferMinutes.Valid {
+		tb := row.TravelBufferMinutes.Int32
+		travelBuffer = &tb
+	}
+	var guestName *string
+	if row.GuestName.Valid {
+		gn := row.GuestName.String
+		guestName = &gn
+	}
+
+	return EventRSVP{
+		ID:                  row.ID,
+		EventID:             row.EventID,
+		UserID:              row.UserID,
+		GuestName:           guestName,
+		Status:              row.Status,
+		ArrivalTime:         arrivalTime,
+		LeavingTime:         leavingTime,
+		GuestCount:          row.GuestCount,
+		TravelBufferMinutes: travelBuffer,
+		Notes:               row.Notes,
+	}
+	}
+
+	func eventFromSQL(row dbsql.CoreEvent) Event {
 	var endTime *time.Time
 	if row.EndTime.Valid {
 		t := row.EndTime.Time

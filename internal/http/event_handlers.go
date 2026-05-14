@@ -91,6 +91,8 @@ func (s *Server) eventView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, _ := CurrentUser(r.Context())
+
 	idStr := r.PathValue("id")
 	var id pgtype.UUID
 	if err := id.Scan(idStr); err != nil {
@@ -104,9 +106,72 @@ func (s *Server) eventView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rsvps, err := s.store.ListEventRSVPs(r.Context(), id)
+	if err != nil {
+		s.logger.Error("list event rsvps", "err", err, "request_id", RequestID(r.Context()))
+	}
+
+	var userRSVP *EventRSVP
+	for _, rsvp := range rsvps {
+		if rsvp.UserID == user.ID {
+			userRSVP = &rsvp
+			break
+		}
+	}
+
 	data := s.newTemplateData(w, r)
 	data.Event = &event
+	data.RSVPs = rsvps
+	data.UserRSVP = userRSVP
+
 	s.render(w, r, http.StatusOK, "event_view.html", data)
+}
+
+func (s *Server) rsvpEvent(w http.ResponseWriter, r *http.Request) {
+	if !s.requireUser(w, r) {
+		return
+	}
+
+	user, _ := CurrentUser(r.Context())
+
+	idStr := r.PathValue("id")
+	var id pgtype.UUID
+	if err := id.Scan(idStr); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	status := strings.TrimSpace(r.FormValue("status"))
+	if status != "yes" && status != "maybe" && status != "no" && status != "waitlist" {
+		http.Error(w, "invalid status", http.StatusBadRequest)
+		return
+	}
+
+	notes := strings.TrimSpace(r.FormValue("notes"))
+
+	existing, err := s.store.GetEventRSVP(r.Context(), id, user.ID)
+	if err == nil {
+		_, err = s.store.UpdateEventRSVP(r.Context(), UpdateEventRSVPParams{
+			ID:     existing.ID,
+			Status: status,
+			Notes:  notes,
+		})
+	} else {
+		_, err = s.store.CreateEventRSVP(r.Context(), CreateEventRSVPParams{
+			EventID: id,
+			UserID:  user.ID,
+			Status:  status,
+			Notes:   notes,
+		})
+	}
+
+	if err != nil {
+		s.logger.Error("save event rsvp", "err", err, "request_id", RequestID(r.Context()))
+		http.Error(w, "failed to save rsvp", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/events/"+idStr, http.StatusSeeOther)
 }
 
 func (s *Server) editEventForm(w http.ResponseWriter, r *http.Request) {

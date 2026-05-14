@@ -32,6 +32,8 @@ type templateData struct {
 	PlaygroupDescription string
 	Events               []Event
 	Event                *Event
+	RSVPs                []EventRSVP
+	UserRSVP             *EventRSVP
 }
 
 func (s *Server) signupForm(w http.ResponseWriter, r *http.Request) {

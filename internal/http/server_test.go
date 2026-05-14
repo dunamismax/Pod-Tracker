@@ -361,6 +361,22 @@ func (s *fakeStore) UpdateEvent(ctx context.Context, params UpdateEventParams) (
 	return Event{}, nil
 }
 
+func (s *fakeStore) GetEventRSVP(ctx context.Context, eventID pgtype.UUID, userID pgtype.UUID) (EventRSVP, error) {
+	return EventRSVP{}, pgx.ErrNoRows
+}
+
+func (s *fakeStore) ListEventRSVPs(ctx context.Context, eventID pgtype.UUID) ([]EventRSVP, error) {
+	return nil, nil
+}
+
+func (s *fakeStore) CreateEventRSVP(ctx context.Context, params CreateEventRSVPParams) (EventRSVP, error) {
+	return EventRSVP{}, nil
+}
+
+func (s *fakeStore) UpdateEventRSVP(ctx context.Context, params UpdateEventRSVPParams) (EventRSVP, error) {
+	return EventRSVP{}, nil
+}
+
 func (s *fakeStore) nextUUID() pgtype.UUID {
 	s.nextID++
 	var bytes [16]byte

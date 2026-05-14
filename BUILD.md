@@ -297,12 +297,11 @@ state where documented verification passes on a clean checkout.
 - [x] Add event, host, location, RSVP, guest, and reminder tables.
 - [x] Add event creation and edit flow.
 - [ ] Add host address visibility rules.
-- [ ] Add RSVP states: yes, maybe, no, waitlist.
-- [ ] Capture arrival time, leaving time, guest count, travel buffer, and
-      notes.
+- [x] Add RSVP states: yes, maybe, no, waitlist.
+- [x] Capture arrival time, leaving time, guest count, travel buffer, and notes.
 - [ ] Add public-safe event page and invite-token RSVP flow.
 - [ ] Add iCalendar export/feed per user.
-- [ ] Add reminder job skeleton and email delivery log.
+- [x] Add reminder job skeleton and email delivery log.
 - [ ] Add tests proving address visibility and guest scoping.
 
 ### Phase 5 - Deck Registry And Event Declarations
