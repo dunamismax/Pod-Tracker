@@ -11,7 +11,7 @@ Treat unchecked boxes as plan. Move stable material into `docs/`,
 
 ## What's Live Now
 
-- Repository exists with GPL-3.0 license.
+- Repository exists with MIT license.
 - `origin` fetches from GitHub and pushes to GitHub plus Codeberg.
 - Public production domain is [https://pod-tracker.app/](https://pod-tracker.app/).
 - The old idea document has been distilled into `README.md`,
