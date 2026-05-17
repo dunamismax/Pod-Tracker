@@ -229,6 +229,12 @@ just check
 just test
 ```
 
+SQLx compile checks need `DATABASE_URL` to point at a migrated database
+whose role can introspect the `core` and `ops` schemas. If the persistent
+local app database is stale, use a freshly migrated temporary local
+database for verification instead of loosening production-like app
+credentials.
+
 Expected coverage as the app matures:
 
 - Rust tests.

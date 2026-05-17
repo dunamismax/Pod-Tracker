@@ -8,16 +8,20 @@ pub mod events;
 pub mod health;
 pub mod identity;
 pub mod migrations;
+pub mod ops;
 pub mod playgroups;
 
 pub use events::{
-    CalendarEventRecord, CreateEventInput, EventHostRecord, EventLocationInput,
-    EventLocationRecord, EventRecord, EventRepository, EventRsvpRecord, EventWithRole, RsvpInput,
-    UpdateEventInput,
+    CalendarEventRecord, CreateEventInput, CreateEventReminderInput, EventHostRecord,
+    EventLocationInput, EventLocationRecord, EventRecord, EventReminderRecord, EventRepository,
+    EventRsvpRecord, EventWithRole, RsvpInput, UpdateEventInput,
 };
 pub use health::HealthRepository;
 pub use identity::{
     AccountRecord, AuthIdentityRecord, IdentityRepository, SessionRecord, UserRecord,
+};
+pub use ops::{
+    BackgroundJobInput, BackgroundJobRecord, EmailDeliveryInput, EmailDeliveryRecord, OpsRepository,
 };
 pub use playgroups::{
     CreateInvite, HouseRuleRecord, MembershipRecord, PlaygroupInviteRecord, PlaygroupRecord,

@@ -350,7 +350,7 @@ state where documented verification passes on a clean checkout.
       notes.
 - [x] Port public-safe event page and invite-token RSVP flow.
 - [x] Port authenticated iCalendar feed.
-- [ ] Port reminder job skeleton and email delivery log.
+- [x] Port reminder job skeleton and email delivery log.
 - [x] Port readiness checks for DB, migrations, jobs, and email tables.
 - [x] Add tests proving address visibility, guest scoping, and calendar
       feed authorization.
@@ -646,3 +646,8 @@ Trust current primary docs over this file.
   event pages, invite-token RSVP flow, authenticated calendar feed, and
   focused tests for address privacy, guest scoping, and calendar
   authorization.
+- 2026-05-17 - Ported the Rust reminder and email job skeleton: added
+  typed event reminder inserts, `ops.email_deliveries` and
+  `ops.background_jobs` repository coverage, `send_email` worker job
+  claiming with `FOR UPDATE SKIP LOCKED`, SMTP2GO delivery status updates,
+  retry handling, and focused PostgreSQL tests.

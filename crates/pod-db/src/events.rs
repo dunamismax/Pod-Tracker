@@ -82,6 +82,18 @@ pub struct EventRsvpRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EventReminderRecord {
+    pub id: Uuid,
+    pub event_id: Uuid,
+    pub scheduled_for: OffsetDateTime,
+    pub reminder_type: String,
+    pub status: String,
+    pub created_by: Option<Uuid>,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CalendarEventRecord {
     pub id: Uuid,
     pub title: String,
@@ -138,6 +150,15 @@ pub struct RsvpInput<'a> {
     pub guest_count: i32,
     pub travel_buffer_minutes: Option<i32>,
     pub notes: &'a str,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CreateEventReminderInput<'a> {
+    pub event_id: Uuid,
+    pub scheduled_for: OffsetDateTime,
+    pub reminder_type: &'a str,
+    pub status: &'a str,
+    pub created_by: Option<Uuid>,
 }
 
 pub struct EventRepository<'a> {
@@ -510,6 +531,32 @@ impl<'a> EventRepository<'a> {
 
         Ok(events)
     }
+
+    pub async fn create_event_reminder(
+        &self,
+        input: CreateEventReminderInput<'_>,
+    ) -> Result<EventReminderRecord, DbError> {
+        let reminder = sqlx::query_as!(
+            EventReminderRecord,
+            r#"
+            insert into core.event_reminders (
+              event_id, scheduled_for, reminder_type, status, created_by
+            )
+            values ($1, $2, $3, $4, $5)
+            returning id, event_id, scheduled_for, reminder_type, status,
+              created_by, created_at, updated_at
+            "#,
+            input.event_id,
+            input.scheduled_for,
+            input.reminder_type,
+            input.status,
+            input.created_by,
+        )
+        .fetch_one(self.pool)
+        .await?;
+
+        Ok(reminder)
+    }
 }
 
 #[cfg(test)]
@@ -517,8 +564,8 @@ mod tests {
     use pod_core::playgroups::PlaygroupRole;
 
     use crate::{
-        CreateEventInput, EventLocationInput, EventRepository, IdentityRepository,
-        PlaygroupRepository, RsvpInput,
+        CreateEventInput, CreateEventReminderInput, EventLocationInput, EventRepository,
+        IdentityRepository, PlaygroupRepository, RsvpInput,
     };
 
     #[sqlx::test(migrations = "./migrations")]
@@ -638,5 +685,18 @@ mod tests {
                 .len(),
             1
         );
+
+        let reminder = repo
+            .create_event_reminder(CreateEventReminderInput {
+                event_id: event.id,
+                scheduled_for: start_time - time::Duration::hours(24),
+                reminder_type: "event_reminder",
+                status: "pending",
+                created_by: Some(owner.id),
+            })
+            .await
+            .expect("create reminder");
+        assert_eq!(reminder.event_id, event.id);
+        assert_eq!(reminder.status, "pending");
     }
 }

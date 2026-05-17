@@ -157,5 +157,11 @@ just check
 just test
 ```
 
+SQLx query macros inspect the database named by `DATABASE_URL` during
+compile checks. If the long-lived local `pod_tracker` database is stale or
+the app role cannot introspect the `core` and `ops` schemas, run the gate
+against a freshly migrated temporary database instead of changing
+production-like credentials.
+
 Use `just legacy-go-test` only when comparing or stabilizing reference
 behavior from the old Go implementation.
