@@ -4,11 +4,17 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use thiserror::Error;
 
+pub mod events;
 pub mod health;
 pub mod identity;
 pub mod migrations;
 pub mod playgroups;
 
+pub use events::{
+    CalendarEventRecord, CreateEventInput, EventHostRecord, EventLocationInput,
+    EventLocationRecord, EventRecord, EventRepository, EventRsvpRecord, EventWithRole, RsvpInput,
+    UpdateEventInput,
+};
 pub use health::HealthRepository;
 pub use identity::{
     AccountRecord, AuthIdentityRecord, IdentityRepository, SessionRecord, UserRecord,

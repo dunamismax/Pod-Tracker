@@ -343,16 +343,16 @@ state where documented verification passes on a clean checkout.
 ### Phase 4 - Events, Hosts, RSVPs, And Calendar Parity
 
 - [x] Port event, host, location, RSVP, guest, and reminder tables.
-- [ ] Port event creation and edit flow.
-- [ ] Port host address visibility rules.
-- [ ] Port RSVP states: yes, maybe, no, waitlist.
-- [ ] Capture arrival time, leaving time, guest count, travel buffer, and
+- [x] Port event creation and edit flow.
+- [x] Port host address visibility rules.
+- [x] Port RSVP states: yes, maybe, no, waitlist.
+- [x] Capture arrival time, leaving time, guest count, travel buffer, and
       notes.
-- [ ] Port public-safe event page and invite-token RSVP flow.
-- [ ] Port authenticated iCalendar feed.
+- [x] Port public-safe event page and invite-token RSVP flow.
+- [x] Port authenticated iCalendar feed.
 - [ ] Port reminder job skeleton and email delivery log.
 - [x] Port readiness checks for DB, migrations, jobs, and email tables.
-- [ ] Add tests proving address visibility, guest scoping, and calendar
+- [x] Add tests proving address visibility, guest scoping, and calendar
       feed authorization.
 
 ### Phase 5 - Rust Deployment Cutover
@@ -640,3 +640,9 @@ Trust current primary docs over this file.
   permission helpers, authenticated playgroup listing/detail pages, scoped
   playgroup access tests, explicit event/reminder table migration checks,
   and readiness checks for migrations, jobs, and email tables.
+- 2026-05-17 - Ported the Rust Phase 4 event surface before deployment
+  cutover: event creation/edit routes, host address visibility rules,
+  member and guest RSVP states with timing/travel details, public-safe
+  event pages, invite-token RSVP flow, authenticated calendar feed, and
+  focused tests for address privacy, guest scoping, and calendar
+  authorization.

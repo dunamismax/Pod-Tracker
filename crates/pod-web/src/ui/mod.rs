@@ -1,5 +1,11 @@
 use leptos::prelude::*;
-use pod_db::{HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole};
+use pod_db::{
+    EventRecord, EventRsvpRecord, EventWithRole, HouseRuleRecord, PlaygroupSettingsRecord,
+    PlaygroupWithRole,
+};
+use time::{OffsetDateTime, UtcOffset};
+
+use crate::server::{EventEditForm, EventForm, EventPageContext, RsvpForm};
 
 pub fn render_home() -> String {
     view! {
@@ -222,6 +228,10 @@ pub fn render_playgroup_detail(
                     <p class="eyebrow">"Playgroup"</p>
                     <h1>{playgroup.name.clone()}</h1>
                     <p class="lede">{playgroup.description.clone()}</p>
+                    <nav class="actions" aria-label="Playgroup actions">
+                        <a href=format!("/playgroups/{}/events/new", playgroup.slug)>"New event"</a>
+                        <a href="/events">"All events"</a>
+                    </nav>
                     <dl class="status-list">
                         <div>
                             <dt>"Role"</dt>
@@ -261,6 +271,311 @@ pub fn render_playgroup_detail(
                         view! { <p class="empty-state">"No house rules yet."</p> }.into_any()
                     }}
                 </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_events(events: &[EventWithRole]) -> String {
+    let events = events.to_vec();
+    let has_events = !events.is_empty();
+
+    view! {
+        <AppShell title="Events">
+            <main class="shell">
+                <section class="panel">
+                    <p class="eyebrow">"Schedule"</p>
+                    <h1>"Events"</h1>
+                    <nav class="actions" aria-label="Calendar">
+                        <a href="/calendar.ics">"Calendar"</a>
+                    </nav>
+                </section>
+                {if has_events {
+                    view! {
+                        <section class="list">
+                            {events.into_iter().map(|event| view! {
+                                <article class="list-item">
+                                    <div>
+                                        <h2><a href=format!("/events/{}", event.id)>{event.title}</a></h2>
+                                        <p>{event.playgroup_name} " · " {display_datetime(event.start_time)}</p>
+                                    </div>
+                                    <span class="badge">{event.visibility}</span>
+                                </article>
+                            }).collect_view()}
+                        </section>
+                    }.into_any()
+                } else {
+                    view! { <p class="empty-state">"No events yet."</p> }.into_any()
+                }}
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_event_form(
+    playgroup: &PlaygroupWithRole,
+    csrf_token: &str,
+    error: Option<&str>,
+    form: Option<&EventForm>,
+) -> String {
+    let playgroup = playgroup.clone();
+    let csrf_token = csrf_token.to_owned();
+    let error = error.map(str::to_owned);
+    let title = form
+        .map(|form| form.title.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let description = form
+        .map(|form| form.description.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let start_time = form
+        .map(|form| form.start_time.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let end_time = form
+        .map(|form| form.end_time.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let visibility = form
+        .map(|form| form.visibility.as_str())
+        .unwrap_or("members")
+        .to_owned();
+    let address_visibility = form
+        .map(|form| form.address_visibility.as_str())
+        .unwrap_or("rsvps")
+        .to_owned();
+    let location_name = form
+        .map(|form| form.location_name.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let address_line1 = form
+        .map(|form| form.address_line1.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let address_line2 = form
+        .map(|form| form.address_line2.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let city = form.map(|form| form.city.as_str()).unwrap_or("").to_owned();
+    let state_province = form
+        .map(|form| form.state_province.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let postal_code = form
+        .map(|form| form.postal_code.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let country = form
+        .map(|form| form.country.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let location_notes = form
+        .map(|form| form.location_notes.as_str())
+        .unwrap_or("")
+        .to_owned();
+
+    view! {
+        <AppShell title="New Event">
+            <main class="shell">
+                <section class="panel">
+                    <p class="eyebrow">{playgroup.name.clone()}</p>
+                    <h1>"New event"</h1>
+                </section>
+                <form method="post" action=format!("/playgroups/{}/events", playgroup.slug) class="form-panel wide-form">
+                    {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                    <input type="hidden" name="csrf_token" value=csrf_token/>
+                    <EventFields title=title description=description start_time=start_time end_time=end_time visibility=visibility/>
+                    <fieldset>
+                        <legend>"Location"</legend>
+                        <label>"Name"<input name="location_name" value=location_name/></label>
+                        <label>"Address line 1"<input name="address_line1" autocomplete="address-line1" value=address_line1/></label>
+                        <label>"Address line 2"<input name="address_line2" autocomplete="address-line2" value=address_line2/></label>
+                        <div class="field-grid">
+                            <label>"City"<input name="city" autocomplete="address-level2" value=city/></label>
+                            <label>"State"<input name="state_province" autocomplete="address-level1" value=state_province/></label>
+                            <label>"Postal code"<input name="postal_code" autocomplete="postal-code" value=postal_code/></label>
+                        </div>
+                        <label>"Country"<input name="country" autocomplete="country-name" value=country/></label>
+                        <label>"Notes"<textarea name="location_notes" rows="2">{location_notes}</textarea></label>
+                        <label>
+                            "Address visibility"
+                            <select name="address_visibility">
+                                <option value="rsvps" selected=address_visibility == "rsvps">"Confirmed RSVPs"</option>
+                                <option value="members" selected=address_visibility == "members">"Members"</option>
+                                <option value="hidden" selected=address_visibility == "hidden">"Hosts and admins"</option>
+                                <option value="public" selected=address_visibility == "public">"Public"</option>
+                            </select>
+                        </label>
+                    </fieldset>
+                    <button type="submit">"Save event"</button>
+                </form>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_event_edit(
+    event: &EventWithRole,
+    csrf_token: &str,
+    error: Option<&str>,
+    form: Option<&EventEditForm>,
+) -> String {
+    let event = event.clone();
+    let csrf_token = csrf_token.to_owned();
+    let error = error.map(str::to_owned);
+    let title = form
+        .map(|form| form.title.as_str())
+        .unwrap_or(&event.title)
+        .to_owned();
+    let description = form
+        .map(|form| form.description.as_str())
+        .unwrap_or(&event.description)
+        .to_owned();
+    let start_time = form
+        .map(|form| form.start_time.clone())
+        .unwrap_or_else(|| datetime_local_value(event.start_time));
+    let end_time = form
+        .map(|form| form.end_time.clone())
+        .unwrap_or_else(|| event.end_time.map(datetime_local_value).unwrap_or_default());
+    let visibility = form
+        .map(|form| form.visibility.as_str())
+        .unwrap_or(&event.visibility)
+        .to_owned();
+
+    view! {
+        <AppShell title="Edit Event">
+            <main class="shell">
+                <form method="post" action=format!("/events/{}/edit", event.id) class="form-panel wide-form">
+                    <h1>"Edit event"</h1>
+                    {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                    <input type="hidden" name="csrf_token" value=csrf_token/>
+                    <EventFields title=title description=description start_time=start_time end_time=end_time visibility=visibility/>
+                    <button type="submit">"Save changes"</button>
+                </form>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_event_detail(
+    event: &EventWithRole,
+    context: &EventPageContext,
+    csrf_token: &str,
+) -> String {
+    let event = event.clone();
+    let context = context.clone();
+    let csrf_token = csrf_token.to_owned();
+    let public_url = (event.visibility == "public_safe")
+        .then(|| {
+            event
+                .invite_token
+                .as_ref()
+                .map(|token| format!("/e/{token}"))
+        })
+        .flatten();
+    let invite_url = event
+        .invite_token
+        .as_ref()
+        .map(|token| format!("/rsvp/{token}"));
+
+    view! {
+        <AppShell title="Event">
+            <main class="shell">
+                <section class="panel">
+                    <p class="eyebrow">{event.playgroup_name.clone()}</p>
+                    <h1>{event.title.clone()}</h1>
+                    <p class="lede">{display_datetime(event.start_time)}</p>
+                    <nav class="actions" aria-label="Event actions">
+                        {if context.can_edit {
+                            view! { <a href=format!("/events/{}/edit", event.id)>"Edit"</a> }.into_any()
+                        } else {
+                            view! { <span></span> }.into_any()
+                        }}
+                        {public_url.map(|url| view! { <a href=url>"Public page"</a> })}
+                        {invite_url.map(|url| view! { <a href=url>"Invite RSVP"</a> })}
+                    </nav>
+                    <p>{event.description.clone()}</p>
+                    <LocationBlock location=context.location.clone() show_address=context.show_address/>
+                </section>
+                <section class="split-layout">
+                    <RsvpPanel event_id=event.id csrf_token=csrf_token user_rsvp=context.user_rsvp.clone()/>
+                    <AttendeeList rsvps=context.rsvps/>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_public_event(event: &EventRecord, context: &EventPageContext) -> String {
+    let event = event.clone();
+    let context = context.clone();
+    let invite_url = event
+        .invite_token
+        .as_ref()
+        .map(|token| format!("/rsvp/{token}"));
+
+    view! {
+        <AppShell title="Event">
+            <main class="shell">
+                <section class="panel">
+                    <p class="eyebrow">"Event"</p>
+                    <h1>{event.title.clone()}</h1>
+                    <p class="lede">{display_datetime(event.start_time)}</p>
+                    <p>{event.description.clone()}</p>
+                    <LocationBlock location=context.location show_address=context.show_address/>
+                    <nav class="actions" aria-label="Public event">
+                        {invite_url.map(|url| view! { <a href=url>"RSVP"</a> })}
+                    </nav>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_guest_rsvp(
+    event: &EventRecord,
+    context: &EventPageContext,
+    csrf_token: &str,
+    error: Option<&str>,
+    form: Option<&RsvpForm>,
+) -> String {
+    let event = event.clone();
+    let context = context.clone();
+    let csrf_token = csrf_token.to_owned();
+    let error = error.map(str::to_owned);
+    let guest_name = form
+        .map(|form| form.guest_name.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let status = form
+        .map(|form| form.status.as_str())
+        .unwrap_or("yes")
+        .to_owned();
+    let notes = form
+        .map(|form| form.notes.as_str())
+        .unwrap_or("")
+        .to_owned();
+
+    view! {
+        <AppShell title="RSVP">
+            <main class="shell">
+                <form method="post" action=format!("/rsvp/{}", event.invite_token.clone().unwrap_or_default()) class="form-panel">
+                    <h1>{event.title.clone()}</h1>
+                    <p class="lede">{display_datetime(event.start_time)}</p>
+                    <LocationBlock location=context.location show_address=context.show_address/>
+                    {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                    <input type="hidden" name="csrf_token" value=csrf_token/>
+                    <label>"Name"<input name="guest_name" required value=guest_name/></label>
+                    <RsvpFields status=status arrival_time="".to_owned() leaving_time="".to_owned() guest_count="0".to_owned() travel_buffer_minutes="".to_owned() notes=notes/>
+                    <button type="submit">"Save RSVP"</button>
+                </form>
             </main>
         </AppShell>
     }
@@ -337,6 +652,221 @@ fn PlaygroupList(playgroups: Vec<PlaygroupWithRole>) -> impl IntoView {
             view! { <p class="empty-state">"No playgroups yet."</p> }.into_any()
         }}
     }
+}
+
+#[component]
+fn EventFields(
+    title: String,
+    description: String,
+    start_time: String,
+    end_time: String,
+    visibility: String,
+) -> impl IntoView {
+    view! {
+        <label>"Title"<input name="title" required value=title/></label>
+        <label>"Description"<textarea name="description" rows="3">{description}</textarea></label>
+        <div class="field-grid">
+            <label>"Start"<input type="datetime-local" name="start_time" required value=start_time/></label>
+            <label>"End"<input type="datetime-local" name="end_time" value=end_time/></label>
+        </div>
+        <label>
+            "Visibility"
+            <select name="visibility">
+                <option value="members" selected=visibility == "members">"Members"</option>
+                <option value="invite_only" selected=visibility == "invite_only">"Invite only"</option>
+                <option value="public_safe" selected=visibility == "public_safe">"Public safe"</option>
+            </select>
+        </label>
+    }
+}
+
+#[component]
+fn RsvpPanel(
+    event_id: uuid::Uuid,
+    csrf_token: String,
+    user_rsvp: Option<EventRsvpRecord>,
+) -> impl IntoView {
+    let status = user_rsvp
+        .as_ref()
+        .map(|rsvp| rsvp.status.as_str())
+        .unwrap_or("yes")
+        .to_owned();
+    let arrival_time = user_rsvp
+        .as_ref()
+        .and_then(|rsvp| rsvp.arrival_time)
+        .map(datetime_local_value)
+        .unwrap_or_default();
+    let leaving_time = user_rsvp
+        .as_ref()
+        .and_then(|rsvp| rsvp.leaving_time)
+        .map(datetime_local_value)
+        .unwrap_or_default();
+    let guest_count = user_rsvp
+        .as_ref()
+        .map(|rsvp| rsvp.guest_count.to_string())
+        .unwrap_or_else(|| "0".to_owned());
+    let travel_buffer_minutes = user_rsvp
+        .as_ref()
+        .and_then(|rsvp| rsvp.travel_buffer_minutes)
+        .map(|minutes| minutes.to_string())
+        .unwrap_or_default();
+    let notes = user_rsvp
+        .as_ref()
+        .map(|rsvp| rsvp.notes.clone())
+        .unwrap_or_default();
+
+    view! {
+        <form method="post" action=format!("/events/{event_id}/rsvp") class="form-panel">
+            <h2>"Your RSVP"</h2>
+            <input type="hidden" name="csrf_token" value=csrf_token/>
+            <RsvpFields
+                status=status
+                arrival_time=arrival_time
+                leaving_time=leaving_time
+                guest_count=guest_count
+                travel_buffer_minutes=travel_buffer_minutes
+                notes=notes
+            />
+            <button type="submit">"Save RSVP"</button>
+        </form>
+    }
+}
+
+#[component]
+fn RsvpFields(
+    status: String,
+    arrival_time: String,
+    leaving_time: String,
+    guest_count: String,
+    travel_buffer_minutes: String,
+    notes: String,
+) -> impl IntoView {
+    view! {
+        <label>
+            "Status"
+            <select name="status">
+                <option value="yes" selected=status == "yes">"Yes"</option>
+                <option value="maybe" selected=status == "maybe">"Maybe"</option>
+                <option value="no" selected=status == "no">"No"</option>
+                <option value="waitlist" selected=status == "waitlist">"Waitlist"</option>
+            </select>
+        </label>
+        <div class="field-grid">
+            <label>"Arrival"<input type="datetime-local" name="arrival_time" value=arrival_time/></label>
+            <label>"Leaving"<input type="datetime-local" name="leaving_time" value=leaving_time/></label>
+        </div>
+        <div class="field-grid">
+            <label>"Guests"<input type="number" min="0" name="guest_count" value=guest_count/></label>
+            <label>"Travel buffer"<input type="number" min="0" name="travel_buffer_minutes" value=travel_buffer_minutes/></label>
+        </div>
+        <label>"Notes"<textarea name="notes" rows="3">{notes}</textarea></label>
+    }
+}
+
+#[component]
+fn AttendeeList(rsvps: Vec<EventRsvpRecord>) -> impl IntoView {
+    let has_rsvps = !rsvps.is_empty();
+
+    view! {
+        <section class="panel">
+            <h2>"Attendees"</h2>
+            {if has_rsvps {
+                view! {
+                    <div class="list">
+                        {rsvps.into_iter().map(|rsvp| {
+                            let name = rsvp.guest_name.unwrap_or_else(|| "Member".to_owned());
+                            view! {
+                                <article class="list-item">
+                                    <div>
+                                        <h3>{name}</h3>
+                                        <p>{rsvp.notes}</p>
+                                    </div>
+                                    <span class="badge">{rsvp.status}</span>
+                                </article>
+                            }
+                        }).collect_view()}
+                    </div>
+                }.into_any()
+            } else {
+                view! { <p class="empty-state">"No RSVPs yet."</p> }.into_any()
+            }}
+        </section>
+    }
+}
+
+#[component]
+fn LocationBlock(
+    location: Option<pod_db::EventLocationRecord>,
+    show_address: bool,
+) -> impl IntoView {
+    view! {
+        {location.map(|location| view! {
+            <div class="location-block">
+                <h2>{location.name}</h2>
+                {if show_address {
+                    view! {
+                        <address>
+                            {location.address_line1.map(|line| view! { <span>{line}</span> })}
+                            {location.address_line2.map(|line| view! { <span>{line}</span> })}
+                            <span>{city_line(&location.city, &location.state_province, &location.postal_code)}</span>
+                            {location.country.map(|country| view! { <span>{country}</span> })}
+                        </address>
+                    }.into_any()
+                } else {
+                    view! { <p class="empty-state">"Address hidden"</p> }.into_any()
+                }}
+                {(!location.notes.is_empty()).then(|| view! { <p>{location.notes}</p> })}
+            </div>
+        })}
+    }
+}
+
+fn datetime_local_value(value: OffsetDateTime) -> String {
+    let value = value.to_offset(UtcOffset::UTC);
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}",
+        value.year(),
+        u8::from(value.month()),
+        value.day(),
+        value.hour(),
+        value.minute()
+    )
+}
+
+fn display_datetime(value: OffsetDateTime) -> String {
+    let value = value.to_offset(UtcOffset::UTC);
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02} UTC",
+        value.year(),
+        u8::from(value.month()),
+        value.day(),
+        value.hour(),
+        value.minute()
+    )
+}
+
+fn city_line(
+    city: &Option<String>,
+    state: &Option<String>,
+    postal_code: &Option<String>,
+) -> String {
+    let mut line = String::new();
+    if let Some(city) = city {
+        line.push_str(city);
+    }
+    if let Some(state) = state {
+        if !line.is_empty() {
+            line.push_str(", ");
+        }
+        line.push_str(state);
+    }
+    if let Some(postal_code) = postal_code {
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(postal_code);
+    }
+    line
 }
 
 #[component]

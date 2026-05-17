@@ -1,5 +1,5 @@
 use axum::extract::State;
-use axum::http::header::{COOKIE, SET_COOKIE, USER_AGENT};
+use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE, USER_AGENT};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
@@ -9,12 +9,18 @@ use pod_core::auth::{
     verify_password,
 };
 use pod_core::config::AppConfig;
+use pod_core::events::{
+    AddressVisibility, EventVisibility, RsvpStatus, can_manage_event, can_show_event_address,
+};
 use pod_core::health::{HealthResponse, ReadinessFailure};
-use pod_core::playgroups::slugify;
-use pod_db::{DbError, IdentityRepository, PlaygroupRepository, UserRecord};
+use pod_core::playgroups::{PlaygroupRole, slugify};
+use pod_db::{
+    CreateEventInput, DbError, EventLocationInput, EventRepository, EventRsvpRecord, EventWithRole,
+    IdentityRepository, PlaygroupRepository, RsvpInput, UpdateEventInput, UserRecord,
+};
 use serde::Deserialize;
 use sqlx::PgPool;
-use time::{Duration, OffsetDateTime};
+use time::{Date, Duration, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
 use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::services::ServeDir;
@@ -52,7 +58,15 @@ pub fn build_router(state: AppState) -> Router {
         .route("/home", get(dashboard))
         .route("/playgroups", get(playgroups).post(create_playgroup))
         .route("/playgroups/{slug}", get(playgroup_detail))
+        .route("/playgroups/{slug}/events/new", get(new_event_form))
+        .route("/playgroups/{slug}/events", post(create_event))
         .route("/events", get(events))
+        .route("/events/{id}", get(event_detail))
+        .route("/events/{id}/edit", get(edit_event_form).post(update_event))
+        .route("/events/{id}/rsvp", post(save_user_rsvp))
+        .route("/e/{token}", get(public_event_detail))
+        .route("/rsvp/{token}", get(guest_rsvp_form).post(save_guest_rsvp))
+        .route("/calendar.ics", get(calendar_feed))
         .route("/observatory", get(observatory))
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
@@ -429,8 +443,503 @@ async fn playgroup_detail(
     .into_response()
 }
 
-async fn events() -> Html<String> {
-    Html(ui::render_placeholder("Events"))
+async fn events(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let events = match EventRepository::new(pool).list_for_user(user.id).await {
+        Ok(events) => events,
+        Err(err) => {
+            tracing::error!(err = %err, "list events");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Html(ui::render_events(&events)).into_response()
+}
+
+async fn new_event_form(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(slug): axum::extract::Path<String>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let repo = PlaygroupRepository::new(pool);
+    let playgroup = match repo.get_by_slug_for_user(&slug, user.id).await {
+        Ok(Some(playgroup)) => playgroup,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get playgroup for new event");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(playgroup.role.as_str()).ok();
+    if !role.is_some_and(can_manage_event) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_event_form(&playgroup, &csrf.token, None, None),
+        csrf.set_cookie,
+    )
+}
+
+async fn create_event(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(slug): axum::extract::Path<String>,
+    Form(form): Form<EventForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let playgroup_repo = PlaygroupRepository::new(pool);
+    let playgroup = match playgroup_repo.get_by_slug_for_user(&slug, user.id).await {
+        Ok(Some(playgroup)) => playgroup,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get playgroup for create event");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(playgroup.role.as_str()).ok();
+    if !role.is_some_and(can_manage_event) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    let title = form.title.trim();
+    let description = form.description.trim();
+    let visibility = match EventVisibility::try_from(form.visibility.trim()) {
+        Ok(visibility) => visibility,
+        Err(()) => {
+            return html_with_cookies(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ui::render_event_form(
+                    &playgroup,
+                    &csrf.token,
+                    Some("Choose a valid event visibility."),
+                    Some(&form),
+                ),
+                csrf.set_cookie,
+            );
+        }
+    };
+    let address_visibility = match AddressVisibility::try_from(form.address_visibility.trim()) {
+        Ok(visibility) => visibility,
+        Err(()) => {
+            return html_with_cookies(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ui::render_event_form(
+                    &playgroup,
+                    &csrf.token,
+                    Some("Choose a valid address visibility."),
+                    Some(&form),
+                ),
+                csrf.set_cookie,
+            );
+        }
+    };
+    let start_time = match parse_datetime_local(&form.start_time) {
+        Some(start_time) if !title.is_empty() => start_time,
+        _ => {
+            return html_with_cookies(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ui::render_event_form(
+                    &playgroup,
+                    &csrf.token,
+                    Some("Title and start time are required."),
+                    Some(&form),
+                ),
+                csrf.set_cookie,
+            );
+        }
+    };
+    let end_time = parse_optional_datetime_local(&form.end_time);
+    let location_name = form.location_name.trim();
+    let location = (!location_name.is_empty()).then(|| EventLocationInput {
+        name: location_name,
+        address_line1: optional_trimmed(&form.address_line1),
+        address_line2: optional_trimmed(&form.address_line2),
+        city: optional_trimmed(&form.city),
+        state_province: optional_trimmed(&form.state_province),
+        postal_code: optional_trimmed(&form.postal_code),
+        country: optional_trimmed(&form.country),
+        notes: form.location_notes.trim(),
+    });
+
+    let invite_token = new_public_token();
+    let event = match EventRepository::new(pool)
+        .create_event(CreateEventInput {
+            playgroup_id: playgroup.id,
+            title,
+            description,
+            start_time,
+            end_time,
+            location,
+            visibility: visibility.as_str(),
+            invite_token: &invite_token,
+            address_visibility: address_visibility.as_str(),
+            created_by: user.id,
+        })
+        .await
+    {
+        Ok(event) => event,
+        Err(err) => {
+            tracing::error!(err = %err, "create event");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Redirect::to(&format!("/events/{}", event.id)).into_response()
+}
+
+async fn event_detail(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let repo = EventRepository::new(pool);
+    let event = match repo.get_for_user(id, user.id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let context = match event_page_context(&repo, &event, Some(user.id), false).await {
+        Ok(context) => context,
+        Err(err) => {
+            tracing::error!(err = %err, "load event context");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_event_detail(&event, &context, &csrf.token),
+        csrf.set_cookie,
+    )
+}
+
+async fn edit_event_form(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let event = match EventRepository::new(pool).get_for_user(id, user.id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event for edit");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(event.member_role.as_str()).ok();
+    if !role.is_some_and(can_manage_event) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_event_edit(&event, &csrf.token, None, None),
+        csrf.set_cookie,
+    )
+}
+
+async fn update_event(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<EventEditForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let repo = EventRepository::new(pool);
+    let event = match repo.get_for_user(id, user.id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event before update");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(event.member_role.as_str()).ok();
+    if !role.is_some_and(can_manage_event) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    let title = form.title.trim();
+    let visibility = match EventVisibility::try_from(form.visibility.trim()) {
+        Ok(visibility) => visibility,
+        Err(()) => {
+            return html_with_cookies(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ui::render_event_edit(
+                    &event,
+                    &csrf.token,
+                    Some("Choose a valid event visibility."),
+                    Some(&form),
+                ),
+                csrf.set_cookie,
+            );
+        }
+    };
+    let start_time = match parse_datetime_local(&form.start_time) {
+        Some(start_time) if !title.is_empty() => start_time,
+        _ => {
+            return html_with_cookies(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ui::render_event_edit(
+                    &event,
+                    &csrf.token,
+                    Some("Title and start time are required."),
+                    Some(&form),
+                ),
+                csrf.set_cookie,
+            );
+        }
+    };
+
+    match repo
+        .update_event(UpdateEventInput {
+            id: event.id,
+            title,
+            description: form.description.trim(),
+            start_time,
+            end_time: parse_optional_datetime_local(&form.end_time),
+            visibility: visibility.as_str(),
+        })
+        .await
+    {
+        Ok(event) => Redirect::to(&format!("/events/{}", event.id)).into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "update event");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+async fn save_user_rsvp(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<RsvpForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let repo = EventRepository::new(pool);
+    match repo.get_for_user(id, user.id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event before rsvp");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    }
+    let rsvp = match parse_rsvp_input(id, Some(user.id), None, &form) {
+        Ok(rsvp) => rsvp,
+        Err(()) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    if let Err(err) = repo.upsert_user_rsvp(rsvp).await {
+        tracing::error!(err = %err, "save user rsvp");
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    Redirect::to(&format!("/events/{id}")).into_response()
+}
+
+async fn public_event_detail(
+    State(state): State<AppState>,
+    axum::extract::Path(token): axum::extract::Path<String>,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let repo = EventRepository::new(pool);
+    let event = match repo.get_by_token(token.trim()).await {
+        Ok(Some(event)) if event.visibility == EventVisibility::PublicSafe.as_str() => event,
+        Ok(_) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get public event");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let context = match public_event_page_context(&repo, event.id).await {
+        Ok(context) => context,
+        Err(err) => {
+            tracing::error!(err = %err, "load public event context");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Html(ui::render_public_event(&event, &context)).into_response()
+}
+
+async fn guest_rsvp_form(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(token): axum::extract::Path<String>,
+) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let repo = EventRepository::new(pool);
+    let event = match repo.get_by_token(token.trim()).await {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get guest rsvp event");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let context = match public_event_page_context(&repo, event.id).await {
+        Ok(context) => context,
+        Err(err) => {
+            tracing::error!(err = %err, "load guest rsvp context");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_guest_rsvp(&event, &context, &csrf.token, None, None),
+        csrf.set_cookie,
+    )
+}
+
+async fn save_guest_rsvp(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(token): axum::extract::Path<String>,
+    Form(form): Form<RsvpForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let repo = EventRepository::new(pool);
+    let event = match repo.get_by_token(token.trim()).await {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get guest rsvp event before save");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let guest_name = form.guest_name.trim();
+    if guest_name.is_empty() {
+        let context = match public_event_page_context(&repo, event.id).await {
+            Ok(context) => context,
+            Err(err) => {
+                tracing::error!(err = %err, "reload guest rsvp context");
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        let csrf = ensure_csrf_cookie(&headers, &state.config);
+        return html_with_cookies(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ui::render_guest_rsvp(
+                &event,
+                &context,
+                &csrf.token,
+                Some("Name and a valid RSVP status are required."),
+                Some(&form),
+            ),
+            csrf.set_cookie,
+        );
+    }
+    let rsvp = match parse_rsvp_input(event.id, None, Some(guest_name), &form) {
+        Ok(rsvp) => rsvp,
+        Err(()) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    if let Err(err) = repo.create_rsvp(rsvp).await {
+        tracing::error!(err = %err, "save guest rsvp");
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    Redirect::to(&format!("/rsvp/{token}?saved=1")).into_response()
+}
+
+async fn calendar_feed(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let events = match EventRepository::new(pool)
+        .list_calendar_events(user.id)
+        .await
+    {
+        Ok(events) => events,
+        Err(err) => {
+            tracing::error!(err = %err, "calendar events");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let calendar = render_calendar(&events);
+    (
+        [
+            (CONTENT_TYPE, "text/calendar; charset=utf-8"),
+            (CONTENT_DISPOSITION, "inline; filename=\"pod-tracker.ics\""),
+        ],
+        calendar,
+    )
+        .into_response()
 }
 
 async fn observatory() -> Html<String> {
@@ -462,6 +971,73 @@ struct PlaygroupForm {
     name: String,
     description: String,
     csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct EventForm {
+    pub(crate) title: String,
+    pub(crate) description: String,
+    pub(crate) start_time: String,
+    #[serde(default)]
+    pub(crate) end_time: String,
+    pub(crate) visibility: String,
+    #[serde(default)]
+    pub(crate) location_name: String,
+    #[serde(default)]
+    pub(crate) address_line1: String,
+    #[serde(default)]
+    pub(crate) address_line2: String,
+    #[serde(default)]
+    pub(crate) city: String,
+    #[serde(default)]
+    pub(crate) state_province: String,
+    #[serde(default)]
+    pub(crate) postal_code: String,
+    #[serde(default)]
+    pub(crate) country: String,
+    #[serde(default)]
+    pub(crate) location_notes: String,
+    #[serde(default = "default_address_visibility")]
+    pub(crate) address_visibility: String,
+    pub(crate) csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct EventEditForm {
+    pub(crate) title: String,
+    pub(crate) description: String,
+    pub(crate) start_time: String,
+    #[serde(default)]
+    pub(crate) end_time: String,
+    pub(crate) visibility: String,
+    pub(crate) csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct RsvpForm {
+    pub(crate) status: String,
+    #[serde(default)]
+    pub(crate) guest_name: String,
+    #[serde(default)]
+    pub(crate) arrival_time: String,
+    #[serde(default)]
+    pub(crate) leaving_time: String,
+    #[serde(default)]
+    pub(crate) guest_count: String,
+    #[serde(default)]
+    pub(crate) travel_buffer_minutes: String,
+    #[serde(default)]
+    pub(crate) notes: String,
+    pub(crate) csrf_token: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct EventPageContext {
+    pub location: Option<pod_db::EventLocationRecord>,
+    pub rsvps: Vec<EventRsvpRecord>,
+    pub user_rsvp: Option<EventRsvpRecord>,
+    pub show_address: bool,
+    pub can_edit: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -613,6 +1189,205 @@ fn is_unique_violation(err: &DbError) -> bool {
     }
 }
 
+async fn event_page_context(
+    repo: &EventRepository<'_>,
+    event: &EventWithRole,
+    user_id: Option<uuid::Uuid>,
+    guest_scope: bool,
+) -> Result<EventPageContext, DbError> {
+    let location = repo.get_location_for_event(event.id).await?;
+    let hosts = repo.list_hosts(event.id).await?;
+    let rsvps = repo.list_rsvps(event.id).await?;
+    let user_rsvp =
+        user_id.and_then(|id| rsvps.iter().find(|rsvp| rsvp.user_id == Some(id)).cloned());
+    let role = PlaygroupRole::try_from(event.member_role.as_str()).ok();
+    let address_visibilities = hosts
+        .iter()
+        .filter_map(|host| AddressVisibility::try_from(host.address_visibility.as_str()).ok())
+        .collect::<Vec<_>>();
+    let viewer_is_host =
+        user_id.is_some_and(|user_id| hosts.iter().any(|host| host.user_id == user_id));
+    let viewer_rsvp = user_rsvp
+        .as_ref()
+        .and_then(|rsvp| RsvpStatus::try_from(rsvp.status.as_str()).ok());
+    let show_address = can_show_event_address(
+        &address_visibilities,
+        viewer_is_host,
+        role,
+        viewer_rsvp,
+        guest_scope,
+    );
+
+    Ok(EventPageContext {
+        location,
+        rsvps,
+        user_rsvp,
+        show_address,
+        can_edit: role.is_some_and(can_manage_event),
+    })
+}
+
+async fn public_event_page_context(
+    repo: &EventRepository<'_>,
+    event_id: uuid::Uuid,
+) -> Result<EventPageContext, DbError> {
+    let location = repo.get_location_for_event(event_id).await?;
+    let hosts = repo.list_hosts(event_id).await?;
+    let address_visibilities = hosts
+        .iter()
+        .filter_map(|host| AddressVisibility::try_from(host.address_visibility.as_str()).ok())
+        .collect::<Vec<_>>();
+    let show_address = can_show_event_address(&address_visibilities, false, None, None, true);
+
+    Ok(EventPageContext {
+        location,
+        rsvps: Vec::new(),
+        user_rsvp: None,
+        show_address,
+        can_edit: false,
+    })
+}
+
+fn parse_rsvp_input<'a>(
+    event_id: uuid::Uuid,
+    user_id: Option<uuid::Uuid>,
+    guest_name: Option<&'a str>,
+    form: &'a RsvpForm,
+) -> Result<RsvpInput<'a>, ()> {
+    let status = RsvpStatus::try_from(form.status.trim())?;
+    let guest_count = parse_optional_i32(&form.guest_count)
+        .unwrap_or(Some(0))
+        .ok_or(())?;
+    if guest_count < 0 {
+        return Err(());
+    }
+    let travel_buffer_minutes = parse_optional_i32(&form.travel_buffer_minutes).ok_or(())?;
+    if travel_buffer_minutes.is_some_and(|minutes| minutes < 0) {
+        return Err(());
+    }
+
+    Ok(RsvpInput {
+        event_id,
+        user_id,
+        guest_name,
+        status: status.as_str(),
+        arrival_time: parse_optional_datetime_local(&form.arrival_time),
+        leaving_time: parse_optional_datetime_local(&form.leaving_time),
+        guest_count,
+        travel_buffer_minutes,
+        notes: form.notes.trim(),
+    })
+}
+
+fn default_address_visibility() -> String {
+    AddressVisibility::Rsvps.as_str().to_owned()
+}
+
+fn optional_trimmed(value: &str) -> Option<&str> {
+    let value = value.trim();
+    (!value.is_empty()).then_some(value)
+}
+
+fn parse_optional_i32(value: &str) -> Option<Option<i32>> {
+    let value = value.trim();
+    if value.is_empty() {
+        Some(None)
+    } else {
+        value.parse::<i32>().ok().map(Some)
+    }
+}
+
+fn parse_optional_datetime_local(value: &str) -> Option<OffsetDateTime> {
+    let value = value.trim();
+    if value.is_empty() {
+        None
+    } else {
+        parse_datetime_local(value)
+    }
+}
+
+fn parse_datetime_local(value: &str) -> Option<OffsetDateTime> {
+    let (date, time) = value.trim().split_once('T')?;
+    let mut date_parts = date.split('-');
+    let year = date_parts.next()?.parse::<i32>().ok()?;
+    let month = Month::try_from(date_parts.next()?.parse::<u8>().ok()?).ok()?;
+    let day = date_parts.next()?.parse::<u8>().ok()?;
+    if date_parts.next().is_some() {
+        return None;
+    }
+
+    let mut time_parts = time.split(':');
+    let hour = time_parts.next()?.parse::<u8>().ok()?;
+    let minute = time_parts.next()?.parse::<u8>().ok()?;
+    if time_parts.next().is_some() {
+        return None;
+    }
+
+    let date = Date::from_calendar_date(year, month, day).ok()?;
+    let time = Time::from_hms(hour, minute, 0).ok()?;
+    Some(PrimitiveDateTime::new(date, time).assume_offset(UtcOffset::UTC))
+}
+
+fn new_public_token() -> String {
+    new_session_token().encoded
+}
+
+fn render_calendar(events: &[pod_db::CalendarEventRecord]) -> String {
+    let mut calendar =
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Pod Tracker//Events//EN\r\nCALSCALE:GREGORIAN\r\n"
+            .to_owned();
+    for event in events {
+        calendar.push_str("BEGIN:VEVENT\r\n");
+        calendar.push_str(&format!(
+            "UID:{}\r\n",
+            ics_escape(&format!("{}@pod-tracker.app", event.id))
+        ));
+        calendar.push_str(&format!(
+            "DTSTAMP:{}\r\n",
+            ics_timestamp(OffsetDateTime::now_utc())
+        ));
+        calendar.push_str(&format!("DTSTART:{}\r\n", ics_timestamp(event.start_time)));
+        if let Some(end_time) = event.end_time {
+            calendar.push_str(&format!("DTEND:{}\r\n", ics_timestamp(end_time)));
+        }
+        calendar.push_str(&format!("SUMMARY:{}\r\n", ics_escape(&event.title)));
+        if !event.description.is_empty() {
+            calendar.push_str(&format!(
+                "DESCRIPTION:{}\r\n",
+                ics_escape(&event.description)
+            ));
+        }
+        if let Some(location_name) = event.location_name.as_ref() {
+            calendar.push_str(&format!("LOCATION:{}\r\n", ics_escape(location_name)));
+        }
+        calendar.push_str("END:VEVENT\r\n");
+    }
+    calendar.push_str("END:VCALENDAR\r\n");
+    calendar
+}
+
+fn ics_timestamp(value: OffsetDateTime) -> String {
+    let value = value.to_offset(UtcOffset::UTC);
+    format!(
+        "{:04}{:02}{:02}T{:02}{:02}{:02}Z",
+        value.year(),
+        u8::from(value.month()),
+        value.day(),
+        value.hour(),
+        value.minute(),
+        value.second()
+    )
+}
+
+fn ics_escape(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace(';', "\\;")
+        .replace(',', "\\,")
+        .replace("\r\n", "\\n")
+        .replace('\n', "\\n")
+}
+
 async fn status(State(state): State<AppState>) -> Html<String> {
     Html(ui::render_status(
         state.config.database_configured(),
@@ -666,10 +1441,13 @@ async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
 
 #[cfg(test)]
 mod tests {
+    use axum::Router;
     use axum::body::{Body, to_bytes};
     use axum::http::header::{CONTENT_TYPE, LOCATION, SET_COOKIE};
     use axum::http::{HeaderMap, Request, StatusCode};
     use pod_core::config::AppConfig;
+    use pod_core::playgroups::PlaygroupRole;
+    use pod_db::{EventRepository, IdentityRepository, PlaygroupRepository};
     use tower::ServiceExt;
 
     use super::{AppState, build_router, session_cookie};
@@ -725,6 +1503,62 @@ mod tests {
             .split_once('=')
             .map(|(_, value)| value)
             .expect("cookie value")
+    }
+
+    struct SignedInUser {
+        csrf_token: String,
+        cookie_header: String,
+    }
+
+    async fn sign_up(app: &Router, email: &str, display_name: &str) -> SignedInUser {
+        let form = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/signup")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("signup form");
+        let csrf_cookie = set_cookie_pair(form.headers(), "pod_tracker_csrf=");
+        let csrf_token = cookie_value(&csrf_cookie).to_owned();
+        let email = email.replace('@', "%40");
+        let display_name = display_name.replace(' ', "+");
+        let signup = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/signup")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", csrf_cookie.clone())
+                    .body(Body::from(format!(
+                        "email={email}&display_name={display_name}&password=correct-horse-battery&csrf_token={csrf_token}"
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("signup");
+        assert_eq!(signup.status(), StatusCode::SEE_OTHER);
+        let session_cookie = set_cookie_pair(signup.headers(), "pod_tracker_session=");
+
+        SignedInUser {
+            csrf_token,
+            cookie_header: format!("{csrf_cookie}; {session_cookie}"),
+        }
+    }
+
+    fn redirected_event_id(response: &axum::response::Response) -> uuid::Uuid {
+        response
+            .headers()
+            .get(LOCATION)
+            .expect("event redirect")
+            .to_str()
+            .expect("location str")
+            .trim_start_matches("/events/")
+            .parse()
+            .expect("event uuid")
     }
 
     #[tokio::test]
@@ -1069,5 +1903,316 @@ mod tests {
             .await
             .expect("outsider view");
         assert_eq!(outsider_view.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn event_routes_enforce_rsvp_only_address_visibility(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool.clone()));
+        let owner = sign_up(&app, "event-owner@example.test", "Owner").await;
+
+        let create_playgroup = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Friday+Night+Commander&description=Weekly+pods&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create playgroup");
+        assert_eq!(create_playgroup.status(), StatusCode::SEE_OTHER);
+
+        let create_event = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups/friday-night-commander/events")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "title=Friday+Pods&description=Bring+decks&start_time=2026-06-01T19:00&end_time=&visibility=public_safe&location_name=Kitchen+Table&address_line1=123+Private+St&address_line2=&city=Durham&state_province=NC&postal_code=27701&country=US&location_notes=&address_visibility=rsvps&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create event");
+        assert_eq!(create_event.status(), StatusCode::SEE_OTHER);
+        let event_id = redirected_event_id(&create_event);
+
+        let edit_form = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/events/{event_id}/edit"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("edit form");
+        assert_eq!(edit_form.status(), StatusCode::OK);
+        let edit_body = body_string(edit_form).await;
+        assert!(edit_body.contains("Friday Pods"));
+
+        let update_event = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/events/{event_id}/edit"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "title=Updated+Pods&description=Bring+two+decks&start_time=2026-06-01T19:30&end_time=&visibility=public_safe&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("update event");
+        assert_eq!(update_event.status(), StatusCode::SEE_OTHER);
+
+        let owner_user = IdentityRepository::new(&pool)
+            .find_user_by_email("event-owner@example.test")
+            .await
+            .expect("owner user")
+            .expect("owner user");
+        let updated = EventRepository::new(&pool)
+            .get_for_user(event_id, owner_user.id)
+            .await
+            .expect("updated event")
+            .expect("updated event");
+        assert_eq!(updated.title, "Updated Pods");
+
+        let invite_token = sqlx::query!(
+            "select invite_token from core.events where id = $1",
+            event_id
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("event token")
+        .invite_token
+        .expect("invite token");
+
+        let public_event = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/e/{invite_token}"))
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("public event");
+        assert_eq!(public_event.status(), StatusCode::OK);
+        let public_body = body_string(public_event).await;
+        assert!(public_body.contains("Kitchen Table"));
+        assert!(!public_body.contains("123 Private St"));
+
+        let member = sign_up(&app, "event-member@example.test", "Member").await;
+        let member_user = IdentityRepository::new(&pool)
+            .find_user_by_email("event-member@example.test")
+            .await
+            .expect("member user")
+            .expect("member user");
+        let playgroup = PlaygroupRepository::new(&pool)
+            .get_by_slug_for_user("friday-night-commander", owner_user.id)
+            .await
+            .expect("playgroup")
+            .expect("playgroup");
+        PlaygroupRepository::new(&pool)
+            .add_membership(playgroup.id, member_user.id, PlaygroupRole::Member, None)
+            .await
+            .expect("add member");
+
+        let member_before_rsvp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/events/{event_id}"))
+                    .header("cookie", member.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("member event before rsvp");
+        assert_eq!(member_before_rsvp.status(), StatusCode::OK);
+        let member_before_body = body_string(member_before_rsvp).await;
+        assert!(!member_before_body.contains("123 Private St"));
+
+        let save_rsvp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/events/{event_id}/rsvp"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", member.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "status=maybe&arrival_time=2026-06-01T19:15&leaving_time=&guest_count=1&travel_buffer_minutes=15&notes=Bringing+a+guest&csrf_token={}",
+                        member.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("save rsvp");
+        assert_eq!(save_rsvp.status(), StatusCode::SEE_OTHER);
+
+        let member_after_rsvp = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/events/{event_id}"))
+                    .header("cookie", member.cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("member event after rsvp");
+        assert_eq!(member_after_rsvp.status(), StatusCode::OK);
+        let member_after_body = body_string(member_after_rsvp).await;
+        assert!(member_after_body.contains("123 Private St"));
+        let member_rsvp = EventRepository::new(&pool)
+            .get_user_rsvp(event_id, member_user.id)
+            .await
+            .expect("member rsvp")
+            .expect("member rsvp");
+        assert_eq!(member_rsvp.status, "maybe");
+        assert_eq!(member_rsvp.guest_count, 1);
+        assert_eq!(member_rsvp.travel_buffer_minutes, Some(15));
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn guest_rsvp_and_calendar_feed_are_scoped(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool.clone()));
+        let owner = sign_up(&app, "calendar-owner@example.test", "Owner").await;
+
+        let create_playgroup = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Calendar+Crew&description=Calendar&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create playgroup");
+        assert_eq!(create_playgroup.status(), StatusCode::SEE_OTHER);
+
+        let create_event = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups/calendar-crew/events")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "title=Calendar+Pods&description=Do+not+leak+address&start_time=2026-06-02T18:30&end_time=&visibility=invite_only&location_name=Private+House&address_line1=456+Hidden+Ave&address_line2=&city=Raleigh&state_province=NC&postal_code=27601&country=US&location_notes=&address_visibility=members&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create event");
+        assert_eq!(create_event.status(), StatusCode::SEE_OTHER);
+        let event_id = redirected_event_id(&create_event);
+        let invite_token = sqlx::query!(
+            "select invite_token from core.events where id = $1",
+            event_id
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("event token")
+        .invite_token
+        .expect("invite token");
+
+        let rsvp_form = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/rsvp/{invite_token}"))
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("guest rsvp form");
+        assert_eq!(rsvp_form.status(), StatusCode::OK);
+        let guest_csrf_cookie = set_cookie_pair(rsvp_form.headers(), "pod_tracker_csrf=");
+        let guest_csrf_token = cookie_value(&guest_csrf_cookie).to_owned();
+        let guest_body = body_string(rsvp_form).await;
+        assert!(guest_body.contains("Private House"));
+        assert!(!guest_body.contains("456 Hidden Ave"));
+
+        let guest_rsvp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/rsvp/{invite_token}"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", guest_csrf_cookie)
+                    .body(Body::from(format!(
+                        "guest_name=Guest+Player&status=waitlist&arrival_time=&leaving_time=&guest_count=0&travel_buffer_minutes=&notes=Maybe+late&csrf_token={guest_csrf_token}"
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("guest rsvp");
+        assert_eq!(guest_rsvp.status(), StatusCode::SEE_OTHER);
+
+        let rsvps = EventRepository::new(&pool)
+            .list_rsvps(event_id)
+            .await
+            .expect("rsvps");
+        assert_eq!(rsvps.len(), 1);
+        assert_eq!(rsvps[0].guest_name.as_deref(), Some("Guest Player"));
+        assert_eq!(rsvps[0].status, "waitlist");
+
+        let unauth_calendar = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/calendar.ics")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("unauth calendar");
+        assert_eq!(unauth_calendar.status(), StatusCode::SEE_OTHER);
+        assert_eq!(
+            unauth_calendar.headers().get(LOCATION).expect("location"),
+            "/login"
+        );
+
+        let calendar = app
+            .oneshot(
+                Request::builder()
+                    .uri("/calendar.ics")
+                    .header("cookie", owner.cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("calendar");
+        assert_eq!(calendar.status(), StatusCode::OK);
+        let calendar_body = body_string(calendar).await;
+        assert!(calendar_body.contains("BEGIN:VCALENDAR"));
+        assert!(calendar_body.contains("SUMMARY:Calendar Pods"));
+        assert!(calendar_body.contains("LOCATION:Private House"));
+        assert!(!calendar_body.contains("456 Hidden Ave"));
     }
 }
