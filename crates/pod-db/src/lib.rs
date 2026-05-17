@@ -4,6 +4,13 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use thiserror::Error;
 
+pub mod health;
+pub mod identity;
+pub mod migrations;
+
+pub use health::HealthRepository;
+pub use identity::{IdentityRepository, SessionRecord, UserRecord};
+
 #[derive(Debug, Error)]
 pub enum DbError {
     #[error("database URL is not configured")]
@@ -12,14 +19,36 @@ pub enum DbError {
     Sqlx(#[from] sqlx::Error),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PoolConfig {
+    pub max_connections: u32,
+    pub acquire_timeout: Duration,
+}
+
+impl Default for PoolConfig {
+    fn default() -> Self {
+        Self {
+            max_connections: 10,
+            acquire_timeout: Duration::from_secs(5),
+        }
+    }
+}
+
 pub async fn connect(database_url: Option<&str>) -> Result<Option<PgPool>, DbError> {
+    connect_with_config(database_url, PoolConfig::default()).await
+}
+
+pub async fn connect_with_config(
+    database_url: Option<&str>,
+    config: PoolConfig,
+) -> Result<Option<PgPool>, DbError> {
     let Some(database_url) = database_url else {
         return Ok(None);
     };
 
     let pool = PgPoolOptions::new()
-        .max_connections(10)
-        .acquire_timeout(Duration::from_secs(5))
+        .max_connections(config.max_connections)
+        .acquire_timeout(config.acquire_timeout)
         .connect(database_url)
         .await?;
 
@@ -28,14 +57,7 @@ pub async fn connect(database_url: Option<&str>) -> Result<Option<PgPool>, DbErr
 }
 
 pub async fn check_database(pool: &PgPool) -> Result<(), DbError> {
-    let value: i64 = sqlx::query_scalar("select 1::bigint")
-        .fetch_one(pool)
-        .await?;
-    if value == 1 {
-        Ok(())
-    } else {
-        Err(sqlx::Error::RowNotFound.into())
-    }
+    HealthRepository::new(pool).ping().await
 }
 
 pub async fn with_tx<T, F>(pool: &PgPool, f: F) -> Result<T, DbError>
@@ -49,42 +71,15 @@ where
 }
 
 pub async fn migrations_table_exists(pool: &PgPool) -> Result<bool, DbError> {
-    let exists: bool = sqlx::query_scalar(
-        r#"
-        select exists (
-          select 1
-          from information_schema.tables
-          where table_schema = 'public'
-            and table_name in ('goose_db_version', '_sqlx_migrations')
-        )
-        "#,
-    )
-    .fetch_one(pool)
-    .await?;
-
-    Ok(exists)
+    HealthRepository::new(pool).migrations_table_exists().await
 }
 
 pub async fn table_exists(pool: &PgPool, table_name: &str) -> Result<bool, DbError> {
-    let exists: bool = sqlx::query_scalar(
-        r#"
-        select exists (
-          select 1
-          from information_schema.tables
-          where table_schema = 'public'
-            and table_name = $1
-        )
-        "#,
-    )
-    .bind(table_name)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(exists)
+    HealthRepository::new(pool).table_exists(table_name).await
 }
 
 pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
-    sqlx::migrate!("../../migrations").run(pool).await
+    migrations::run(pool).await
 }
 
 pub async fn set_application_name<'c, E>(executor: E) -> Result<(), DbError>

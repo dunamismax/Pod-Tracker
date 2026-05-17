@@ -1718,7 +1718,9 @@ version = "0.1.0"
 dependencies = [
  "sqlx",
  "thiserror 2.0.18",
+ "time",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

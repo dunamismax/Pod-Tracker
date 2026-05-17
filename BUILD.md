@@ -61,11 +61,11 @@ needed to understand, stabilize, or safely replace existing behavior.
   PostgreSQL service. Production uses a real PostgreSQL service on the
   Ubuntu VM.
 
-Current local baseline observed on 2026-05-13:
+Current local baseline observed on 2026-05-17:
 
 ```text
-PostgreSQL: 18 Homebrew
-psql: /opt/homebrew/opt/postgresql@18/bin/psql
+PostgreSQL server: 17.9 Homebrew
+psql: 17.10 Homebrew
 ```
 
 FileFerry is the local example for Stephen's Rust web preferences:
@@ -316,14 +316,14 @@ state where documented verification passes on a clean checkout.
 - [x] Decide whether to continue the existing migration numbering or
       start a clean Rust-compatible migration history before production
       data matters; document the choice here.
-- [ ] Wire sqlx migrations and PostgreSQL pool management.
+- [x] Wire sqlx migrations and PostgreSQL pool management.
 - [x] Keep or recreate required extension migration:
       `pgcrypto`, `pg_trgm`, `pg_stat_statements`, `btree_gin`.
-- [ ] Add typed query coverage for health/readiness and base identity
+- [x] Add typed query coverage for health/readiness and base identity
       flows.
-- [ ] Add transaction helper and repository boundaries in `pod-db`.
+- [x] Add transaction helper and repository boundaries in `pod-db`.
 - [x] Add migration smoke test against local real PostgreSQL.
-- [ ] Add sqlx offline metadata or an equivalent reproducible query-check
+- [x] Add sqlx offline metadata or an equivalent reproducible query-check
       workflow if used by CI.
 
 ### Phase 3 - Identity, Sessions, And Playgroups Parity
@@ -626,3 +626,7 @@ Trust current primary docs over this file.
   `pod-worker`; added an Axum/Tokio web binary, environment config,
   tracing, request IDs, panic logging, `/healthz`, `/readyz`, Leptos SSR
   base pages, static CSS, Rust `just` targets, and Rust CI checks.
+- 2026-05-17 - Added SQLx-owned forward migrations for the Rust rewrite,
+  PostgreSQL-backed CI query checks, typed `pod-db` health and
+  identity/session repositories, configurable pool setup, and a SQLx
+  migration smoke recipe.

@@ -19,7 +19,8 @@ Current Rust rewrite baseline:
 ```text
 rustc 1.95.0
 cargo 1.95.0
-PostgreSQL 18 Homebrew
+PostgreSQL server 17.9 Homebrew
+psql 17.10 Homebrew
 ```
 
 The committed `rust-toolchain.toml` pins Rust 1.95.0 with `rustfmt` and
@@ -98,9 +99,11 @@ SQL migrations live in `migrations/` and still carry Goose annotations so
 the existing production path can remain untouched while the Rust rewrite
 comes up beside it.
 
-The Rust `pod-db` crate also embeds the same migration directory through
-`sqlx::migrate!` so the rewrite can move to a SQLx-owned migration
-workflow when the cutover plan is explicit.
+The Rust `pod-db` crate owns a SQLx-compatible copy of the current
+forward migrations in `crates/pod-db/migrations/`. These files intentionally
+do not include Goose down sections because SQLx would execute them as
+ordinary SQL. Keep the two migration sources in sync until the production
+cutover retires the Go/Goose path.
 
 Useful commands:
 
@@ -109,6 +112,7 @@ just migrate-status
 just migrate-up
 just migrate-down
 just migrate-smoke
+just sqlx-migrate-smoke
 ```
 
 `just migrate-smoke` creates a timestamped local smoke-test database,
@@ -117,11 +121,20 @@ extensions, and drops the smoke database on exit. On Ubuntu, create a
 matching PostgreSQL role for the OS user or adapt the recipe to a local
 admin role before running it.
 
+`just sqlx-migrate-smoke` applies the SQLx migration source to a temporary
+database, checks the same required extensions, and compiles the `pod-db`
+crate against that database so SQLx query macros are validated.
+
 ## SQL Generation
 
 New Rust database access goes through `sqlx` in `crates/pod-db`. The old
 `sqlc` output remains only as reference behavior until the Rust parity
 work replaces it.
+
+The current query-check workflow uses a live local PostgreSQL database
+rather than committed SQLx offline metadata. CI applies
+`crates/pod-db/migrations/` to PostgreSQL before clippy, tests, and build
+steps so SQLx macros are checked against the schema.
 
 ## Running
 

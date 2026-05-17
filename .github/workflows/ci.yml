@@ -8,6 +8,22 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: pod_tracker_ci
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/pod_tracker_ci?sslmode=disable
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,6 +40,12 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check
 
+      - name: Apply SQLx migrations
+        run: |
+          for migration in crates/pod-db/migrations/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done
+
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
@@ -38,6 +60,9 @@ jobs:
 
       - name: Migration placeholder check
         run: test -f migrations/001_extensions.sql
+
+      - name: SQLx migration source check
+        run: test -f crates/pod-db/migrations/001_extensions.sql
 
       - name: Frontend asset check
         run: test -f crates/pod-web/assets/app.css
