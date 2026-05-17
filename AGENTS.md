@@ -73,13 +73,18 @@ or full Moxfield replacement.
 
 ## Stack Rules
 
-- Go application monolith with separate web and worker binaries.
+- Rust application monolith with separate web and worker binaries.
+- Cargo workspace with focused crates under `crates/`.
+- Axum for HTTP routing, middleware, extractors, and server edges.
+- Leptos for server-rendered UI, reusable app components, forms/actions,
+  and narrowly hydrated interactions where they earn their place.
+- Tokio as the async runtime.
 - PostgreSQL as source of truth.
-- Server-rendered HTML plus HTMX.
+- Server-rendered HTML for primary screens.
 - SSE for browser event streams.
 - PostgreSQL `LISTEN` / `NOTIFY` for lightweight realtime.
 - PostgreSQL-backed job tables with `FOR UPDATE SKIP LOCKED`.
-- sqlc preferred for typed SQL.
+- sqlx preferred for typed SQL, migrations, and PostgreSQL pool access.
 - Migrations are canonical schema history.
 - Caddy and systemd for production on the Ubuntu VM.
 - **No Docker PostgreSQL** in local development or production.
@@ -88,10 +93,17 @@ Default against:
 
 - Client-side SPA routing.
 - Runtime JavaScript frameworks before evidence earns them.
+- New HTMX surface unless a future spike proves it is simpler than
+  Leptos-owned server rendering/actions for that specific interaction.
 - ORMs that hide SQL.
 - Microservices, Kubernetes, queues, Redis, or managed-service lock-in
   before the monolith proves it needs them.
 - AI/RAG/pgvector before the core app and SQL Observatory are useful.
+
+The existing Go implementation is parity reference behavior for the Rust
+rewrite. Do not extend Go as the product path. Preserve observed behavior
+while replacing it with Rust, Leptos, Axum, Tokio, sqlx, PostgreSQL,
+Caddy, and systemd.
 
 ---
 
@@ -155,7 +167,8 @@ Red lines:
   domain behavior, repositories own database access, migrations own
   schema truth.
 - Use explicit SQL for important behavior.
-- Keep HTMX partials small and inspectable.
+- Keep Leptos components, pages, and server functions small and
+  inspectable.
 - Include error handling and validation where reliability depends on it.
 - Do not hide domain behavior in broad utility packages or template
   conditionals.
@@ -170,8 +183,8 @@ Build the actual app, not a marketing shell.
 - Prioritize dense, repeated-use workflows for admins, hosts, and
   players.
 - Make event planning, RSVPs, pod generation, and game logging fast.
-- Use server-rendered pages and HTMX partials.
-- Keep JavaScript small and feature-scoped.
+- Use server-rendered Leptos pages and forms/actions.
+- Keep JavaScript or hydration small and feature-scoped.
 - Use icons for clear actions where available.
 - Do not use in-app prose to explain obvious mechanics.
 - Verify responsive layouts with real browser checks once UI exists.
@@ -218,12 +231,12 @@ just test
 
 Expected coverage as the app matures:
 
-- Go tests.
+- Rust tests.
 - Migration tests against real PostgreSQL.
-- SQL generation checks.
+- sqlx query/migration checks.
 - Server startup smoke.
 - `/healthz` and `/readyz`.
-- Template rendering tests.
+- Leptos component/page rendering tests.
 - Playwright smoke for critical workflows.
 - Caddy config validation.
 - Backup and restore drill before production claims.

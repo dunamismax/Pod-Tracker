@@ -35,13 +35,18 @@ Pod Tracker is built around the game-night loop:
 
 ## Stack
 
-- **Go** application monolith.
+- **Rust** application monolith.
+- **Axum** for HTTP routing, middleware, and server edges.
+- **Leptos** for server-rendered application UI and focused hydrated
+  interactions where they earn their place.
+- **Tokio** for async runtime.
 - **PostgreSQL** as the source of truth.
 - **Server-rendered HTML** for the core product.
-- **HTMX** for focused partial updates.
-- **Tailwind CSS or restrained plain CSS** for styling.
+- **Restrained plain CSS** by default; add a heavier styling pipeline only
+  when the product proves it needs one.
 - **SSE** and PostgreSQL `LISTEN` / `NOTIFY` for lightweight realtime.
-- **sqlc or equivalent typed SQL workflow** for explicit database access.
+- **sqlx or equivalent Rust typed SQL workflow** for explicit database
+  access.
 - **No Docker PostgreSQL** for local development or production.
 
 Local development uses the installed macOS PostgreSQL service. At project
@@ -58,6 +63,11 @@ Cloudflare DNS
   -> pod-tracker-worker
   -> PostgreSQL service
 ```
+
+The existing Go implementation is now reference behavior for the Rust
+rewrite. New product work should proceed through the Rust/Leptos/Axum plan
+in [BUILD.md](BUILD.md), with PostgreSQL remaining the visible engine of
+the product.
 
 ## PostgreSQL Showcase
 
@@ -107,10 +117,10 @@ Minimum launch checklist:
 
 ## Development Status
 
-This repository is being rebuilt from the idea file into a new
-PostgreSQL-first Go application. See [BUILD.md](BUILD.md) for the active
-phase checklist and [AGENTS.md](AGENTS.md) for repo-local operating
-rules.
+This repository is being rewritten from the current Go implementation into
+a PostgreSQL-first Rust application using Axum and Leptos. See
+[BUILD.md](BUILD.md) for the active phase checklist and [AGENTS.md](AGENTS.md)
+for repo-local operating rules.
 
 ## License
 
