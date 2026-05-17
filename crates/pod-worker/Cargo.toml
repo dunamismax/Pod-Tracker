@@ -1,0 +1,22 @@
+[package]
+name = "pod-worker"
+version = "0.1.0"
+description = "Background worker binary for Pod Tracker."
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "pod-tracker-worker"
+path = "src/bin/pod-tracker-worker.rs"
+
+[dependencies]
+anyhow.workspace = true
+dotenvy.workspace = true
+pod-core.workspace = true
+pod-db.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

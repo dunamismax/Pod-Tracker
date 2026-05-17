@@ -5,24 +5,26 @@ PostgreSQL for local development.
 
 ## Toolchain
 
-Observed local baseline on 2026-05-13:
+Observed local baseline on 2026-05-17:
 
 ```sh
-go version
+rustc --version
+cargo --version
 psql --version
 just --version
 ```
 
-Original project-start baseline:
+Current Rust rewrite baseline:
 
 ```text
-go1.26.3 darwin/arm64
-PostgreSQL 17.9 Homebrew
-just 1.51.0
+rustc 1.95.0
+cargo 1.95.0
+PostgreSQL 18 Homebrew
 ```
 
-On the Ubuntu VM, use the system PostgreSQL packages and the same
-database URLs from `.env.example`.
+The committed `rust-toolchain.toml` pins Rust 1.95.0 with `rustfmt` and
+`clippy`. On the Ubuntu VM, use the system PostgreSQL packages and the
+same database URLs from `.env.example`.
 
 ## Environment
 
@@ -90,8 +92,15 @@ recipe. It is not a production command.
 
 ## Migrations
 
-Goose is the canonical migration tool. SQL migrations live in
-`migrations/` and use Goose annotations.
+The current migration history is inherited from the Go reference
+implementation and remains numbered as-is before production Rust cutover.
+SQL migrations live in `migrations/` and still carry Goose annotations so
+the existing production path can remain untouched while the Rust rewrite
+comes up beside it.
+
+The Rust `pod-db` crate also embeds the same migration directory through
+`sqlx::migrate!` so the rewrite can move to a SQLx-owned migration
+workflow when the cutover plan is explicit.
 
 Useful commands:
 
@@ -110,15 +119,9 @@ admin role before running it.
 
 ## SQL Generation
 
-sqlc generates typed Go query code from migration-backed schema and SQL
-files:
-
-```sh
-just generate
-```
-
-Generated code is committed so clean checkouts can build without a
-separate generation step. `just check` runs generation before tests.
+New Rust database access goes through `sqlx` in `crates/pod-db`. The old
+`sqlc` output remains only as reference behavior until the Rust parity
+work replaces it.
 
 ## Running
 
@@ -127,4 +130,19 @@ just run
 just worker
 ```
 
-The web server defaults to `http://localhost:8080`.
+The Rust web server defaults to `http://localhost:8080`. With no
+`POD_TRACKER_DATABASE_URL`, `/healthz` can still report process health
+and `/readyz` reports that database readiness cannot be proven.
+
+## Verification
+
+Use the Rust workspace gate for normal work:
+
+```sh
+just fmt
+just check
+just test
+```
+
+Use `just legacy-go-test` only when comparing or stabilizing reference
+behavior from the old Go implementation.

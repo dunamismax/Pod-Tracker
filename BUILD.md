@@ -293,36 +293,36 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 1 - Rust Workspace Foundation
 
-- [ ] Add `rust-toolchain.toml`.
+- [x] Add `rust-toolchain.toml`.
 - [ ] Replace Go module metadata with a Cargo workspace.
-- [ ] Add crates: `pod-core`, `pod-db`, `pod-web`, `pod-worker`, and
+- [x] Add crates: `pod-core`, `pod-db`, `pod-web`, `pod-worker`, and
       `xtask` only when it earns its keep.
-- [ ] Add workspace dependency policy and Rust 2024 edition.
-- [ ] Add `pod-web` Axum server binary with Tokio.
-- [ ] Add config loading from environment.
-- [ ] Add structured tracing, request IDs, panic behavior, and log
+- [x] Add workspace dependency policy and Rust 2024 edition.
+- [x] Add `pod-web` Axum server binary with Tokio.
+- [x] Add config loading from environment.
+- [x] Add structured tracing, request IDs, panic behavior, and log
       redaction basics.
-- [ ] Add `/healthz` and `/readyz`.
-- [ ] Add Leptos SSR base layout, public home page, and static CSS asset
+- [x] Add `/healthz` and `/readyz`.
+- [x] Add Leptos SSR base layout, public home page, and static CSS asset
       pipeline.
-- [ ] Add `just run`, `just worker`, `just fmt`, `just check`, and
+- [x] Add `just run`, `just worker`, `just fmt`, `just check`, and
       `just test`.
-- [ ] Update CI from Go/sqlc checks to Rust workspace checks.
+- [x] Update CI from Go/sqlc checks to Rust workspace checks.
 
 ### Phase 2 - PostgreSQL, Migrations, And Typed SQL
 
-- [ ] Document Rust local development in `docs/development.md` while
+- [x] Document Rust local development in `docs/development.md` while
       preserving the no-Docker PostgreSQL rule.
-- [ ] Decide whether to continue the existing migration numbering or
+- [x] Decide whether to continue the existing migration numbering or
       start a clean Rust-compatible migration history before production
       data matters; document the choice here.
 - [ ] Wire sqlx migrations and PostgreSQL pool management.
-- [ ] Keep or recreate required extension migration:
+- [x] Keep or recreate required extension migration:
       `pgcrypto`, `pg_trgm`, `pg_stat_statements`, `btree_gin`.
 - [ ] Add typed query coverage for health/readiness and base identity
       flows.
 - [ ] Add transaction helper and repository boundaries in `pod-db`.
-- [ ] Add migration smoke test against local real PostgreSQL.
+- [x] Add migration smoke test against local real PostgreSQL.
 - [ ] Add sqlx offline metadata or an equivalent reproducible query-check
       workflow if used by CI.
 
@@ -621,3 +621,8 @@ Trust current primary docs over this file.
 - 2026-05-17 - Reoriented the active plan from Go to Rust, Leptos, Axum,
   Tokio, sqlx, and PostgreSQL while preserving the existing product scope
   and treating the Go app as parity reference behavior for the rewrite.
+- 2026-05-17 - Added the Rust workspace foundation with Rust 1.95,
+  workspace-managed dependencies, `pod-core`, `pod-db`, `pod-web`, and
+  `pod-worker`; added an Axum/Tokio web binary, environment config,
+  tracing, request IDs, panic logging, `/healthz`, `/readyz`, Leptos SSR
+  base pages, static CSS, Rust `just` targets, and Rust CI checks.

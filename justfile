@@ -3,28 +3,29 @@ set dotenv-load := true
 database_url := env_var_or_default("POD_TRACKER_DATABASE_URL", "postgres://pod_tracker:pod_tracker@localhost:5432/pod_tracker?sslmode=disable")
 migration_database_url := env_var_or_default("POD_TRACKER_MIGRATION_DATABASE_URL", database_url)
 goose := "go run github.com/pressly/goose/v3/cmd/goose@v3.27.1"
-sqlc := "go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0"
 
 default:
   just --list
 
 run:
-  go run ./cmd/pod-tracker-web
+  cargo run -p pod-web --bin pod-tracker-web
 
 worker:
-  go run ./cmd/pod-tracker-worker
+  cargo run -p pod-worker --bin pod-tracker-worker
 
 fmt:
-  gofmt -w $(find . -name '*.go' -not -path './vendor/*')
-
-generate:
-  {{sqlc}} generate
+  cargo fmt --all
 
 check:
-  {{sqlc}} generate
-  go test ./...
+  cargo fmt --all --check
+  cargo clippy --workspace --all-targets --all-features -- -D warnings
+  cargo test --workspace --all-features
+  cargo build --workspace
 
 test:
+  cargo test --workspace --all-features
+
+legacy-go-test:
   go test ./...
 
 db-create:
