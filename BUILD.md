@@ -334,15 +334,15 @@ state where documented verification passes on a clean checkout.
 - [x] Port signup, login, logout, and settings.
 - [x] Add secure, HttpOnly, same-site session cookies.
 - [x] Add CSRF protection for state-changing forms and Leptos actions.
-- [ ] Port playgroups, memberships, invites, roles, settings, and house
+- [x] Port playgroups, memberships, invites, roles, settings, and house
       rules.
-- [ ] Port owner/admin/member/host/guest/viewer role checks.
+- [x] Port owner/admin/member/host/guest/viewer role checks.
 - [x] Port authenticated dashboard.
-- [ ] Add tests for auth, sessions, CSRF, and playgroup access.
+- [x] Add tests for auth, sessions, CSRF, and playgroup access.
 
 ### Phase 4 - Events, Hosts, RSVPs, And Calendar Parity
 
-- [ ] Port event, host, location, RSVP, guest, and reminder tables.
+- [x] Port event, host, location, RSVP, guest, and reminder tables.
 - [ ] Port event creation and edit flow.
 - [ ] Port host address visibility rules.
 - [ ] Port RSVP states: yes, maybe, no, waitlist.
@@ -351,7 +351,7 @@ state where documented verification passes on a clean checkout.
 - [ ] Port public-safe event page and invite-token RSVP flow.
 - [ ] Port authenticated iCalendar feed.
 - [ ] Port reminder job skeleton and email delivery log.
-- [ ] Port readiness checks for DB, migrations, jobs, and email tables.
+- [x] Port readiness checks for DB, migrations, jobs, and email tables.
 - [ ] Add tests proving address visibility, guest scoping, and calendar
       feed authorization.
 
@@ -635,3 +635,8 @@ Trust current primary docs over this file.
   session token hashing, secure SameSite session cookies, CSRF-protected
   signup/login/logout forms, settings, authenticated dashboard access, and
   focused repository and route tests.
+- 2026-05-17 - Ported Rust playgroup repository and route surface:
+  playgroups, owner memberships, invites, settings, house rules, role
+  permission helpers, authenticated playgroup listing/detail pages, scoped
+  playgroup access tests, explicit event/reminder table migration checks,
+  and readiness checks for migrations, jobs, and email tables.

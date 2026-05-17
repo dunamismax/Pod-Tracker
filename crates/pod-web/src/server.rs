@@ -10,7 +10,8 @@ use pod_core::auth::{
 };
 use pod_core::config::AppConfig;
 use pod_core::health::{HealthResponse, ReadinessFailure};
-use pod_db::{DbError, IdentityRepository, UserRecord};
+use pod_core::playgroups::slugify;
+use pod_db::{DbError, IdentityRepository, PlaygroupRepository, UserRecord};
 use serde::Deserialize;
 use sqlx::PgPool;
 use time::{Duration, OffsetDateTime};
@@ -49,6 +50,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/logout", post(logout))
         .route("/settings", get(settings))
         .route("/home", get(dashboard))
+        .route("/playgroups", get(playgroups).post(create_playgroup))
+        .route("/playgroups/{slug}", get(playgroup_detail))
         .route("/events", get(events))
         .route("/observatory", get(observatory))
         .route("/healthz", get(healthz))
@@ -252,12 +255,178 @@ async fn dashboard(State(state): State<AppState>, headers: HeaderMap) -> Respons
         return Redirect::to("/login").into_response();
     };
 
+    let playgroups = match state.db.as_ref() {
+        Some(pool) => match PlaygroupRepository::new(pool).list_for_user(user.id).await {
+            Ok(playgroups) => playgroups,
+            Err(err) => {
+                tracing::error!(err = %err, "list dashboard playgroups");
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        },
+        None => Vec::new(),
+    };
     let csrf = ensure_csrf_cookie(&headers, &state.config);
     html_with_cookies(
         StatusCode::OK,
-        ui::render_dashboard(&user.display_name, &csrf.token),
+        ui::render_dashboard(&user.display_name, &csrf.token, &playgroups),
         csrf.set_cookie,
     )
+}
+
+async fn playgroups(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let playgroups = match PlaygroupRepository::new(pool).list_for_user(user.id).await {
+        Ok(playgroups) => playgroups,
+        Err(err) => {
+            tracing::error!(err = %err, "list playgroups");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_playgroups(&csrf.token, &playgroups, None, "", ""),
+        csrf.set_cookie,
+    )
+}
+
+async fn create_playgroup(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<PlaygroupForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let repo = PlaygroupRepository::new(pool);
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    let name = form.name.trim();
+    let description = form.description.trim();
+    let playgroups = match repo.list_for_user(user.id).await {
+        Ok(playgroups) => playgroups,
+        Err(err) => {
+            tracing::error!(err = %err, "list playgroups before create");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    if name.is_empty() {
+        return html_with_cookies(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ui::render_playgroups(
+                &csrf.token,
+                &playgroups,
+                Some("Playgroup name is required."),
+                name,
+                description,
+            ),
+            csrf.set_cookie,
+        );
+    }
+
+    let slug = slugify(name);
+    if slug.is_empty() {
+        return html_with_cookies(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ui::render_playgroups(
+                &csrf.token,
+                &playgroups,
+                Some("Playgroup name must include at least one letter or number."),
+                name,
+                description,
+            ),
+            csrf.set_cookie,
+        );
+    }
+
+    match repo
+        .create_playgroup(user.id, name, &slug, description)
+        .await
+    {
+        Ok(_) => Redirect::to("/playgroups").into_response(),
+        Err(err) if is_unique_violation(&err) => html_with_cookies(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ui::render_playgroups(
+                &csrf.token,
+                &playgroups,
+                Some("A playgroup already uses that slug. Adjust the name and try again."),
+                name,
+                description,
+            ),
+            csrf.set_cookie,
+        ),
+        Err(err) => {
+            tracing::error!(err = %err, "create playgroup");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+async fn playgroup_detail(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(slug): axum::extract::Path<String>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let repo = PlaygroupRepository::new(pool);
+    let playgroup = match repo.get_by_slug_for_user(&slug, user.id).await {
+        Ok(Some(playgroup)) => playgroup,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get playgroup");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = pod_core::playgroups::PlaygroupRole::try_from(playgroup.role.as_str()).ok();
+    let house_rules = match repo
+        .list_house_rules(
+            playgroup.id,
+            role.is_some_and(pod_core::playgroups::PlaygroupRole::can_view_member_content),
+        )
+        .await
+    {
+        Ok(house_rules) => house_rules,
+        Err(err) => {
+            tracing::error!(err = %err, "list house rules");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let settings = match repo.get_settings(playgroup.id).await {
+        Ok(settings) => settings,
+        Err(err) => {
+            tracing::error!(err = %err, "get playgroup settings");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Html(ui::render_playgroup_detail(
+        &playgroup,
+        settings.as_ref(),
+        &house_rules,
+    ))
+    .into_response()
 }
 
 async fn events() -> Html<String> {
@@ -285,6 +454,13 @@ struct LoginForm {
 
 #[derive(Debug, Deserialize)]
 struct CsrfForm {
+    csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PlaygroupForm {
+    name: String,
+    description: String,
     csrf_token: String,
 }
 
@@ -457,13 +633,32 @@ async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
             .into_response();
     };
 
-    if let Err(err) = pod_db::check_database(pool).await {
+    let health = pod_db::HealthRepository::new(pool);
+    if let Err(err) = health.ping().await {
         tracing::warn!(err = %err, "readiness check failed");
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(ReadinessFailure::not_ready("database")),
         )
             .into_response();
+    }
+    match health.first_missing_readiness_check().await {
+        Ok(Some(check)) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ReadinessFailure::not_ready(check)),
+            )
+                .into_response();
+        }
+        Ok(None) => {}
+        Err(err) => {
+            tracing::warn!(err = %err, "readiness dependency check failed");
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ReadinessFailure::not_ready("dependencies")),
+            )
+                .into_response();
+        }
     }
 
     (StatusCode::OK, Json(HealthResponse::ready())).into_response()
@@ -564,6 +759,23 @@ mod tests {
             .expect("response");
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn readyz_requires_migrations_jobs_and_email_tables(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/readyz")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]
@@ -740,5 +952,122 @@ mod tests {
                 .expect("location"),
             "/login"
         );
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn authenticated_users_create_and_view_only_their_playgroups(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool));
+
+        let owner_form = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/signup")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("owner signup form");
+        let owner_csrf_cookie = set_cookie_pair(owner_form.headers(), "pod_tracker_csrf=");
+        let owner_csrf_token = cookie_value(&owner_csrf_cookie).to_owned();
+
+        let owner_signup = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/signup")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner_csrf_cookie.clone())
+                    .body(Body::from(format!(
+                        "email=owner%40example.test&display_name=Owner&password=correct-horse-battery&csrf_token={owner_csrf_token}"
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("owner signup");
+        let owner_session_cookie = set_cookie_pair(owner_signup.headers(), "pod_tracker_session=");
+        let owner_cookie_header = format!("{owner_csrf_cookie}; {owner_session_cookie}");
+
+        let create = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner_cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Friday+Night+Commander&description=Weekly+pods&csrf_token={owner_csrf_token}"
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create playgroup");
+        assert_eq!(create.status(), StatusCode::SEE_OTHER);
+        assert_eq!(
+            create.headers().get(LOCATION).expect("location"),
+            "/playgroups"
+        );
+
+        let owner_view = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/playgroups/friday-night-commander")
+                    .header("cookie", owner_cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("owner view");
+        assert_eq!(owner_view.status(), StatusCode::OK);
+        let owner_body = body_string(owner_view).await;
+        assert!(owner_body.contains("Friday Night Commander"));
+        assert!(owner_body.contains("owner"));
+
+        let outsider_form = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/signup")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider signup form");
+        let outsider_csrf_cookie = set_cookie_pair(outsider_form.headers(), "pod_tracker_csrf=");
+        let outsider_csrf_token = cookie_value(&outsider_csrf_cookie).to_owned();
+
+        let outsider_signup = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/signup")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", outsider_csrf_cookie.clone())
+                    .body(Body::from(format!(
+                        "email=outsider%40example.test&display_name=Outsider&password=correct-horse-battery&csrf_token={outsider_csrf_token}"
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider signup");
+        let outsider_session_cookie =
+            set_cookie_pair(outsider_signup.headers(), "pod_tracker_session=");
+        let outsider_cookie_header = format!("{outsider_csrf_cookie}; {outsider_session_cookie}");
+
+        let outsider_view = app
+            .oneshot(
+                Request::builder()
+                    .uri("/playgroups/friday-night-commander")
+                    .header("cookie", outsider_cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider view");
+        assert_eq!(outsider_view.status(), StatusCode::NOT_FOUND);
     }
 }

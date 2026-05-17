@@ -86,6 +86,24 @@ impl<'a> HealthRepository<'a> {
 
         Ok(row.exists)
     }
+
+    pub async fn first_missing_readiness_check(&self) -> Result<Option<&'static str>, DbError> {
+        if !self.migrations_table_exists().await? {
+            return Ok(Some("migrations"));
+        }
+
+        for (check, schema, table) in [
+            ("identity_tables", "core", "users"),
+            ("job_tables", "ops", "background_jobs"),
+            ("email_tables", "ops", "email_deliveries"),
+        ] {
+            if !self.schema_table_exists(schema, table).await? {
+                return Ok(Some(check));
+            }
+        }
+
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
@@ -106,6 +124,37 @@ mod tests {
             repo.schema_table_exists("core", "users")
                 .await
                 .expect("core.users check")
+        );
+        for table in [
+            "event_locations",
+            "events",
+            "event_hosts",
+            "event_rsvps",
+            "event_guests",
+            "event_reminders",
+        ] {
+            assert!(
+                repo.schema_table_exists("core", table)
+                    .await
+                    .expect("event table check"),
+                "core.{table} should exist"
+            );
+        }
+        assert!(
+            repo.schema_table_exists("ops", "background_jobs")
+                .await
+                .expect("ops.background_jobs check")
+        );
+        assert!(
+            repo.schema_table_exists("ops", "email_deliveries")
+                .await
+                .expect("ops.email_deliveries check")
+        );
+        assert_eq!(
+            repo.first_missing_readiness_check()
+                .await
+                .expect("readiness checks"),
+            None
         );
     }
 }

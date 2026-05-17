@@ -1752,6 +1752,7 @@ dependencies = [
 name = "pod-db"
 version = "0.1.0"
 dependencies = [
+ "pod-core",
  "sqlx",
  "thiserror 2.0.18",
  "time",

@@ -7,10 +7,15 @@ use thiserror::Error;
 pub mod health;
 pub mod identity;
 pub mod migrations;
+pub mod playgroups;
 
 pub use health::HealthRepository;
 pub use identity::{
     AccountRecord, AuthIdentityRecord, IdentityRepository, SessionRecord, UserRecord,
+};
+pub use playgroups::{
+    CreateInvite, HouseRuleRecord, MembershipRecord, PlaygroupInviteRecord, PlaygroupRecord,
+    PlaygroupRepository, PlaygroupSettingsRecord, PlaygroupWithRole,
 };
 
 #[derive(Debug, Error)]

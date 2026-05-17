@@ -122,6 +122,101 @@ h1 {
   line-height: 1.1;
 }
 
+.section-gap {
+  margin-top: 40px;
+}
+
+.lede {
+  max-width: 680px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.split-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 32px;
+  margin-top: 32px;
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.list-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid var(--line);
+  padding: 16px;
+  background: #ffffff;
+}
+
+.list-item h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.list-item p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.badge {
+  flex: none;
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.empty-state {
+  color: var(--muted);
+}
+
+.form-panel {
+  display: grid;
+  align-self: start;
+  gap: 16px;
+  border: 1px solid var(--line);
+  padding: 20px;
+  background: #ffffff;
+}
+
+.form-panel h2 {
+  margin: 0;
+}
+
+.form-panel label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.form-panel input,
+.form-panel textarea {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  font-weight: 500;
+}
+
+.form-panel textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
 .status-list {
   display: grid;
   gap: 1px;
@@ -210,5 +305,18 @@ button {
 
   .hero p:not(.eyebrow) {
     font-size: 1.05rem;
+  }
+
+  .split-layout,
+  .list-item {
+    grid-template-columns: 1fr;
+  }
+
+  .split-layout {
+    display: grid;
+  }
+
+  .list-item {
+    display: grid;
   }
 }

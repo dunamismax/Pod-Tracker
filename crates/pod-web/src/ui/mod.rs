@@ -1,4 +1,5 @@
 use leptos::prelude::*;
+use pod_db::{HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole};
 
 pub fn render_home() -> String {
     view! {
@@ -126,9 +127,14 @@ pub fn render_login(csrf_token: &str, error: Option<&str>, email: &str) -> Strin
     .to_html()
 }
 
-pub fn render_dashboard(display_name: &str, csrf_token: &str) -> String {
+pub fn render_dashboard(
+    display_name: &str,
+    csrf_token: &str,
+    playgroups: &[PlaygroupWithRole],
+) -> String {
     let display_name = display_name.to_owned();
     let csrf_token = csrf_token.to_owned();
+    let playgroups = playgroups.to_vec();
 
     view! {
         <AppShell title="Dashboard">
@@ -137,13 +143,123 @@ pub fn render_dashboard(display_name: &str, csrf_token: &str) -> String {
                     <p class="eyebrow">"Dashboard"</p>
                     <h1>{display_name}</h1>
                     <nav class="actions" aria-label="Dashboard">
+                        <a href="/playgroups">"Playgroups"</a>
                         <a href="/events">"Events"</a>
                         <a href="/settings">"Settings"</a>
                     </nav>
+                    <PlaygroupList playgroups=playgroups/>
                     <form method="post" action="/logout" class="inline-form">
                         <input type="hidden" name="csrf_token" value=csrf_token/>
                         <button type="submit">"Log out"</button>
                     </form>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_playgroups(
+    csrf_token: &str,
+    playgroups: &[PlaygroupWithRole],
+    error: Option<&str>,
+    name: &str,
+    description: &str,
+) -> String {
+    let csrf_token = csrf_token.to_owned();
+    let playgroups = playgroups.to_vec();
+    let error = error.map(str::to_owned);
+    let name = name.to_owned();
+    let description = description.to_owned();
+
+    view! {
+        <AppShell title="Playgroups">
+            <main class="shell">
+                <section class="panel">
+                    <p class="eyebrow">"Commander groups"</p>
+                    <h1>"Playgroups"</h1>
+                </section>
+                <section class="split-layout">
+                    <div>
+                        <h2>"Your playgroups"</h2>
+                        <PlaygroupList playgroups=playgroups/>
+                    </div>
+                    <form method="post" action="/playgroups" class="form-panel">
+                        <h2>"New playgroup"</h2>
+                        {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                        <input type="hidden" name="csrf_token" value=csrf_token/>
+                        <label>
+                            "Name"
+                            <input name="name" required value=name/>
+                        </label>
+                        <label>
+                            "Description"
+                            <textarea name="description" rows="4">{description}</textarea>
+                        </label>
+                        <button type="submit">"Create playgroup"</button>
+                    </form>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_playgroup_detail(
+    playgroup: &PlaygroupWithRole,
+    settings: Option<&PlaygroupSettingsRecord>,
+    house_rules: &[HouseRuleRecord],
+) -> String {
+    let playgroup = playgroup.clone();
+    let settings = settings.cloned();
+    let house_rules = house_rules.to_vec();
+    let has_house_rules = !house_rules.is_empty();
+
+    view! {
+        <AppShell title="Playgroup">
+            <main class="shell">
+                <section class="panel">
+                    <p class="eyebrow">"Playgroup"</p>
+                    <h1>{playgroup.name.clone()}</h1>
+                    <p class="lede">{playgroup.description.clone()}</p>
+                    <dl class="status-list">
+                        <div>
+                            <dt>"Role"</dt>
+                            <dd>{playgroup.role.clone()}</dd>
+                        </div>
+                        {settings.map(|settings| view! {
+                            <div>
+                                <dt>"Event visibility"</dt>
+                                <dd>{settings.default_event_visibility}</dd>
+                            </div>
+                        })}
+                    </dl>
+                </section>
+                <section class="panel section-gap">
+                    <h2>"House rules"</h2>
+                    {if has_house_rules {
+                        view! {
+                            <div class="list">
+                                {house_rules
+                                    .into_iter()
+                                    .map(|rule| view! {
+                                        <article class="list-item">
+                                            <div>
+                                                <h3>{rule.title}</h3>
+                                                <p>{rule.body}</p>
+                                            </div>
+                                            <span class="badge">
+                                                {if rule.visible_to_guests { "guest visible" } else { "members" }}
+                                            </span>
+                                        </article>
+                                    })
+                                    .collect_view()}
+                            </div>
+                        }
+                            .into_any()
+                    } else {
+                        view! { <p class="empty-state">"No house rules yet."</p> }.into_any()
+                    }}
                 </section>
             </main>
         </AppShell>
@@ -193,6 +309,37 @@ pub fn render_placeholder(title: &'static str) -> String {
 }
 
 #[component]
+fn PlaygroupList(playgroups: Vec<PlaygroupWithRole>) -> impl IntoView {
+    let has_playgroups = !playgroups.is_empty();
+
+    view! {
+        {if has_playgroups {
+            view! {
+                <div class="list">
+                    {playgroups
+                        .into_iter()
+                        .map(|playgroup| view! {
+                            <article class="list-item">
+                                <div>
+                                    <h3>
+                                        <a href=format!("/playgroups/{}", playgroup.slug)>{playgroup.name}</a>
+                                    </h3>
+                                    <p>{playgroup.description}</p>
+                                </div>
+                                <span class="badge">{playgroup.role}</span>
+                            </article>
+                        })
+                        .collect_view()}
+                </div>
+            }
+                .into_any()
+        } else {
+            view! { <p class="empty-state">"No playgroups yet."</p> }.into_any()
+        }}
+    }
+}
+
+#[component]
 fn AppShell(title: &'static str, children: Children) -> impl IntoView {
     view! {
         <!DOCTYPE html>
@@ -208,6 +355,7 @@ fn AppShell(title: &'static str, children: Children) -> impl IntoView {
                     <a class="brand" href="/">"Pod Tracker"</a>
                     <nav aria-label="Main">
                         <a href="/home">"Home"</a>
+                        <a href="/playgroups">"Playgroups"</a>
                         <a href="/events">"Events"</a>
                         <a href="/login">"Login"</a>
                         <a href="/observatory">"Observatory"</a>
