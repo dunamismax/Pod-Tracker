@@ -359,9 +359,9 @@ state where documented verification passes on a clean checkout.
 
 - [x] Add Rust release build path for `pod-tracker-web` and
       `pod-tracker-worker`.
-- [ ] Update Caddy config for the Rust web service port while preserving
+- [x] Update Caddy config for the Rust web service port while preserving
       a rollback path.
-- [ ] Update systemd units for Rust binaries.
+- [x] Update systemd units for Rust binaries.
 - [x] Update deployment script for Cargo release builds, migrations, and
       service restart order.
 - [x] Update production environment template without secrets.
@@ -467,15 +467,15 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 14 - Operations And Deployment
 
-- [ ] Keep Caddy config current for `pod-tracker.app`.
-- [ ] Keep systemd units current for Rust web and worker binaries.
+- [x] Keep Caddy config current for `pod-tracker.app`.
+- [x] Keep systemd units current for Rust web and worker binaries.
 - [x] Keep deployment script current for the Ubuntu VM.
 - [x] Keep production environment template current without secrets.
 - [x] Keep database migration step in deploy.
 - [x] Keep `pg_dump` backup script current.
 - [x] Keep restore script and restore drill documentation current.
 - [x] Keep operations runbook in `docs/operations.md`.
-- [ ] Add Caddy config validation.
+- [x] Add Caddy config validation.
 - [ ] Add backup and restore drill from a real snapshot before public
       claims.
 
@@ -488,8 +488,8 @@ state where documented verification passes on a clean checkout.
 - [ ] Add structured error pages.
 - [ ] Add log redaction checks.
 - [ ] Add CSRF tests.
-- [ ] Add security header checks.
-- [ ] Add privacy model in `docs/privacy.md`.
+- [x] Add security header checks.
+- [x] Add privacy model in `docs/privacy.md`.
 - [ ] Add RLS or equivalent scoped-query tests for tenant, guest, public
       token, and host-address boundaries.
 
@@ -657,3 +657,12 @@ Trust current primary docs over this file.
   migrations, updated the production environment template and operations
   runbook, verified release binaries, smoked `/healthz` and `/readyz`
   locally, and completed a local backup/restore drill.
+- 2026-05-17 - Completed local Rust deployment config checks: documented
+  the stable Caddy proxy port and rollback path, verified Rust web and
+  worker systemd unit paths, added `just caddy-validate` and
+  `just systemd-verify`, and added Rust-side security headers with route
+  tests.
+- 2026-05-17 - Added `docs/privacy.md` covering sensitive fields,
+  membership and guest scopes, address visibility, calendar privacy,
+  logging boundaries, database authorization expectations, and
+  backup/restore handling without overstating unimplemented guarantees.

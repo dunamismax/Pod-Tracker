@@ -29,6 +29,27 @@ check:
 test:
   cargo test --workspace --all-features
 
+caddy-validate:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if command -v caddy >/dev/null 2>&1; then
+    caddy validate --adapter caddyfile --config deploy/caddy/Caddyfile
+  else
+    go run github.com/caddyserver/caddy/v2/cmd/caddy@v2.10.2 validate --adapter caddyfile --config deploy/caddy/Caddyfile
+  fi
+
+systemd-verify:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    systemd-analyze verify deploy/systemd/pod-tracker-web.service deploy/systemd/pod-tracker-worker.service deploy/systemd/pod-tracker-backup.service
+  else
+    grep -q '^ExecStart=/opt/pod-tracker/current/bin/pod-tracker-web$' deploy/systemd/pod-tracker-web.service
+    grep -q '^ExecStart=/opt/pod-tracker/current/bin/pod-tracker-worker$' deploy/systemd/pod-tracker-worker.service
+    grep -q '^EnvironmentFile=/etc/pod-tracker/env$' deploy/systemd/pod-tracker-web.service
+    grep -q '^EnvironmentFile=/etc/pod-tracker/env$' deploy/systemd/pod-tracker-worker.service
+  fi
+
 legacy-go-test:
   go test ./...
 

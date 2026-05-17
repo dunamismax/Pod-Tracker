@@ -64,6 +64,19 @@ The checked-in site config proxies `pod-tracker.app` to
 production environment template. Rollback keeps the same proxy port and
 points `/opt/pod-tracker/current` back to the previous verified release.
 
+Before installing updated service files or reloading Caddy, validate the
+checked-in config:
+
+```sh
+just caddy-validate
+just systemd-verify
+```
+
+`just caddy-validate` uses a local `caddy` binary when present and falls
+back to a pinned `go run` invocation for the Caddy CLI. `just
+systemd-verify` uses `systemd-analyze verify` on Linux hosts and performs
+a minimal Rust binary path check on non-systemd development machines.
+
 Install a Rust toolchain compatible with `rust-toolchain.toml` on the VM
 before the first Rust deploy. The deploy script uses Cargo directly and
 builds with `--locked`.

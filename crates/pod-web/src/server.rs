@@ -1,6 +1,8 @@
+use axum::body::Body;
 use axum::extract::State;
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE, USER_AGENT};
-use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, Request, StatusCode};
+use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Form, Json, Router};
@@ -76,6 +78,35 @@ pub fn build_router(state: AppState) -> Router {
         .layer(PropagateRequestIdLayer::new(request_id_header.clone()))
         .layer(SetRequestIdLayer::new(request_id_header, MakeRequestUuid))
         .layer(TraceLayer::new_for_http())
+        .layer(middleware::from_fn(add_security_headers))
+}
+
+async fn add_security_headers(request: Request<Body>, next: Next) -> Response {
+    let mut response = next.run(request).await;
+    let headers = response.headers_mut();
+    headers.insert(
+        HeaderName::from_static("x-content-type-options"),
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        HeaderName::from_static("referrer-policy"),
+        HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    headers.insert(
+        HeaderName::from_static("x-frame-options"),
+        HeaderValue::from_static("DENY"),
+    );
+    headers.insert(
+        HeaderName::from_static("content-security-policy"),
+        HeaderValue::from_static(
+            "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        ),
+    );
+    headers.insert(
+        HeaderName::from_static("permissions-policy"),
+        HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+    );
+    response
 }
 
 async fn home() -> Html<String> {
@@ -1627,6 +1658,40 @@ mod tests {
             .expect("response");
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn responses_include_security_headers() {
+        let app = build_router(test_state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+        let headers = response.headers();
+
+        assert_eq!(
+            headers.get("x-content-type-options").expect("header"),
+            "nosniff"
+        );
+        assert_eq!(
+            headers.get("referrer-policy").expect("header"),
+            "strict-origin-when-cross-origin"
+        );
+        assert_eq!(headers.get("x-frame-options").expect("header"), "DENY");
+        assert_eq!(
+            headers.get("content-security-policy").expect("header"),
+            "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+        );
+        assert_eq!(
+            headers.get("permissions-policy").expect("header"),
+            "camera=(), microphone=(), geolocation=()"
+        );
     }
 
     #[tokio::test]

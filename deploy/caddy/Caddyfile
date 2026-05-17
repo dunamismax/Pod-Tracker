@@ -7,6 +7,9 @@ pod-tracker.app {
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
 
+	# Rust web service, matching POD_TRACKER_ADDR in production.env.example.
+	# Rollback keeps this port stable and moves /opt/pod-tracker/current to
+	# the previous verified release before restarting pod-tracker-web.service.
 	reverse_proxy 127.0.0.1:8083
 }
 
