@@ -357,16 +357,16 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 5 - Rust Deployment Cutover
 
-- [ ] Add Rust release build path for `pod-tracker-web` and
+- [x] Add Rust release build path for `pod-tracker-web` and
       `pod-tracker-worker`.
 - [ ] Update Caddy config for the Rust web service port while preserving
       a rollback path.
 - [ ] Update systemd units for Rust binaries.
-- [ ] Update deployment script for Cargo release builds, migrations, and
+- [x] Update deployment script for Cargo release builds, migrations, and
       service restart order.
-- [ ] Update production environment template without secrets.
-- [ ] Re-run backup and restore docs against the Rust deployment path.
-- [ ] Smoke the Rust service locally.
+- [x] Update production environment template without secrets.
+- [x] Re-run backup and restore docs against the Rust deployment path.
+- [x] Smoke the Rust service locally.
 - [ ] With explicit approval, run production cutover from Go to Rust.
 - [ ] After verified cutover, remove Go code, `go.mod`, `go.sum`,
       `sqlc.yaml`, generated sqlc files, old Go templates, and Go-specific
@@ -469,12 +469,12 @@ state where documented verification passes on a clean checkout.
 
 - [ ] Keep Caddy config current for `pod-tracker.app`.
 - [ ] Keep systemd units current for Rust web and worker binaries.
-- [ ] Keep deployment script current for the Ubuntu VM.
-- [ ] Keep production environment template current without secrets.
-- [ ] Keep database migration step in deploy.
-- [ ] Keep `pg_dump` backup script current.
-- [ ] Keep restore script and restore drill documentation current.
-- [ ] Keep operations runbook in `docs/operations.md`.
+- [x] Keep deployment script current for the Ubuntu VM.
+- [x] Keep production environment template current without secrets.
+- [x] Keep database migration step in deploy.
+- [x] Keep `pg_dump` backup script current.
+- [x] Keep restore script and restore drill documentation current.
+- [x] Keep operations runbook in `docs/operations.md`.
 - [ ] Add Caddy config validation.
 - [ ] Add backup and restore drill from a real snapshot before public
       claims.
@@ -651,3 +651,9 @@ Trust current primary docs over this file.
   `ops.background_jobs` repository coverage, `send_email` worker job
   claiming with `FOR UPDATE SKIP LOCKED`, SMTP2GO delivery status updates,
   retry handling, and focused PostgreSQL tests.
+- 2026-05-17 - Added the Rust deployment release path: introduced the
+  `pod-tracker-migrate` SQLx migration binary, wired `just release`,
+  converted the deploy script to Cargo release builds and SQLx
+  migrations, updated the production environment template and operations
+  runbook, verified release binaries, smoked `/healthz` and `/readyz`
+  locally, and completed a local backup/restore drill.

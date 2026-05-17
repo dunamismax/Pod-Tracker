@@ -1799,11 +1799,14 @@ dependencies = [
 name = "pod-db"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "dotenvy",
  "pod-core",
  "serde_json",
  "sqlx",
  "thiserror 2.0.18",
  "time",
+ "tokio",
  "tracing",
  "uuid",
 ]

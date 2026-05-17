@@ -11,7 +11,7 @@ Cloudflare DNS
   -> PostgreSQL service
 ```
 
-This runbook documents the Go/PostgreSQL deployment shape. It does not
+This runbook documents the Rust/PostgreSQL deployment shape. It does not
 claim the current public site has been migrated until these steps have
 been run and verified on the VM.
 
@@ -39,7 +39,8 @@ sudo install -d -m 0750 /var/backups/pod-tracker
 
 Create `/etc/pod-tracker/env` from
 `deploy/env/production.env.example`, replacing placeholders with real
-local PostgreSQL credentials. Do not commit that file.
+local PostgreSQL credentials and SMTP2GO settings. Do not commit that
+file.
 
 ```sh
 sudo install -m 0640 -o root -g pod-tracker deploy/env/production.env.example /etc/pod-tracker/env
@@ -58,6 +59,14 @@ sudo systemctl enable pod-tracker-web.service pod-tracker-worker.service
 The exact Caddy include path depends on the VM's Caddy packaging. If the
 main `/etc/caddy/Caddyfile` does not import `sites-enabled`, add an
 import line or place the `pod-tracker.app` site block in the main file.
+The checked-in site config proxies `pod-tracker.app` to
+`127.0.0.1:8083`, which is the Rust web service address in the
+production environment template. Rollback keeps the same proxy port and
+points `/opt/pod-tracker/current` back to the previous verified release.
+
+Install a Rust toolchain compatible with `rust-toolchain.toml` on the VM
+before the first Rust deploy. The deploy script uses Cargo directly and
+builds with `--locked`.
 
 ## Deploy
 
@@ -67,10 +76,14 @@ Run from a clean checkout on the VM:
 sudo deploy/scripts/deploy.sh
 ```
 
-The deploy script builds both Go binaries, applies database migrations
-with `POD_TRACKER_MIGRATION_DATABASE_URL`, advances
+The deploy script creates an immutable release directory, copies the Rust
+workspace and deploy assets, builds `pod-tracker-web`,
+`pod-tracker-worker`, and `pod-tracker-migrate` with Cargo, applies SQLx
+migrations with `POD_TRACKER_MIGRATION_DATABASE_URL`, advances
 `/opt/pod-tracker/current`, restarts the web and worker services, and
-reloads Caddy.
+reloads Caddy. Keep `POD_TRACKER_DATABASE_URL` on the runtime role and
+`POD_TRACKER_MIGRATION_DATABASE_URL` on the more privileged migration
+role.
 
 Check health:
 
@@ -79,6 +92,17 @@ systemctl status pod-tracker-web.service
 systemctl status pod-tracker-worker.service
 curl -fsS https://pod-tracker.app/healthz
 curl -fsS https://pod-tracker.app/readyz
+```
+
+For local release smoke before touching production:
+
+```sh
+just release
+POD_TRACKER_ADDR=127.0.0.1:18083 \
+  POD_TRACKER_DATABASE_URL=postgres://pod_tracker:pod_tracker@localhost:5432/pod_tracker?sslmode=disable \
+  target/release/pod-tracker-web
+curl -fsS http://127.0.0.1:18083/healthz
+curl -fsS http://127.0.0.1:18083/readyz
 ```
 
 ## Backup
@@ -108,6 +132,17 @@ database. A production restore requires an explicit maintenance window,
 a fresh backup, stopped services, and confirmation that the target URL is
 the intended database.
 
+Rust migration and readiness commands for the restored database:
+
+```sh
+POD_TRACKER_MIGRATION_DATABASE_URL="$POD_TRACKER_RESTORE_DATABASE_URL" \
+  /opt/pod-tracker/current/bin/pod-tracker-migrate up
+POD_TRACKER_DATABASE_URL="$POD_TRACKER_RESTORE_DATABASE_URL" \
+  POD_TRACKER_ADDR=127.0.0.1:18084 \
+  /opt/pod-tracker/current/bin/pod-tracker-web
+curl -fsS http://127.0.0.1:18084/readyz
+```
+
 ## Rollback
 
 List releases:
@@ -129,6 +164,6 @@ deploying it.
 
 ## Current Readiness
 
-`/readyz` checks the database when `POD_TRACKER_DATABASE_URL` is set.
-Job and email readiness checks are still pending because those
-subsystems do not exist yet.
+`/readyz` checks the database when `POD_TRACKER_DATABASE_URL` is set and
+requires the SQLx migration table plus `core.users`,
+`ops.background_jobs`, and `ops.email_deliveries`.

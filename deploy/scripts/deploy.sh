@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export PATH=$PATH:/usr/local/go/bin
-
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 release_root="${POD_TRACKER_RELEASE_ROOT:-/opt/pod-tracker/releases}"
 current_link="${POD_TRACKER_CURRENT_LINK:-/opt/pod-tracker/current}"
@@ -16,22 +14,28 @@ if [[ ! -f "$env_file" ]]; then
 fi
 
 install -d "$release_dir/bin"
-cp -a "$repo_root"/cmd "$release_dir"/
+cp -a "$repo_root"/Cargo.lock "$repo_root"/Cargo.toml "$repo_root"/rust-toolchain.toml "$release_dir"/
+cp -a "$repo_root"/AGENTS.md "$repo_root"/BUILD.md "$repo_root"/README.md "$repo_root"/LICENSE "$release_dir"/
+cp -a "$repo_root"/crates "$release_dir"/
 cp -a "$repo_root"/deploy "$release_dir"/
-cp -a "$repo_root"/internal "$release_dir"/
-cp -a "$repo_root"/migrations "$release_dir"/
-cp -a "$repo_root"/web "$release_dir"/
-cp -a "$repo_root"/go.mod "$repo_root"/go.sum "$repo_root"/sqlc.yaml "$repo_root"/justfile "$release_dir"/
+cp -a "$repo_root"/docs "$release_dir"/
+cp -a "$repo_root"/justfile "$release_dir"/
 
 (
   cd "$release_dir"
-  go build -o bin/pod-tracker-web ./cmd/pod-tracker-web
-  go build -o bin/pod-tracker-worker ./cmd/pod-tracker-worker
   set -a
   # shellcheck disable=SC1090
   . "$env_file"
   set +a
-  go run github.com/pressly/goose/v3/cmd/goose@v3.27.1 -dir migrations postgres "$POD_TRACKER_MIGRATION_DATABASE_URL" up
+  export DATABASE_URL="${DATABASE_URL:-$POD_TRACKER_DATABASE_URL}"
+  cargo build --locked --release \
+    -p pod-web --bin pod-tracker-web \
+    -p pod-worker --bin pod-tracker-worker \
+    -p pod-db --bin pod-tracker-migrate
+  cp target/release/pod-tracker-web bin/
+  cp target/release/pod-tracker-worker bin/
+  cp target/release/pod-tracker-migrate bin/
+  bin/pod-tracker-migrate up
 )
 
 ln -sfn "$release_dir" "$current_link"

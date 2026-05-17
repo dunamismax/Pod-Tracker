@@ -14,6 +14,9 @@ run:
 worker:
   cargo run -p pod-worker --bin pod-tracker-worker
 
+release:
+  cargo build --locked --release -p pod-web --bin pod-tracker-web -p pod-worker --bin pod-tracker-worker -p pod-db --bin pod-tracker-migrate
+
 fmt:
   cargo fmt --all
 
@@ -38,13 +41,14 @@ db-drop:
 db-reset: db-drop db-create migrate-up
 
 migrate-up:
-  {{goose}} -dir migrations postgres "{{migration_database_url}}" up
+  POD_TRACKER_MIGRATION_DATABASE_URL="{{migration_database_url}}" cargo run -p pod-db --bin pod-tracker-migrate -- up
 
 migrate-status:
-  {{goose}} -dir migrations postgres "{{migration_database_url}}" status
+  POD_TRACKER_MIGRATION_DATABASE_URL="{{migration_database_url}}" cargo run -p pod-db --bin pod-tracker-migrate -- status
 
 migrate-down:
-  {{goose}} -dir migrations postgres "{{migration_database_url}}" down
+  @echo "SQLx migrations are forward-only; write a new migration instead." >&2
+  @exit 1
 
 migrate-smoke:
   #!/usr/bin/env bash
