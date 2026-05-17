@@ -148,6 +148,54 @@ h1 {
   margin: 0;
 }
 
+.auth-panel {
+  max-width: 520px;
+}
+
+.stack {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.stack label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.stack input {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  padding: 0 12px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  font-weight: 500;
+}
+
+button {
+  min-height: 44px;
+  border: 1px solid var(--accent);
+  padding: 0 16px;
+  background: var(--accent);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.inline-form {
+  margin-top: 24px;
+}
+
+.form-error {
+  margin: 18px 0 0;
+  color: #9f1d20;
+  font-weight: 700;
+}
+
 @media (max-width: 680px) {
   .topbar {
     align-items: flex-start;

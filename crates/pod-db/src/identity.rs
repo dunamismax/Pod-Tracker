@@ -27,6 +27,28 @@ pub struct SessionRecord {
     pub revoked_at: Option<OffsetDateTime>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccountRecord {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub account_type: String,
+    pub label: Option<String>,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthIdentityRecord {
+    pub id: Uuid,
+    pub account_id: Uuid,
+    pub provider: String,
+    pub provider_subject: String,
+    pub email: Option<String>,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+    pub last_used_at: Option<OffsetDateTime>,
+}
+
 pub struct IdentityRepository<'a> {
     pool: &'a PgPool,
 }
@@ -42,6 +64,7 @@ impl<'a> IdentityRepository<'a> {
         display_name: &str,
         password_hash: &str,
     ) -> Result<UserRecord, DbError> {
+        let mut tx = self.pool.begin().await?;
         let user = sqlx::query_as!(
             UserRecord,
             r#"
@@ -53,9 +76,35 @@ impl<'a> IdentityRepository<'a> {
             display_name,
             password_hash
         )
-        .fetch_one(self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
+        let account = sqlx::query_as!(
+            AccountRecord,
+            r#"
+            insert into core.accounts (user_id, account_type, label)
+            values ($1, 'password', 'Email password')
+            returning id, user_id, account_type, label, created_at, updated_at
+            "#,
+            user.id
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query_as!(
+            AuthIdentityRecord,
+            r#"
+            insert into core.auth_identities (account_id, provider, provider_subject, email)
+            values ($1, 'email', lower($2), lower($2))
+            returning id, account_id, provider, provider_subject, email, created_at, updated_at, last_used_at
+            "#,
+            account.id,
+            email
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
         Ok(user)
     }
 
@@ -73,6 +122,65 @@ impl<'a> IdentityRepository<'a> {
         .await?;
 
         Ok(user)
+    }
+
+    pub async fn find_user_by_id(&self, user_id: Uuid) -> Result<Option<UserRecord>, DbError> {
+        let user = sqlx::query_as!(
+            UserRecord,
+            r#"
+            select id, email, display_name, password_hash, created_at, updated_at
+            from core.users
+            where id = $1
+            "#,
+            user_id
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(user)
+    }
+
+    pub async fn find_account_for_user(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Option<AccountRecord>, DbError> {
+        let account = sqlx::query_as!(
+            AccountRecord,
+            r#"
+            select id, user_id, account_type, label, created_at, updated_at
+            from core.accounts
+            where user_id = $1
+            order by created_at asc
+            limit 1
+            "#,
+            user_id
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(account)
+    }
+
+    pub async fn find_auth_identity(
+        &self,
+        provider: &str,
+        provider_subject: &str,
+    ) -> Result<Option<AuthIdentityRecord>, DbError> {
+        let identity = sqlx::query_as!(
+            AuthIdentityRecord,
+            r#"
+            select id, account_id, provider, provider_subject, email, created_at, updated_at, last_used_at
+            from core.auth_identities
+            where provider = $1
+              and provider_subject = lower($2)
+            "#,
+            provider,
+            provider_subject
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(identity)
     }
 
     pub async fn create_session(
@@ -156,6 +264,23 @@ impl<'a> IdentityRepository<'a> {
 
         Ok(row.is_some())
     }
+
+    pub async fn revoke_session_by_token_hash(&self, token_hash: &[u8]) -> Result<bool, DbError> {
+        let row = sqlx::query!(
+            r#"
+            update core.sessions
+            set revoked_at = now()
+            where token_hash = $1
+              and revoked_at is null
+            returning id
+            "#,
+            token_hash
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(row.is_some())
+    }
 }
 
 #[cfg(test)]
@@ -177,6 +302,20 @@ mod tests {
             .expect("create user");
 
         assert_eq!(user.email, "player@example.test");
+        let account = repo
+            .find_account_for_user(user.id)
+            .await
+            .expect("find account")
+            .expect("account exists");
+        assert_eq!(account.account_type, "password");
+        assert_eq!(
+            repo.find_auth_identity("email", "PLAYER@example.test")
+                .await
+                .expect("find auth identity")
+                .expect("auth identity exists")
+                .account_id,
+            account.id
+        );
         assert_eq!(
             repo.find_user_by_email("player@example.test")
                 .await
@@ -219,6 +358,18 @@ mod tests {
                 .await
                 .expect("find revoked session")
                 .is_none()
+        );
+
+        let second_token_hash = [8_u8; 32];
+        let session = repo
+            .create_session(user.id, &second_token_hash, Some("pod-db-test"), expires_at)
+            .await
+            .expect("create second session");
+        assert_eq!(session.user_id, user.id);
+        assert!(
+            repo.revoke_session_by_token_hash(&second_token_hash)
+                .await
+                .expect("revoke second session")
         );
     }
 }

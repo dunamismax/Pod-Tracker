@@ -9,7 +9,9 @@ pub mod identity;
 pub mod migrations;
 
 pub use health::HealthRepository;
-pub use identity::{IdentityRepository, SessionRecord, UserRecord};
+pub use identity::{
+    AccountRecord, AuthIdentityRecord, IdentityRepository, SessionRecord, UserRecord,
+};
 
 #[derive(Debug, Error)]
 pub enum DbError {

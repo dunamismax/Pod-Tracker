@@ -328,16 +328,16 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 3 - Identity, Sessions, And Playgroups Parity
 
-- [ ] Port users, sessions, accounts, and auth identity schema.
-- [ ] Add Argon2id password hashing or document a better Rust password
+- [x] Port users, sessions, accounts, and auth identity schema.
+- [x] Add Argon2id password hashing or document a better Rust password
       hashing choice.
-- [ ] Port signup, login, logout, and settings.
-- [ ] Add secure, HttpOnly, same-site session cookies.
-- [ ] Add CSRF protection for state-changing forms and Leptos actions.
+- [x] Port signup, login, logout, and settings.
+- [x] Add secure, HttpOnly, same-site session cookies.
+- [x] Add CSRF protection for state-changing forms and Leptos actions.
 - [ ] Port playgroups, memberships, invites, roles, settings, and house
       rules.
 - [ ] Port owner/admin/member/host/guest/viewer role checks.
-- [ ] Port authenticated dashboard.
+- [x] Port authenticated dashboard.
 - [ ] Add tests for auth, sessions, CSRF, and playgroup access.
 
 ### Phase 4 - Events, Hosts, RSVPs, And Calendar Parity
@@ -630,3 +630,8 @@ Trust current primary docs over this file.
   PostgreSQL-backed CI query checks, typed `pod-db` health and
   identity/session repositories, configurable pool setup, and a SQLx
   migration smoke recipe.
+- 2026-05-17 - Ported Rust identity and session auth surface: completed
+  account and auth identity schema, added Argon2id password hashing,
+  session token hashing, secure SameSite session cookies, CSRF-protected
+  signup/login/logout forms, settings, authenticated dashboard access, and
+  focused repository and route tests.
