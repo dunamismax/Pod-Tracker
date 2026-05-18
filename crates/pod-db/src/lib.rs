@@ -9,6 +9,7 @@ pub mod events;
 pub mod games;
 pub mod health;
 pub mod identity;
+pub mod meta;
 pub mod migrations;
 pub mod ops;
 pub mod playgroups;
@@ -31,6 +32,11 @@ pub use games::{
 pub use health::HealthRepository;
 pub use identity::{
     AccountRecord, AuthIdentityRecord, IdentityRepository, SessionRecord, UserRecord,
+};
+pub use meta::{
+    META_DASHBOARD_REFRESH_JOB_TYPE, MetaAttendanceSummary, MetaCommanderPopularity, MetaDashboard,
+    MetaDeckWinRate, MetaDistributionMetric, MetaMatchupSummary, MetaPlayerWinRate, MetaRepository,
+    MetaStaleDeck,
 };
 pub use ops::{
     BackgroundJobInput, BackgroundJobRecord, EmailDeliveryInput, EmailDeliveryRecord, OpsRepository,

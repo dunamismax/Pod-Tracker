@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::DbError;
+use crate::{DbError, meta::enqueue_meta_dashboard_refresh};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameRecord {
@@ -317,6 +317,8 @@ impl<'a> GameRepository<'a> {
             .execute(&mut *tx)
             .await?;
         }
+
+        enqueue_meta_dashboard_refresh(&mut *tx).await?;
 
         tx.commit().await?;
         Ok(Some(GameWithPlayers {

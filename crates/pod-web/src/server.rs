@@ -27,8 +27,8 @@ use pod_db::{
     CardSearchFilters, CreateDeckInput, CreateEventInput, DbError, DeckRepository,
     DecklistImportInput, EventDeckDeclarationInput, EventDeckDeclarationWithDeck,
     EventLocationInput, EventRepository, EventRsvpRecord, EventWithRole, GameRepository,
-    GameWithPlayers, IdentityRepository, LogGameInput, PlaygroupRepository, PodRepository,
-    PodWithSeats, RsvpInput, ScryfallRepository, UpdateEventInput, UserRecord,
+    GameWithPlayers, IdentityRepository, LogGameInput, MetaRepository, PlaygroupRepository,
+    PodRepository, PodWithSeats, RsvpInput, ScryfallRepository, UpdateEventInput, UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -88,6 +88,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/decks/{id}/import", post(import_decklist))
         .route("/decks/{id}/export/{format}", get(export_decklist_route))
         .route("/cards", get(cards))
+        .route("/meta", get(meta_dashboard))
         .route("/e/{token}", get(public_event_detail))
         .route("/rsvp/{token}", get(guest_rsvp_form).post(save_guest_rsvp))
         .route("/calendar.ics", get(calendar_feed))
@@ -879,6 +880,25 @@ async fn cards(State(state): State<AppState>, Query(query): Query<CardSearchQuer
         },
     ))
     .into_response()
+}
+
+async fn meta_dashboard(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let dashboard = match MetaRepository::new(pool).dashboard_for_user(user.id).await {
+        Ok(dashboard) => dashboard,
+        Err(err) => {
+            tracing::error!(err = %err, "load meta dashboard");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Html(ui::render_meta_dashboard(&dashboard)).into_response()
 }
 
 async fn new_event_form(
@@ -2545,7 +2565,7 @@ mod tests {
     use pod_core::config::AppConfig;
     use pod_core::playgroups::PlaygroupRole;
     use pod_db::{
-        EventRepository, IdentityRepository, PlaygroupRepository, PodRepository,
+        EventRepository, IdentityRepository, MetaRepository, PlaygroupRepository, PodRepository,
         ScryfallImportInput, ScryfallRepository,
     };
     use serde_json::json;
@@ -2826,6 +2846,55 @@ mod tests {
         assert!(body.contains("Scryfall local index"));
         assert!(!body.contains("invite_token"));
         assert!(!body.contains("address_line1"));
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn meta_route_renders_member_scoped_dashboard(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool.clone()));
+        let owner = sign_up(&app, "meta-route-owner@example.test", "Meta Route Owner").await;
+
+        let create_group = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Meta+Route+Crew&description=Dashboards&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create group");
+        assert_eq!(create_group.status(), StatusCode::SEE_OTHER);
+
+        MetaRepository::new(&pool)
+            .refresh_dashboard_views()
+            .await
+            .expect("refresh views");
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/meta")
+                    .header("cookie", owner.cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("meta response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_string(response).await;
+        assert!(body.contains("Meta Dashboard"));
+        assert!(body.contains("Meta Route Crew"));
+        assert!(body.contains("RSVP yes rate"));
+        assert!(!body.contains("invite_token"));
+        assert!(!body.contains("address_line1"));
+        assert!(!body.contains("to_address"));
     }
 
     #[tokio::test]

@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use sqlx::PgPool;
 
-use crate::DbError;
+use crate::{DbError, meta::enqueue_meta_dashboard_refresh};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventRecord {
@@ -240,6 +240,8 @@ impl<'a> EventRepository<'a> {
         .fetch_one(&mut *tx)
         .await?;
 
+        enqueue_meta_dashboard_refresh(&mut *tx).await?;
+
         tx.commit().await?;
         Ok(event)
     }
@@ -472,6 +474,8 @@ impl<'a> EventRepository<'a> {
         .fetch_one(self.pool)
         .await?;
 
+        enqueue_meta_dashboard_refresh(self.pool).await?;
+
         Ok(rsvp)
     }
 
@@ -505,6 +509,8 @@ impl<'a> EventRepository<'a> {
         )
         .fetch_one(self.pool)
         .await?;
+
+        enqueue_meta_dashboard_refresh(self.pool).await?;
 
         Ok(rsvp)
     }

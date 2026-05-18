@@ -2,9 +2,10 @@ use std::time::Duration;
 
 use anyhow::Context;
 use pod_core::config::AppConfig;
-use pod_db::{BackgroundJobRecord, OpsRepository, ScryfallRepository};
+use pod_db::{BackgroundJobRecord, MetaRepository, OpsRepository, ScryfallRepository};
 use pod_worker::{
-    SCRYFALL_BULK_IMPORT_JOB_TYPE, ScryfallBulkClient, process_scryfall_bulk_import_job,
+    META_DASHBOARD_REFRESH_JOB_TYPE, SCRYFALL_BULK_IMPORT_JOB_TYPE, ScryfallBulkClient,
+    process_meta_dashboard_refresh_job, process_scryfall_bulk_import_job,
 };
 use serde::{Deserialize, Serialize};
 use tokio::time;
@@ -70,7 +71,16 @@ async fn process_due_jobs(
 
         tracing::info!(job_id = %job.id, job_type = %job.job_type, "worker_job_claimed");
         let scryfall_repo = ScryfallRepository::new(pool);
-        let result = process_job(ops, &scryfall_repo, email_client, scryfall_client, &job).await;
+        let meta_repo = MetaRepository::new(pool);
+        let result = process_job(
+            ops,
+            &scryfall_repo,
+            &meta_repo,
+            email_client,
+            scryfall_client,
+            &job,
+        )
+        .await;
         match result {
             Ok(()) => {
                 ops.complete_background_job(job.id)
@@ -91,6 +101,7 @@ async fn process_due_jobs(
 async fn process_job(
     ops: &OpsRepository<'_>,
     scryfall_repo: &ScryfallRepository<'_>,
+    meta_repo: &MetaRepository<'_>,
     email_client: &Smtp2GoClient,
     scryfall_client: &ScryfallBulkClient,
     job: &BackgroundJobRecord,
@@ -107,6 +118,13 @@ async fn process_job(
                 cards_imported = import.cards_imported,
                 "scryfall_bulk_import_completed"
             );
+            Ok(())
+        }
+        META_DASHBOARD_REFRESH_JOB_TYPE => {
+            process_meta_dashboard_refresh_job(meta_repo)
+                .await
+                .context("process meta dashboard refresh")?;
+            tracing::info!(job_id = %job.id, "meta_dashboard_refresh_completed");
             Ok(())
         }
         other => anyhow::bail!("unknown job type: {other}"),

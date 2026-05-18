@@ -440,14 +440,14 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 11 - Meta Dashboard
 
-- [ ] Add materialized views for attendance, deck win rates, player win
+- [x] Add materialized views for attendance, deck win rates, player win
       rates, commander popularity, bracket distribution, color identity,
       archetypes, matchup history, and stale decks.
-- [ ] Add dashboard focused on meta health, variety, and planning.
-- [ ] Make competitive ranking optional rather than the default lens.
-- [ ] Refresh materialized views through background jobs.
-- [ ] Add SQL Observatory entries for the dashboard views.
-- [ ] Add tests for metrics and refresh behavior.
+- [x] Add dashboard focused on meta health, variety, and planning.
+- [x] Make competitive ranking optional rather than the default lens.
+- [x] Refresh materialized views through background jobs.
+- [x] Add SQL Observatory entries for the dashboard views.
+- [x] Add tests for metrics and refresh behavior.
 
 ### Phase 12 - Collection Tracking
 
@@ -723,3 +723,9 @@ Trust current primary docs over this file.
   repository access, plain-text, Moxfield-compatible, and
   Archidekt-compatible text exports, deck-detail export actions, and
   focused parser/export, repository, route, and browser smoke coverage.
+- 2026-05-18 - Completed the Rust Phase 11 meta dashboard foundation:
+  added playgroup-scoped materialized views for attendance, win rates,
+  commander popularity, deck variety, matchup history, and stale decks;
+  wired refresh jobs through the worker; added an authenticated SSR
+  `/meta` dashboard, SQL Observatory materialized-view entries, and
+  focused PostgreSQL-backed metrics, refresh, worker, and route tests.

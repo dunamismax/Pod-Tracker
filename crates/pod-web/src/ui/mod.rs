@@ -1,8 +1,8 @@
 use leptos::prelude::*;
 use pod_db::{
     CardSearchResult, DeckBracketSnapshotRecord, DeckRecord, EventDeckDeclarationWithDeck,
-    EventRecord, EventRsvpRecord, EventWithRole, GameWithPlayers, HouseRuleRecord,
-    PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
+    EventRecord, EventRsvpRecord, EventWithRole, GameWithPlayers, HouseRuleRecord, MetaDashboard,
+    MetaDistributionMetric, PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
 };
 use time::{OffsetDateTime, UtcOffset};
 
@@ -1205,6 +1205,236 @@ pub fn render_settings(email: &str, display_name: &str, csrf_token: &str) -> Str
     .to_html()
 }
 
+pub fn render_meta_dashboard(dashboard: &MetaDashboard) -> String {
+    let dashboard = dashboard.clone();
+    let has_playgroups = !dashboard.attendance.is_empty();
+
+    view! {
+        <AppShell title="Meta" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header compact">
+                    <p class="eyebrow">"Meta"</p>
+                    <h1>"Meta Dashboard"</h1>
+                </section>
+                {if has_playgroups {
+                    view! {
+                        <div class="stack">
+                            {dashboard.attendance.iter().map(|group| {
+                                let playgroup_id = group.playgroup_id;
+                                let deck_win_rates = dashboard
+                                    .deck_win_rates
+                                    .iter()
+                                    .filter(|metric| metric.playgroup_id == playgroup_id)
+                                    .cloned()
+                                    .collect::<Vec<_>>();
+                                let player_win_rates = dashboard
+                                    .player_win_rates
+                                    .iter()
+                                    .filter(|metric| metric.playgroup_id == playgroup_id)
+                                    .cloned()
+                                    .collect::<Vec<_>>();
+                                let commander_popularity = dashboard
+                                    .commander_popularity
+                                    .iter()
+                                    .filter(|metric| metric.playgroup_id == playgroup_id)
+                                    .cloned()
+                                    .collect::<Vec<_>>();
+                                let bracket_distribution = dashboard
+                                    .bracket_distribution
+                                    .iter()
+                                    .filter(|metric| metric.playgroup_id == playgroup_id)
+                                    .cloned()
+                                    .collect::<Vec<_>>();
+                                let color_identity_distribution = dashboard
+                                    .color_identity_distribution
+                                    .iter()
+                                    .filter(|metric| metric.playgroup_id == playgroup_id)
+                                    .cloned()
+                                    .collect::<Vec<_>>();
+                                let archetype_distribution = dashboard
+                                    .archetype_distribution
+                                    .iter()
+                                    .filter(|metric| metric.playgroup_id == playgroup_id)
+                                    .cloned()
+                                    .collect::<Vec<_>>();
+                                let matchup_history = dashboard
+                                    .matchup_history
+                                    .iter()
+                                    .filter(|metric| metric.playgroup_id == playgroup_id)
+                                    .cloned()
+                                    .collect::<Vec<_>>();
+                                let stale_decks = dashboard
+                                    .stale_decks
+                                    .iter()
+                                    .filter(|metric| metric.playgroup_id == playgroup_id)
+                                    .cloned()
+                                    .collect::<Vec<_>>();
+
+                                view! {
+                                    <section class="section-gap">
+                                        <div class="section-heading">
+                                            <h2>{group.playgroup_name.clone()}</h2>
+                                            <span>{group.last_event_at.map(display_datetime).unwrap_or_else(|| "No events".to_owned())}</span>
+                                        </div>
+                                        <dl class="status-list">
+                                            <div><dt>"Events"</dt><dd>{group.events_total}</dd></div>
+                                            <div><dt>"Completed"</dt><dd>{group.completed_events}</dd></div>
+                                            <div><dt>"Confirmed RSVPs"</dt><dd>{group.confirmed_rsvps}</dd></div>
+                                            <div><dt>"Active players"</dt><dd>{group.active_players}</dd></div>
+                                            <div><dt>"RSVP yes rate"</dt><dd>{percent_label(group.attendance_rate)}</dd></div>
+                                        </dl>
+                                        <div class="split-layout section-gap">
+                                            <article class="panel">
+                                                <div class="section-heading">
+                                                    <h2>"Variety"</h2>
+                                                    <span>"decks"</span>
+                                                </div>
+                                                <DistributionList title="Bracket" metrics=bracket_distribution/>
+                                                <DistributionList title="Color" metrics=color_identity_distribution/>
+                                                <DistributionList title="Archetype" metrics=archetype_distribution/>
+                                            </article>
+                                            <article class="panel">
+                                                <div class="section-heading">
+                                                    <h2>"Commanders"</h2>
+                                                    <span>"popularity"</span>
+                                                </div>
+                                                {if commander_popularity.is_empty() {
+                                                    view! { <p class="empty-state">"No commander data yet."</p> }.into_any()
+                                                } else {
+                                                    view! {
+                                                        <dl class="compact-list">
+                                                            {commander_popularity.into_iter().map(|metric| view! {
+                                                                <div>
+                                                                    <dt>{metric.commander}</dt>
+                                                                    <dd>{format!("{} decks · {} games", metric.deck_count, metric.games_seen)}</dd>
+                                                                </div>
+                                                            }).collect_view()}
+                                                        </dl>
+                                                    }.into_any()
+                                                }}
+                                            </article>
+                                        </div>
+                                        <div class="split-layout wide-left section-gap">
+                                            <article class="panel">
+                                                <div class="section-heading">
+                                                    <h2>"Planning"</h2>
+                                                    <span>"freshness"</span>
+                                                </div>
+                                                {if matchup_history.is_empty() {
+                                                    view! { <p class="empty-state">"No matchup history yet."</p> }.into_any()
+                                                } else {
+                                                    view! {
+                                                        <dl class="compact-list">
+                                                            {matchup_history.into_iter().map(|metric| view! {
+                                                                <div>
+                                                                    <dt>{format!("{}: {}", metric.matchup_type, metric.games_together)}</dt>
+                                                                    <dd>{format!("{} vs {} · {}", metric.left_label, metric.right_label, display_datetime(metric.last_played_at))}</dd>
+                                                                </div>
+                                                            }).collect_view()}
+                                                        </dl>
+                                                    }.into_any()
+                                                }}
+                                            </article>
+                                            <article class="panel">
+                                                <div class="section-heading">
+                                                    <h2>"Stale Decks"</h2>
+                                                    <span>"rotation"</span>
+                                                </div>
+                                                {if stale_decks.is_empty() {
+                                                    view! { <p class="empty-state">"No stale active decks."</p> }.into_any()
+                                                } else {
+                                                    view! {
+                                                        <dl class="compact-list">
+                                                            {stale_decks.into_iter().map(|deck| view! {
+                                                                <div>
+                                                                    <dt>{deck.deck_name}</dt>
+                                                                    <dd>{format!("{} · {}", deck.commander, stale_reason_label(&deck.stale_reason))}</dd>
+                                                                </div>
+                                                            }).collect_view()}
+                                                        </dl>
+                                                    }.into_any()
+                                                }}
+                                            </article>
+                                        </div>
+                                        <div class="split-layout section-gap">
+                                            <article class="panel">
+                                                <div class="section-heading">
+                                                    <h2>"Deck Wins"</h2>
+                                                    <span>"optional ranking"</span>
+                                                </div>
+                                                {if deck_win_rates.is_empty() {
+                                                    view! { <p class="empty-state">"No deck results yet."</p> }.into_any()
+                                                } else {
+                                                    view! {
+                                                        <dl class="compact-list">
+                                                            {deck_win_rates.into_iter().map(|metric| view! {
+                                                                <div>
+                                                                    <dt>{metric.deck_name}</dt>
+                                                                    <dd>{format!("{} · {}-{} · {}", metric.commander, metric.wins, metric.games_played, percent_label(metric.win_rate))}</dd>
+                                                                </div>
+                                                            }).collect_view()}
+                                                        </dl>
+                                                    }.into_any()
+                                                }}
+                                            </article>
+                                            <article class="panel">
+                                                <div class="section-heading">
+                                                    <h2>"Player Wins"</h2>
+                                                    <span>"optional ranking"</span>
+                                                </div>
+                                                {if player_win_rates.is_empty() {
+                                                    view! { <p class="empty-state">"No player results yet."</p> }.into_any()
+                                                } else {
+                                                    view! {
+                                                        <dl class="compact-list">
+                                                            {player_win_rates.into_iter().map(|metric| view! {
+                                                                <div>
+                                                                    <dt>{metric.display_name}</dt>
+                                                                    <dd>{format!("{}-{} · {}", metric.wins, metric.games_played, percent_label(metric.win_rate))}</dd>
+                                                                </div>
+                                                            }).collect_view()}
+                                                        </dl>
+                                                    }.into_any()
+                                                }}
+                                            </article>
+                                        </div>
+                                    </section>
+                                }
+                            }).collect_view()}
+                        </div>
+                    }.into_any()
+                } else {
+                    view! { <p class="empty-state">"No playgroup meta yet."</p> }.into_any()
+                }}
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+#[component]
+fn DistributionList(title: &'static str, metrics: Vec<MetaDistributionMetric>) -> impl IntoView {
+    view! {
+        <section class="section-gap">
+            <h3>{title}</h3>
+            {if metrics.is_empty() {
+                view! { <p class="empty-state">"No deck data yet."</p> }.into_any()
+            } else {
+                view! {
+                    <dl class="compact-list">
+                        {metrics.into_iter().map(|metric| view! {
+                            <div>
+                                <dt>{metric.label}</dt>
+                                <dd>{metric.deck_count}</dd>
+                            </div>
+                        }).collect_view()}
+                    </dl>
+                }.into_any()
+            }}
+        </section>
+    }
+}
+
 pub fn render_placeholder(title: &'static str) -> String {
     let (eyebrow, copy) = match title {
         "About" => (
@@ -1298,6 +1528,22 @@ join mtg.deck_versions v on v.id = s.deck_version_id
 where v.deck_id = $1
 order by v.version_number desc
 limit 1;"#;
+    let meta_sql = r#"refresh materialized view meta.attendance_summary;
+refresh materialized view meta.deck_win_rates;
+refresh materialized view meta.player_win_rates;
+refresh materialized view meta.commander_popularity;
+refresh materialized view meta.bracket_distribution;
+refresh materialized view meta.color_identity_distribution;
+refresh materialized view meta.archetype_distribution;
+refresh materialized view meta.matchup_summary;
+refresh materialized view meta.stale_decks;
+
+select a.playgroup_name, a.events_total, a.confirmed_rsvps,
+       c.commander, c.games_seen, s.deck_name, s.stale_reason
+from meta.attendance_summary a
+left join meta.commander_popularity c on c.playgroup_id = a.playgroup_id
+left join meta.stale_decks s on s.playgroup_id = a.playgroup_id
+where a.playgroup_id = $1;"#;
 
     view! {
         <AppShell title="SQL Observatory" account_label="Account" account_href="/settings">
@@ -1375,6 +1621,23 @@ limit 1;"#;
                             <div><dt>"Inputs"</dt><dd>"deck_id"</dd></div>
                             <div><dt>"Indexes"</dt><dd>"deck versions by deck, snapshot version key"</dd></div>
                             <div><dt>"Output"</dt><dd>"latest imported bracket snapshot and warning codes"</dd></div>
+                        </dl>
+                    </article>
+                </section>
+                <section class="split-layout wide-left section-gap">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <h2>"Meta dashboard"</h2>
+                            <span class="badge">"materialized views"</span>
+                        </div>
+                        <pre class="sql-block"><code>{meta_sql}</code></pre>
+                    </article>
+                    <article class="panel">
+                        <h2>"Plan Shape"</h2>
+                        <dl class="compact-list">
+                            <div><dt>"Inputs"</dt><dd>"playgroup_id from membership scope"</dd></div>
+                            <div><dt>"Indexes"</dt><dd>"materialized-view indexes by playgroup and metric key"</dd></div>
+                            <div><dt>"Output"</dt><dd>"attendance, variety, freshness, stale-deck, and optional win-rate metrics"</dd></div>
                         </dl>
                     </article>
                 </section>
@@ -1922,6 +2185,18 @@ fn display_datetime(value: OffsetDateTime) -> String {
     )
 }
 
+fn percent_label(value: i32) -> String {
+    format!("{value}%")
+}
+
+fn stale_reason_label(value: &str) -> &'static str {
+    match value {
+        "never_played" => "never played",
+        "idle_45_days" => "idle 45 days",
+        _ => "stale",
+    }
+}
+
 fn yes_no(value: bool) -> &'static str {
     if value { "yes" } else { "no" }
 }
@@ -2025,6 +2300,7 @@ fn AppShell(
                         <a href="/events">"Events"</a>
                         <a href="/decks">"Decks"</a>
                         <a href="/cards">"Cards"</a>
+                        <a href="/meta">"Meta"</a>
                         <a href="/observatory">"Observatory"</a>
                         <a class="nav-login" href=account_href>{account_label}</a>
                     </nav>

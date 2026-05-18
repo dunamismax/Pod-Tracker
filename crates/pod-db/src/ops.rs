@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use crate::DbError;
+use crate::{DbError, META_DASHBOARD_REFRESH_JOB_TYPE};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackgroundJobRecord {
@@ -218,6 +218,20 @@ impl<'a> OpsRepository<'a> {
         .await
     }
 
+    pub async fn enqueue_meta_dashboard_refresh(
+        &self,
+        run_at: OffsetDateTime,
+    ) -> Result<BackgroundJobRecord, DbError> {
+        let payload = json!({});
+        self.insert_background_job(BackgroundJobInput {
+            queue: "default",
+            job_type: META_DASHBOARD_REFRESH_JOB_TYPE,
+            payload: &payload,
+            run_at,
+        })
+        .await
+    }
+
     pub async fn acquire_next_background_job(
         &self,
         worker_id: &str,
@@ -373,5 +387,18 @@ mod tests {
         assert_eq!(job.queue, "default");
         assert_eq!(job.job_type, "scryfall_bulk_import");
         assert_eq!(job.payload["bulk_type"], "default_cards");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn queues_meta_dashboard_refresh_jobs(pool: sqlx::PgPool) {
+        let repo = OpsRepository::new(&pool);
+        let job = repo
+            .enqueue_meta_dashboard_refresh(time::OffsetDateTime::now_utc())
+            .await
+            .expect("queue refresh");
+
+        assert_eq!(job.queue, "default");
+        assert_eq!(job.job_type, "meta_dashboard_refresh");
+        assert_eq!(job.payload, serde_json::json!({}));
     }
 }

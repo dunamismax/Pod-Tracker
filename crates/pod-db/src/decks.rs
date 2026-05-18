@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use sqlx::PgPool;
 
-use crate::DbError;
+use crate::{DbError, meta::enqueue_meta_dashboard_refresh};
 use pod_core::decklists::{DecklistEntry, parse_plain_text_decklist};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -223,6 +223,8 @@ impl<'a> DeckRepository<'a> {
         )
         .fetch_one(self.pool)
         .await?;
+
+        enqueue_meta_dashboard_refresh(self.pool).await?;
 
         Ok(deck)
     }
