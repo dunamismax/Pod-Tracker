@@ -11,6 +11,9 @@ use pod_core::auth::{
     verify_password,
 };
 use pod_core::config::AppConfig;
+use pod_core::decklists::{
+    DecklistExportEntry, DecklistExportFormat, DecklistSection, export_decklist,
+};
 use pod_core::decks::{
     DeckStatus, DeckVisibility, TutorDensity, normalize_color_identity, normalize_tags,
 };
@@ -83,6 +86,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/decks", get(decks).post(create_deck))
         .route("/decks/{id}", get(deck_detail))
         .route("/decks/{id}/import", post(import_decklist))
+        .route("/decks/{id}/export/{format}", get(export_decklist_route))
         .route("/cards", get(cards))
         .route("/e/{token}", get(public_event_detail))
         .route("/rsvp/{token}", get(guest_rsvp_form).post(save_guest_rsvp))
@@ -671,7 +675,13 @@ async fn deck_detail(
     let csrf = ensure_csrf_cookie(&headers, &state.config);
     html_with_cookies(
         StatusCode::OK,
-        ui::render_deck_detail(&deck, &csrf.token, snapshot.as_ref(), None),
+        ui::render_deck_detail(
+            &deck,
+            &csrf.token,
+            snapshot.as_ref(),
+            None,
+            deck.owner_user_id == user.id && snapshot.is_some(),
+        ),
         csrf.set_cookie,
     )
 }
@@ -721,6 +731,7 @@ async fn import_decklist(
                 &csrf.token,
                 snapshot.as_ref(),
                 Some("Paste a plain-text decklist before importing."),
+                snapshot.is_some(),
             ),
             csrf.set_cookie,
         );
@@ -742,6 +753,7 @@ async fn import_decklist(
                 &csrf.token,
                 None,
                 Some("No decklist cards were found to import."),
+                false,
             ),
             csrf.set_cookie,
         ),
@@ -750,6 +762,63 @@ async fn import_decklist(
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }
     }
+}
+
+async fn export_decklist_route(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path((id, format)): axum::extract::Path<(uuid::Uuid, String)>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let Some(format) = parse_export_format(&format) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+
+    let deck_repo = DeckRepository::new(pool);
+    let export = match deck_repo
+        .latest_decklist_export_for_owner(id, user.id)
+        .await
+    {
+        Ok(Some(export)) => export,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "export decklist");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    if export.cards.is_empty() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    let entries = export
+        .cards
+        .iter()
+        .map(|card| DecklistExportEntry {
+            quantity: card.quantity,
+            card_name: &card.card_name,
+            matched_name: card.matched_name.as_deref(),
+            section: decklist_section_from_db(&card.section),
+            match_status: &card.match_status,
+            is_commander: card.is_commander,
+        })
+        .collect::<Vec<_>>();
+    let body = export_decklist(&entries, format);
+    let filename = decklist_export_filename(&export.deck.name, format);
+
+    let mut response = Response::new(Body::from(body));
+    response.headers_mut().insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    if let Ok(value) = HeaderValue::from_str(&format!("attachment; filename=\"{filename}\"")) {
+        response.headers_mut().insert(CONTENT_DISPOSITION, value);
+    }
+    response
 }
 
 async fn cards(State(state): State<AppState>, Query(query): Query<CardSearchQuery>) -> Response {
@@ -2245,6 +2314,45 @@ fn parse_deck_form(
     })
 }
 
+fn parse_export_format(value: &str) -> Option<DecklistExportFormat> {
+    match value {
+        "plain-text" | "plain" | "txt" => Some(DecklistExportFormat::PlainText),
+        "moxfield" => Some(DecklistExportFormat::Moxfield),
+        "archidekt" => Some(DecklistExportFormat::Archidekt),
+        _ => None,
+    }
+}
+
+fn decklist_section_from_db(value: &str) -> DecklistSection {
+    match value {
+        "commander" => DecklistSection::Commander,
+        "sideboard" => DecklistSection::Sideboard,
+        "maybeboard" => DecklistSection::Maybeboard,
+        _ => DecklistSection::Main,
+    }
+}
+
+fn decklist_export_filename(deck_name: &str, format: DecklistExportFormat) -> String {
+    let mut slug = String::new();
+    let mut last_was_dash = false;
+    for character in deck_name.chars().flat_map(char::to_lowercase) {
+        if character.is_ascii_alphanumeric() {
+            slug.push(character);
+            last_was_dash = false;
+        } else if !last_was_dash && !slug.is_empty() {
+            slug.push('-');
+            last_was_dash = true;
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    if slug.is_empty() {
+        slug.push_str("decklist");
+    }
+    format!("{}-{}.{}", slug, format.slug(), format.extension())
+}
+
 fn optional_trimmed(value: &str) -> Option<&str> {
     let value = value.trim();
     (!value.is_empty()).then_some(value)
@@ -2432,7 +2540,7 @@ async fn readyz(State(state): State<AppState>) -> impl IntoResponse {
 mod tests {
     use axum::Router;
     use axum::body::{Body, to_bytes};
-    use axum::http::header::{CONTENT_TYPE, LOCATION, SET_COOKIE};
+    use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE, LOCATION, SET_COOKIE};
     use axum::http::{HeaderMap, Request, StatusCode};
     use pod_core::config::AppConfig;
     use pod_core::playgroups::PlaygroupRole;
@@ -3528,7 +3636,7 @@ mod tests {
                     .method("POST")
                     .uri(format!("/decks/{deck_id}/import"))
                     .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-                    .header("cookie", outsider.cookie_header)
+                    .header("cookie", outsider.cookie_header.clone())
                     .body(Body::from(format!(
                         "decklist=Commander%0A1+Atraxa%2C+Praetors%27+Voice&csrf_token={}",
                         outsider.csrf_token
@@ -3573,6 +3681,100 @@ mod tests {
         assert!(imported_detail_body.contains("Bracket check"));
         assert!(imported_detail_body.contains("1 Game Changer"));
         assert!(imported_detail_body.contains("1 decklist line(s) did not match"));
+        assert!(imported_detail_body.contains("Plain text"));
+        assert!(imported_detail_body.contains("Moxfield"));
+        assert!(imported_detail_body.contains("Archidekt"));
+
+        let outsider_export = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/decks/{deck_id}/export/plain-text"))
+                    .header("cookie", outsider.cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider export");
+        assert_eq!(outsider_export.status(), StatusCode::NOT_FOUND);
+
+        let plain_export = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/decks/{deck_id}/export/plain-text"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("plain export");
+        assert_eq!(plain_export.status(), StatusCode::OK);
+        assert_eq!(
+            plain_export
+                .headers()
+                .get(CONTENT_TYPE)
+                .expect("content type"),
+            "text/plain; charset=utf-8"
+        );
+        assert!(
+            plain_export
+                .headers()
+                .get(CONTENT_DISPOSITION)
+                .expect("content disposition")
+                .to_str()
+                .expect("content disposition str")
+                .contains("atraxa-counters-plain-text.txt")
+        );
+        let plain_body = body_string(plain_export).await;
+        assert!(plain_body.contains("Commander\n1 Atraxa, Praetors' Voice"));
+        assert!(plain_body.contains("Deck\n1 Sol Ring"));
+        assert!(plain_body.contains("1 Missing Card"));
+
+        let moxfield_export = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/decks/{deck_id}/export/moxfield"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("moxfield export");
+        assert_eq!(moxfield_export.status(), StatusCode::OK);
+        let moxfield_body = body_string(moxfield_export).await;
+        assert!(moxfield_body.contains("COMMANDER:\n1 Atraxa, Praetors' Voice"));
+        assert!(moxfield_body.contains("MAINBOARD:\n1 Sol Ring"));
+
+        let archidekt_export = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/decks/{deck_id}/export/archidekt"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("archidekt export");
+        assert_eq!(archidekt_export.status(), StatusCode::OK);
+        let archidekt_body = body_string(archidekt_export).await;
+        assert!(archidekt_body.contains("1x Atraxa, Praetors' Voice `Commander`"));
+        assert!(archidekt_body.contains("1x Sol Ring `Mainboard`"));
+
+        let bad_export = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/decks/{deck_id}/export/csv"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("bad export");
+        assert_eq!(bad_export.status(), StatusCode::NOT_FOUND);
 
         let create_event = app
             .clone()

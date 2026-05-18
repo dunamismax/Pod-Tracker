@@ -582,6 +582,7 @@ pub fn render_deck_detail(
     csrf_token: &str,
     snapshot: Option<&DeckBracketSnapshotRecord>,
     import_error: Option<&str>,
+    can_export: bool,
 ) -> String {
     let deck = deck.clone();
     let tags = deck.tags.join(", ");
@@ -598,6 +599,15 @@ pub fn render_deck_detail(
                     <p class="lede">{deck.commander.clone()}</p>
                     <nav class="actions" aria-label="Deck actions">
                         <a class="button secondary" href="/decks">"All decks"</a>
+                        {can_export.then(|| view! {
+                            <a class="button secondary" href=format!("/decks/{}/export/plain-text", deck.id)>"Plain text"</a>
+                        })}
+                        {can_export.then(|| view! {
+                            <a class="button secondary" href=format!("/decks/{}/export/moxfield", deck.id)>"Moxfield"</a>
+                        })}
+                        {can_export.then(|| view! {
+                            <a class="button secondary" href=format!("/decks/{}/export/archidekt", deck.id)>"Archidekt"</a>
+                        })}
                     </nav>
                     <dl class="status-list">
                         <div><dt>"Color identity"</dt><dd>{deck.color_identity.clone()}</dd></div>

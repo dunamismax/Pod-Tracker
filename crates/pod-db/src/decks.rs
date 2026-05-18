@@ -76,6 +76,7 @@ pub struct DeckCardRecord {
     pub id: Uuid,
     pub deck_version_id: Uuid,
     pub oracle_id: Option<Uuid>,
+    pub line_number: i32,
     pub quantity: i32,
     pub card_name: String,
     pub matched_name: Option<String>,
@@ -112,6 +113,13 @@ pub struct DecklistImportSummary {
     pub version: DeckVersionRecord,
     pub cards: Vec<DeckCardRecord>,
     pub snapshot: DeckBracketSnapshotRecord,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecklistExportRecord {
+    pub deck: DeckRecord,
+    pub version: DeckVersionRecord,
+    pub cards: Vec<DeckCardRecord>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -614,6 +622,79 @@ impl<'a> DeckRepository<'a> {
 
         Ok(snapshot)
     }
+
+    pub async fn latest_decklist_export_for_owner(
+        &self,
+        deck_id: Uuid,
+        owner_user_id: Uuid,
+    ) -> Result<Option<DecklistExportRecord>, DbError> {
+        let Some(deck) = self.get_owned_deck(deck_id, owner_user_id).await? else {
+            return Ok(None);
+        };
+        let Some(version) = sqlx::query_as!(
+            DeckVersionRecord,
+            r#"
+            select id, deck_id, version_number, source_format, source_text,
+              imported_at, created_at
+            from mtg.deck_versions
+            where deck_id = $1
+            order by version_number desc
+            limit 1
+            "#,
+            deck_id,
+        )
+        .fetch_optional(self.pool)
+        .await?
+        else {
+            return Ok(None);
+        };
+
+        let cards = sqlx::query_as!(
+            DeckCardRecord,
+            r#"
+            select id, deck_version_id, oracle_id, line_number, quantity, card_name,
+              matched_name, section, match_status, match_method, name_similarity,
+              is_commander, created_at
+            from mtg.deck_cards
+            where deck_version_id = $1
+            order by line_number asc, created_at asc, id asc
+            "#,
+            version.id,
+        )
+        .fetch_all(self.pool)
+        .await?;
+
+        Ok(Some(DecklistExportRecord {
+            deck,
+            version,
+            cards,
+        }))
+    }
+
+    async fn get_owned_deck(
+        &self,
+        deck_id: Uuid,
+        owner_user_id: Uuid,
+    ) -> Result<Option<DeckRecord>, DbError> {
+        let deck = sqlx::query_as!(
+            DeckRecord,
+            r#"
+            select id, owner_user_id, playgroup_id, name, commander, color_identity,
+              claimed_bracket, archetype, tags, visibility, status,
+              game_changers_count, has_infinite_combo, has_fast_mana,
+              tutor_density, has_extra_turns, has_mass_land_denial,
+              salt_notes, notes, created_at, updated_at
+            from core.decks
+            where id = $1 and owner_user_id = $2
+            "#,
+            deck_id,
+            owner_user_id,
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(deck)
+    }
 }
 
 async fn insert_deck_card(
@@ -626,16 +707,17 @@ async fn insert_deck_card(
         DeckCardRecord,
         r#"
         insert into mtg.deck_cards (
-          deck_version_id, oracle_id, quantity, card_name, matched_name,
+          deck_version_id, oracle_id, line_number, quantity, card_name, matched_name,
           section, match_status, match_method, name_similarity, is_commander
         )
-        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        returning id, deck_version_id, oracle_id, quantity, card_name,
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        returning id, deck_version_id, oracle_id, line_number, quantity, card_name,
           matched_name, section, match_status, match_method, name_similarity,
           is_commander, created_at
         "#,
         deck_version_id,
         resolution.oracle_id,
+        entry.line_number,
         entry.quantity,
         entry.name,
         resolution.matched_name,
@@ -1201,6 +1283,7 @@ Deck
 
         assert!(summary.cards.iter().any(|card| {
             card.card_name == "Atraxa, Praetors' Voice"
+                && card.line_number == 1
                 && card.match_status == "matched"
                 && card.match_method == "exact"
                 && card.is_commander
@@ -1234,6 +1317,25 @@ Deck
         assert_eq!(updated.commander, "Atraxa, Praetors' Voice");
         assert_eq!(updated.color_identity, "WUBRG");
         assert_eq!(updated.game_changers_count, 1);
+
+        let outsider_export = repo
+            .latest_decklist_export_for_owner(deck.id, outsider.id)
+            .await
+            .expect("outsider export");
+        assert!(outsider_export.is_none());
+
+        let export = repo
+            .latest_decklist_export_for_owner(deck.id, owner.id)
+            .await
+            .expect("owner export")
+            .expect("export");
+        assert_eq!(export.version.id, summary.version.id);
+        assert_eq!(export.cards.len(), 6);
+        assert_eq!(export.cards[0].card_name, "Atraxa, Praetors' Voice");
+        assert!(export.cards[0].is_commander);
+        assert_eq!(export.cards[0].section, "commander");
+        assert_eq!(export.cards[5].card_name, "Fire // Ice");
+        assert_eq!(export.cards[5].match_status, "ambiguous");
     }
 
     fn card_json(

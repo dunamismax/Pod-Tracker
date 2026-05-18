@@ -17,8 +17,8 @@ pub mod scryfall;
 
 pub use decks::{
     CreateDeckInput, DeckBracketSnapshotRecord, DeckCardRecord, DeckRecord, DeckRepository,
-    DeckVersionRecord, DecklistImportInput, DecklistImportSummary, EventDeckDeclarationInput,
-    EventDeckDeclarationRecord, EventDeckDeclarationWithDeck,
+    DeckVersionRecord, DecklistExportRecord, DecklistImportInput, DecklistImportSummary,
+    EventDeckDeclarationInput, EventDeckDeclarationRecord, EventDeckDeclarationWithDeck,
 };
 pub use events::{
     CalendarEventRecord, CreateEventInput, CreateEventReminderInput, EventHostRecord,

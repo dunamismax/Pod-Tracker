@@ -433,10 +433,10 @@ state where documented verification passes on a clean checkout.
 - [x] Add Game Changers version tables.
 - [x] Count Game Changers per deck version.
 - [x] Show bracket-relevant warnings.
-- [ ] Export plain-text, Moxfield-compatible, and
+- [x] Export plain-text, Moxfield-compatible, and
       Archidekt-compatible lists.
 - [x] Snapshot deck bracket analysis over time.
-- [ ] Add tests for parsing, matching, warnings, and exports.
+- [x] Add tests for parsing, matching, warnings, and exports.
 
 ### Phase 11 - Meta Dashboard
 
@@ -718,3 +718,8 @@ Trust current primary docs over this file.
   bracket snapshots, owner-scoped import route/UI, SQL Observatory Game
   Changers snapshot entry, and focused parser, repository, route, and
   browser smoke coverage.
+- 2026-05-18 - Completed the remaining Rust Phase 10 export slice: added
+  stable deck-card line numbers, owner-scoped latest decklist export
+  repository access, plain-text, Moxfield-compatible, and
+  Archidekt-compatible text exports, deck-detail export actions, and
+  focused parser/export, repository, route, and browser smoke coverage.
