@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 use pod_db::{
     DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord, EventWithRole,
-    HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole,
+    HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
 };
 use time::{OffsetDateTime, UtcOffset};
 
@@ -804,6 +804,7 @@ pub fn render_event_detail(
                     <p class="lede">{display_datetime(event.start_time)}</p>
                     <nav class="actions" aria-label="Event actions">
                         {context.can_edit.then(|| view! { <a class="button primary" href=format!("/events/{}/edit", event.id)>"Edit"</a> })}
+                        <a class="button secondary" href=format!("/events/{}/pods", event.id)>"Pods"</a>
                         {public_url.map(|url| view! { <a class="button secondary" href=url>"Public page"</a> })}
                         {invite_url.map(|url| view! { <a class="button ghost" href=url>"Invite RSVP"</a> })}
                     </nav>
@@ -818,6 +819,125 @@ pub fn render_event_detail(
                     <DeckDeclarationPanel event_id=event.id csrf_token=csrf_token decks=context.user_decks/>
                     <EventDeckDeclarationList declarations=context.deck_declarations/>
                 </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_event_pods(
+    event: &EventWithRole,
+    pods: &[PodWithSeats],
+    csrf_token: &str,
+    can_edit: bool,
+) -> String {
+    let event = event.clone();
+    let pods = pods.to_vec();
+    let csrf_token = csrf_token.to_owned();
+    let pod_options = pods
+        .iter()
+        .map(|pod| (pod.pod.id, pod.pod.name.clone()))
+        .collect::<Vec<_>>();
+
+    view! {
+        <AppShell title="Pods" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header">
+                    <p class="eyebrow">{event.playgroup_name.clone()}</p>
+                    <h1>{event.title.clone()} " pods"</h1>
+                    <p class="lede">{display_datetime(event.start_time)}</p>
+                    <nav class="actions" aria-label="Pod actions">
+                        <a class="button secondary" href=format!("/events/{}", event.id)>"Event"</a>
+                        {can_edit.then(|| view! {
+                            <form method="post" action=format!("/events/{}/pods/generate", event.id) class="inline-form">
+                                <input type="hidden" name="csrf_token" value=csrf_token.clone()/>
+                                <button class="button primary" type="submit">"Generate"</button>
+                            </form>
+                        })}
+                        {(can_edit && !pods.is_empty()).then(|| view! {
+                            <form method="post" action=format!("/events/{}/pods/publish", event.id) class="inline-form">
+                                <input type="hidden" name="csrf_token" value=csrf_token.clone()/>
+                                <button class="button secondary" type="submit">"Publish"</button>
+                            </form>
+                        })}
+                    </nav>
+                </section>
+                {if pods.is_empty() {
+                    view! { <p class="empty-state">"No pod assignments yet."</p> }.into_any()
+                } else {
+                    view! {
+                        <section class="pod-grid" aria-label="Pod assignments">
+                            {pods.into_iter().map(|pod| {
+                                let pod_id = pod.pod.id;
+                                let state = pod.pod.state.clone();
+                                let pod_name = pod.pod.name.clone();
+                                let score = pod.pod.total_score;
+                                let options = pod_options.clone();
+                                let csrf_for_lock = csrf_token.clone();
+                                let csrf_for_seats = csrf_token.clone();
+                                view! {
+                                    <article class="panel pod-panel">
+                                        <div class="section-heading">
+                                            <div>
+                                                <h2>{pod_name}</h2>
+                                                <span>"Score " {score}</span>
+                                            </div>
+                                            <span class="badge">{state.clone()}</span>
+                                        </div>
+                                        <dl class="status-list compact-list">
+                                            <div><dt>"Size"</dt><dd>{pod.pod.size_fit_score}</dd></div>
+                                            <div><dt>"Bracket"</dt><dd>{pod.pod.bracket_compatibility_score}</dd></div>
+                                            <div><dt>"Pairs"</dt><dd>{pod.pod.repeat_player_pair_penalty}</dd></div>
+                                            <div><dt>"Decks"</dt><dd>{pod.pod.repeat_deck_matchup_penalty}</dd></div>
+                                        </dl>
+                                        {if pod.seats.is_empty() {
+                                            view! { <p class="empty-state">"No seats."</p> }.into_any()
+                                        } else {
+                                            view! {
+                                                <div class="list">
+                                                    {pod.seats.into_iter().map(|seat| {
+                                                        let label = seat
+                                                            .guest_name
+                                                            .clone()
+                                                            .or_else(|| seat.user_id.map(|id| format!("Member {}", short_id(id))))
+                                                            .unwrap_or_else(|| "Seat".to_owned());
+                                                        let csrf_for_move = csrf_for_seats.clone();
+                                                        view! {
+                                                            <article class="list-item">
+                                                                <div>
+                                                                    <h3>{seat.seat_position} ". " {label}</h3>
+                                                                    <p>{seat.deck_id.map(|id| format!("Deck {}", short_id(id))).unwrap_or_else(|| "No deck declared".to_owned())}</p>
+                                                                </div>
+                                                                {can_edit.then(|| view! {
+                                                                    <form method="post" action=format!("/pods/{pod_id}/seats/{}/move", seat.id) class="move-form">
+                                                                        <input type="hidden" name="csrf_token" value=csrf_for_move/>
+                                                                        <select name="target_pod_id" aria-label="Target pod">
+                                                                            {options.iter().map(|(id, name)| view! {
+                                                                                <option value=id.to_string() selected=*id == pod_id>{name.clone()}</option>
+                                                                            }).collect_view()}
+                                                                        </select>
+                                                                        <input type="number" min="1" name="seat_position" value=seat.seat_position.to_string() aria-label="Seat"/>
+                                                                        <button class="button secondary" type="submit">"Move"</button>
+                                                                    </form>
+                                                                })}
+                                                            </article>
+                                                        }
+                                                    }).collect_view()}
+                                                </div>
+                                            }.into_any()
+                                        }}
+                                        {(can_edit && state == "proposed").then(|| view! {
+                                            <form method="post" action=format!("/pods/{pod_id}/lock") class="inline-form">
+                                                <input type="hidden" name="csrf_token" value=csrf_for_lock/>
+                                                <button class="button secondary" type="submit">"Lock"</button>
+                                            </form>
+                                        })}
+                                    </article>
+                                }
+                            }).collect_view()}
+                        </section>
+                    }.into_any()
+                }}
             </main>
         </AppShell>
     }
@@ -950,6 +1070,75 @@ pub fn render_placeholder(title: &'static str) -> String {
                     <p class="eyebrow">{eyebrow}</p>
                     <h1>{title}</h1>
                     <p class="body-copy">{copy}</p>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_observatory() -> String {
+    let pod_sql = r#"with confirmed as (
+  select r.id as rsvp_id, r.user_id, r.guest_name, ed.deck_id
+  from core.event_rsvps r
+  left join lateral (
+    select deck_id
+    from core.event_deck_declarations
+    where event_id = r.event_id and user_id = r.user_id
+    order by preference asc, created_at asc
+    limit 1
+  ) ed on true
+  where r.event_id = $1 and r.status = 'yes'
+)
+select rsvp_id, user_id, guest_name, deck_id
+from confirmed
+order by rsvp_id;"#;
+    let scoring_sql = r#"select count(*)::int
+from core.pod_seats a
+join core.pod_seats b on b.pod_id = a.pod_id and b.user_id = $3
+join core.pods prior_pods on prior_pods.id = a.pod_id
+join core.events prior_events on prior_events.id = prior_pods.event_id
+join core.events current_events on current_events.id = $1
+where a.user_id = $2
+  and prior_pods.event_id <> $1
+  and prior_pods.state in ('locked', 'active', 'completed')
+  and prior_events.playgroup_id = current_events.playgroup_id;"#;
+
+    view! {
+        <AppShell title="SQL Observatory" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header compact">
+                    <p class="eyebrow">"PostgreSQL"</p>
+                    <h1>"SQL Observatory"</h1>
+                    <p class="body-copy">
+                        "Safe query shapes for the Rust pod generator. Inputs are event-scoped IDs; output avoids addresses, emails, invite tokens, and private notes."
+                    </p>
+                </section>
+                <section class="split-layout wide-left section-gap">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <h2>"Confirmed attendees"</h2>
+                            <span class="badge">"candidate SQL"</span>
+                        </div>
+                        <pre class="sql-block"><code>{pod_sql}</code></pre>
+                    </article>
+                    <article class="panel">
+                        <h2>"Plan Shape"</h2>
+                        <dl class="compact-list">
+                            <div><dt>"Inputs"</dt><dd>"event_id, user pair, deck pair"</dd></div>
+                            <div><dt>"Indexes"</dt><dd>"event RSVPs, pod seats, pods by event"</dd></div>
+                            <div><dt>"Output"</dt><dd>"candidate seats and repeat penalties"</dd></div>
+                        </dl>
+                    </article>
+                </section>
+                <section class="section-gap">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <h2>"Repeat pair penalty"</h2>
+                            <span class="badge">"scoring SQL"</span>
+                        </div>
+                        <pre class="sql-block"><code>{scoring_sql}</code></pre>
+                    </article>
                 </section>
             </main>
         </AppShell>
@@ -1284,6 +1473,10 @@ fn display_datetime(value: OffsetDateTime) -> String {
 
 fn yes_no(value: bool) -> &'static str {
     if value { "yes" } else { "no" }
+}
+
+fn short_id(id: uuid::Uuid) -> String {
+    id.to_string().chars().take(8).collect()
 }
 
 fn city_line(

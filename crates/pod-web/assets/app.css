@@ -59,6 +59,10 @@ code {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
+pre {
+  margin: 0;
+}
+
 .skip-link {
   position: fixed;
   top: 10px;
@@ -537,6 +541,18 @@ button:focus-visible {
   grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
 }
 
+.pod-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 22px;
+  align-items: start;
+}
+
+.pod-panel {
+  display: grid;
+  gap: 16px;
+}
+
 .list {
   display: grid;
   gap: 10px;
@@ -772,8 +788,41 @@ button:focus-visible {
   line-height: 1.45;
 }
 
+.sql-block {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #111816;
+  color: #ecf4ef;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
 .inline-form {
   margin-top: 20px;
+}
+
+.actions .inline-form,
+.pod-panel .inline-form {
+  margin-top: 0;
+}
+
+.move-form {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) 72px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.move-form select,
+.move-form input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
 }
 
 .form-error {
@@ -802,6 +851,10 @@ button:focus-visible {
 
   .dashboard-header .actions {
     margin-top: 22px;
+  }
+
+  .move-form {
+    grid-template-columns: 1fr;
   }
 }
 

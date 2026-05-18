@@ -11,6 +11,7 @@ pub mod identity;
 pub mod migrations;
 pub mod ops;
 pub mod playgroups;
+pub mod pods;
 
 pub use decks::{
     CreateDeckInput, DeckRecord, DeckRepository, EventDeckDeclarationInput,
@@ -32,6 +33,7 @@ pub use playgroups::{
     CreateInvite, HouseRuleRecord, MembershipRecord, PlaygroupInviteRecord, PlaygroupRecord,
     PlaygroupRepository, PlaygroupSettingsRecord, PlaygroupWithRole,
 };
+pub use pods::{PodGenerationSummary, PodRecord, PodRepository, PodSeatRecord, PodWithSeats};
 
 #[derive(Debug, Error)]
 pub enum DbError {

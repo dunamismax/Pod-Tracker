@@ -390,15 +390,15 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 7 - Pod Generation
 
-- [ ] Add pod and pod seat tables.
-- [ ] Add pod states: proposed, locked, active, completed, cancelled.
-- [ ] Add SQL-backed candidate generation for confirmed attendees.
-- [ ] Score pod size fit, bracket compatibility, repeated player pairs,
+- [x] Add pod and pod seat tables.
+- [x] Add pod states: proposed, locked, active, completed, cancelled.
+- [x] Add SQL-backed candidate generation for confirmed attendees.
+- [x] Score pod size fit, bracket compatibility, repeated player pairs,
       repeated deck matchups, guest placement, and availability windows.
-- [ ] Allow admin manual edits and manual locks.
-- [ ] Publish pod assignments and notify players.
-- [ ] Add SQL Observatory entry for the pod candidate and scoring query.
-- [ ] Add tests covering generation, constraints, locks, and permissions.
+- [x] Allow admin manual edits and manual locks.
+- [x] Publish pod assignments and notify players.
+- [x] Add SQL Observatory entry for the pod candidate and scoring query.
+- [x] Add tests covering generation, constraints, locks, and permissions.
 
 ### Phase 8 - Game Logging
 
@@ -681,3 +681,10 @@ Trust current primary docs over this file.
   repository access with ownership and visibility checks, SSR deck
   registry/search/detail pages, event deck declaration UI, and focused
   repository, route, and browser smoke coverage.
+- 2026-05-18 - Completed the Rust Phase 7 pod generation slice: added pod
+  and seat migrations, pod state/domain scoring helpers, SQL-backed
+  confirmed-attendee generation, scored repository output, admin pod
+  route controls for generation, locks, manual seat moves, publish, email
+  notification jobs, SQL Observatory pod query entries, and focused
+  repository and route tests for generation, locks, movement, publishing,
+  and permissions.

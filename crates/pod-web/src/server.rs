@@ -22,8 +22,8 @@ use pod_core::playgroups::{PlaygroupRole, slugify};
 use pod_db::{
     CreateDeckInput, CreateEventInput, DbError, DeckRepository, EventDeckDeclarationInput,
     EventDeckDeclarationWithDeck, EventLocationInput, EventRepository, EventRsvpRecord,
-    EventWithRole, IdentityRepository, PlaygroupRepository, RsvpInput, UpdateEventInput,
-    UserRecord,
+    EventWithRole, IdentityRepository, PlaygroupRepository, PodRepository, RsvpInput,
+    UpdateEventInput, UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -69,9 +69,14 @@ pub fn build_router(state: AppState) -> Router {
         .route("/playgroups/{slug}/events", post(create_event))
         .route("/events", get(events))
         .route("/events/{id}", get(event_detail))
+        .route("/events/{id}/pods", get(event_pods))
+        .route("/events/{id}/pods/generate", post(generate_event_pods))
+        .route("/events/{id}/pods/publish", post(publish_event_pods))
         .route("/events/{id}/edit", get(edit_event_form).post(update_event))
         .route("/events/{id}/rsvp", post(save_user_rsvp))
         .route("/events/{id}/decks", post(declare_event_deck))
+        .route("/pods/{id}/lock", post(lock_pod))
+        .route("/pods/{id}/seats/{seat_id}/move", post(move_pod_seat))
         .route("/decks", get(decks).post(create_deck))
         .route("/decks/{id}", get(deck_detail))
         .route("/e/{token}", get(public_event_detail))
@@ -853,6 +858,239 @@ async fn event_detail(
     )
 }
 
+async fn event_pods(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let event = match EventRepository::new(pool).get_for_user(id, user.id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event pods");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(event.member_role.as_str()).ok();
+    let pods = match PodRepository::new(pool).list_for_event(event.id).await {
+        Ok(pods) => pods,
+        Err(err) => {
+            tracing::error!(err = %err, "list event pods");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_event_pods(
+            &event,
+            &pods,
+            &csrf.token,
+            role.is_some_and(can_manage_event),
+        ),
+        csrf.set_cookie,
+    )
+}
+
+async fn generate_event_pods(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<CsrfForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let event = match EventRepository::new(pool).get_for_user(id, user.id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event before pod generation");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(event.member_role.as_str()).ok();
+    if !role.is_some_and(can_manage_event) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    match PodRepository::new(pool)
+        .generate_candidate_pods(id, 4)
+        .await
+    {
+        Ok(_) => Redirect::to(&format!("/events/{id}/pods")).into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "generate event pods");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+async fn publish_event_pods(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<CsrfForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let event = match EventRepository::new(pool).get_for_user(id, user.id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event before pod publish");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(event.member_role.as_str()).ok();
+    if !role.is_some_and(can_manage_event) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    match PodRepository::new(pool).publish_event_pods(id).await {
+        Ok(_) => Redirect::to(&format!("/events/{id}/pods")).into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "publish event pods");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+async fn lock_pod(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<CsrfForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let pod_repo = PodRepository::new(pool);
+    let event_id = match pod_repo.event_id_for_pod(id).await {
+        Ok(Some(event_id)) => event_id,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get pod event before lock");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let event = match EventRepository::new(pool)
+        .get_for_user(event_id, user.id)
+        .await
+    {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event before pod lock");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(event.member_role.as_str()).ok();
+    if !role.is_some_and(can_manage_event) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    match pod_repo.lock_pod(id).await {
+        Ok(Some(_)) => Redirect::to(&format!("/events/{event_id}/pods")).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "lock pod");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+async fn move_pod_seat(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path((id, seat_id)): axum::extract::Path<(uuid::Uuid, uuid::Uuid)>,
+    Form(form): Form<PodMoveForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let pod_repo = PodRepository::new(pool);
+    let event_id = match pod_repo.event_id_for_pod(id).await {
+        Ok(Some(event_id)) => event_id,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get pod event before move");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let event = match EventRepository::new(pool)
+        .get_for_user(event_id, user.id)
+        .await
+    {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event before seat move");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(event.member_role.as_str()).ok();
+    if !role.is_some_and(can_manage_event) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let target_pod_id = match form.target_pod_id.parse() {
+        Ok(id) => id,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    let seat_position = parse_optional_i32(&form.seat_position)
+        .unwrap_or(None)
+        .filter(|position| *position > 0);
+    let Some(seat_position) = seat_position else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+
+    match pod_repo
+        .move_seat(seat_id, target_pod_id, seat_position)
+        .await
+    {
+        Ok(Some(_)) => Redirect::to(&format!("/events/{event_id}/pods")).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "move pod seat");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
 async fn edit_event_form(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -1200,7 +1438,7 @@ async fn calendar_feed(State(state): State<AppState>, headers: HeaderMap) -> Res
 }
 
 async fn observatory() -> Html<String> {
-    Html(ui::render_placeholder("SQL Observatory"))
+    Html(ui::render_observatory())
 }
 
 #[derive(Debug, Deserialize)]
@@ -1279,6 +1517,13 @@ struct DeckDeclarationForm {
     preference: String,
     #[serde(default)]
     testing_notes: String,
+    csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PodMoveForm {
+    target_pod_id: String,
+    seat_position: String,
     csrf_token: String,
 }
 
@@ -1848,7 +2093,7 @@ mod tests {
     use axum::http::{HeaderMap, Request, StatusCode};
     use pod_core::config::AppConfig;
     use pod_core::playgroups::PlaygroupRole;
-    use pod_db::{EventRepository, IdentityRepository, PlaygroupRepository};
+    use pod_db::{EventRepository, IdentityRepository, PlaygroupRepository, PodRepository};
     use tower::ServiceExt;
 
     use super::{AppState, build_router, session_cookie};
@@ -2836,5 +3081,193 @@ mod tests {
         let event_body = body_string(event).await;
         assert!(event_body.contains("Atraxa Counters"));
         assert!(event_body.contains("Testing counter package"));
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn pod_routes_generate_publish_and_enforce_permissions(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool.clone()));
+        let owner = sign_up(&app, "pod-route-owner@example.test", "Owner").await;
+        let member = sign_up(&app, "pod-route-member@example.test", "Member").await;
+
+        let create_playgroup = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Pod+Route+Crew&description=Pods&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create playgroup");
+        assert_eq!(create_playgroup.status(), StatusCode::SEE_OTHER);
+
+        let identity = IdentityRepository::new(&pool);
+        let owner_user = identity
+            .find_user_by_email("pod-route-owner@example.test")
+            .await
+            .expect("owner user")
+            .expect("owner user");
+        let member_user = identity
+            .find_user_by_email("pod-route-member@example.test")
+            .await
+            .expect("member user")
+            .expect("member user");
+        let playgroup = PlaygroupRepository::new(&pool)
+            .get_by_slug_for_user("pod-route-crew", owner_user.id)
+            .await
+            .expect("playgroup")
+            .expect("playgroup");
+        PlaygroupRepository::new(&pool)
+            .add_membership(playgroup.id, member_user.id, PlaygroupRole::Member, None)
+            .await
+            .expect("member membership");
+
+        let create_event = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups/pod-route-crew/events")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "title=Pod+Night&description=Generate+pods&start_time=2026-06-05T19:00&end_time=&visibility=members&location_name=&address_line1=&address_line2=&city=&state_province=&postal_code=&country=&location_notes=&address_visibility=hidden&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create event");
+        assert_eq!(create_event.status(), StatusCode::SEE_OTHER);
+        let event_id = redirected_event_id(&create_event);
+
+        for signed_in in [&owner, &member] {
+            let rsvp = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri(format!("/events/{event_id}/rsvp"))
+                        .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                        .header("cookie", signed_in.cookie_header.clone())
+                        .body(Body::from(format!(
+                            "status=yes&arrival_time=&leaving_time=&guest_count=0&travel_buffer_minutes=&notes=&csrf_token={}",
+                            signed_in.csrf_token
+                        )))
+                        .expect("request"),
+                )
+                .await
+                .expect("rsvp");
+            assert_eq!(rsvp.status(), StatusCode::SEE_OTHER);
+        }
+
+        let member_generate = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/events/{event_id}/pods/generate"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", member.cookie_header.clone())
+                    .body(Body::from(format!("csrf_token={}", member.csrf_token)))
+                    .expect("request"),
+            )
+            .await
+            .expect("member generate");
+        assert_eq!(member_generate.status(), StatusCode::FORBIDDEN);
+
+        let owner_generate = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/events/{event_id}/pods/generate"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!("csrf_token={}", owner.csrf_token)))
+                    .expect("request"),
+            )
+            .await
+            .expect("owner generate");
+        assert_eq!(owner_generate.status(), StatusCode::SEE_OTHER);
+
+        let pods = PodRepository::new(&pool)
+            .list_for_event(event_id)
+            .await
+            .expect("pods");
+        assert_eq!(pods.len(), 1);
+        assert_eq!(pods[0].seats.len(), 2);
+
+        let owner_pods = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/events/{event_id}/pods"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("owner pods");
+        assert_eq!(owner_pods.status(), StatusCode::OK);
+        let owner_pods_body = body_string(owner_pods).await;
+        assert!(owner_pods_body.contains("Pod 1"));
+        assert!(owner_pods_body.contains("Generate"));
+
+        let member_lock = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/pods/{}/lock", pods[0].pod.id))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", member.cookie_header.clone())
+                    .body(Body::from(format!("csrf_token={}", member.csrf_token)))
+                    .expect("request"),
+            )
+            .await
+            .expect("member lock");
+        assert_eq!(member_lock.status(), StatusCode::FORBIDDEN);
+
+        let owner_lock = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/pods/{}/lock", pods[0].pod.id))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!("csrf_token={}", owner.csrf_token)))
+                    .expect("request"),
+            )
+            .await
+            .expect("owner lock");
+        assert_eq!(owner_lock.status(), StatusCode::SEE_OTHER);
+
+        let owner_publish = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/events/{event_id}/pods/publish"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!("csrf_token={}", owner.csrf_token)))
+                    .expect("request"),
+            )
+            .await
+            .expect("owner publish");
+        assert_eq!(owner_publish.status(), StatusCode::SEE_OTHER);
+
+        let active = PodRepository::new(&pool)
+            .list_for_event(event_id)
+            .await
+            .expect("active pods");
+        assert_eq!(active[0].pod.state, "active");
     }
 }

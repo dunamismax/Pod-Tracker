@@ -4,3 +4,4 @@ pub mod decks;
 pub mod events;
 pub mod health;
 pub mod playgroups;
+pub mod pods;
