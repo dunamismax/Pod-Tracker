@@ -3,12 +3,13 @@ use pod_db::{
     CardSearchResult, CollectionCardRecord, CollectionRecord, DeckBracketSnapshotRecord,
     DeckMissingCardRecord, DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord,
     EventWithRole, GameWithPlayers, HouseRuleRecord, MetaDashboard, MetaDistributionMetric,
-    PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
+    PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats, WishlistCardRecord,
+    WishlistMissingCardRecord, WishlistRecord,
 };
 use time::{OffsetDateTime, UtcOffset};
 
 use crate::server::{
-    CollectionForm, DeckForm, EventEditForm, EventForm, EventPageContext, RsvpForm,
+    CollectionForm, DeckForm, EventEditForm, EventForm, EventPageContext, RsvpForm, WishlistForm,
 };
 
 pub fn render_home() -> String {
@@ -1046,6 +1047,273 @@ pub fn render_collection_missing_cards(
                         }.into_any()
                     } else {
                         view! { <p class="empty-state">"This collection covers the latest imported decklist."</p> }.into_any()
+                    }}
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_wishlists(
+    csrf_token: &str,
+    wishlists: &[WishlistRecord],
+    playgroups: &[PlaygroupWithRole],
+    error: Option<&str>,
+    form: Option<&WishlistForm>,
+) -> String {
+    let csrf_token = csrf_token.to_owned();
+    let wishlists = wishlists.to_vec();
+    let playgroups = playgroups.to_vec();
+    let error = error.map(str::to_owned);
+    let name = form.map(|form| form.name.as_str()).unwrap_or("").to_owned();
+    let visibility = form
+        .map(|form| form.visibility.as_str())
+        .unwrap_or("private")
+        .to_owned();
+    let playgroup_id = form
+        .map(|form| form.playgroup_id.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let notes = form
+        .map(|form| form.notes.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let has_wishlists = !wishlists.is_empty();
+
+    view! {
+        <AppShell title="Wishlists" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header compact">
+                    <p class="eyebrow">"Collection tracking"</p>
+                    <h1>"Wishlists"</h1>
+                    <nav class="actions" aria-label="Wishlist navigation">
+                        <a class="button secondary" href="/collections">"Collections"</a>
+                    </nav>
+                </section>
+                <section class="split-layout wide-left">
+                    <div class="workspace-panel">
+                        <div class="section-heading">
+                            <h2>"Visible wishlists"</h2>
+                            <span>{wishlists.len()} " wishlists"</span>
+                        </div>
+                        {if has_wishlists {
+                            view! {
+                                <div class="list">
+                                    {wishlists.into_iter().map(|wishlist| view! {
+                                        <article class="list-item">
+                                            <div>
+                                                <h2><a href=format!("/wishlists/{}", wishlist.id)>{wishlist.name}</a></h2>
+                                                <p>{wishlist.notes}</p>
+                                            </div>
+                                            <dl class="compact-list inline">
+                                                <div><dt>"Visibility"</dt><dd>{wishlist.visibility}</dd></div>
+                                            </dl>
+                                        </article>
+                                    }).collect_view()}
+                                </div>
+                            }.into_any()
+                        } else {
+                            view! { <p class="empty-state">"No visible wishlists yet."</p> }.into_any()
+                        }}
+                    </div>
+                    <form method="post" action="/wishlists" class="form-panel">
+                        <h2>"New wishlist"</h2>
+                        {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                        <input type="hidden" name="csrf_token" value=csrf_token/>
+                        <label>"Name"<input name="name" required value=name/></label>
+                        <div class="field-grid">
+                            <label>
+                                "Visibility"
+                                <select name="visibility">
+                                    <option value="private" selected=visibility == "private">"Private"</option>
+                                    <option value="playgroup" selected=visibility == "playgroup">"Playgroup"</option>
+                                    <option value="public" selected=visibility == "public">"Public"</option>
+                                </select>
+                            </label>
+                            <label>
+                                "Playgroup"
+                                <select name="playgroup_id">
+                                    <option value="" selected=playgroup_id.is_empty()>"None"</option>
+                                    {playgroups.into_iter().map(|playgroup| {
+                                        let id = playgroup.id.to_string();
+                                        view! {
+                                            <option value=id.clone() selected=playgroup_id == id>
+                                                {playgroup.name}
+                                            </option>
+                                        }
+                                    }).collect_view()}
+                                </select>
+                            </label>
+                        </div>
+                        <label>"Notes"<textarea name="notes" rows="3">{notes}</textarea></label>
+                        <button class="button primary" type="submit">"Save wishlist"</button>
+                    </form>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_wishlist_detail(
+    wishlist: &WishlistRecord,
+    cards: &[WishlistCardRecord],
+    collections: &[CollectionRecord],
+    csrf_token: &str,
+    error: Option<&str>,
+    can_edit: bool,
+) -> String {
+    let wishlist = wishlist.clone();
+    let cards = cards.to_vec();
+    let collections = collections.to_vec();
+    let csrf_token = csrf_token.to_owned();
+    let error = error.map(str::to_owned);
+    let has_cards = !cards.is_empty();
+
+    view! {
+        <AppShell title="Wishlist" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header">
+                    <p class="eyebrow">"Wishlist"</p>
+                    <h1>{wishlist.name.clone()}</h1>
+                    <p class="lede">{wishlist.notes.clone()}</p>
+                    <nav class="actions" aria-label="Wishlist actions">
+                        <a class="button secondary" href="/wishlists">"All wishlists"</a>
+                        <a class="button secondary" href="/collections">"Collections"</a>
+                    </nav>
+                    <dl class="status-list">
+                        <div><dt>"Visibility"</dt><dd>{wishlist.visibility.clone()}</dd></div>
+                    </dl>
+                </section>
+                <section class="split-layout wide-left">
+                    <div class="workspace-panel">
+                        <div class="section-heading">
+                            <h2>"Cards"</h2>
+                            <span>{cards.iter().map(|card| card.desired_quantity).sum::<i32>()} " wanted"</span>
+                        </div>
+                        {if has_cards {
+                            view! {
+                                <div class="list">
+                                    {cards.into_iter().map(|card| view! {
+                                        <article class="list-item">
+                                            <div>
+                                                <h2>{card.card_name}</h2>
+                                                <p>{card.notes}</p>
+                                            </div>
+                                            <dl class="compact-list inline">
+                                                <div><dt>"Qty"</dt><dd>{card.desired_quantity}</dd></div>
+                                                <div><dt>"Priority"</dt><dd>{card.priority}</dd></div>
+                                            </dl>
+                                        </article>
+                                    }).collect_view()}
+                                </div>
+                            }.into_any()
+                        } else {
+                            view! { <p class="empty-state">"No wishlist cards yet."</p> }.into_any()
+                        }}
+                    </div>
+                    {can_edit.then(|| view! {
+                        <form method="post" action=format!("/wishlists/{}/cards", wishlist.id) class="form-panel">
+                            <h2>"Add or update card"</h2>
+                            {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                            <input type="hidden" name="csrf_token" value=csrf_token/>
+                            <label>"Card"<input name="card_name" required placeholder="Counterspell"/></label>
+                            <div class="field-grid">
+                                <label>"Quantity"<input name="desired_quantity" inputmode="numeric" value="1"/></label>
+                                <label>
+                                    "Priority"
+                                    <select name="priority">
+                                        <option value="medium">"Medium"</option>
+                                        <option value="high">"High"</option>
+                                        <option value="low">"Low"</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <label>"Notes"<textarea name="notes" rows="3"></textarea></label>
+                            <button class="button primary" type="submit">"Save card"</button>
+                        </form>
+                    })}
+                </section>
+                <section class="workspace-panel section-gap">
+                    <div class="section-heading">
+                        <h2>"Collection coverage"</h2>
+                        <span>{collections.len()} " visible collections"</span>
+                    </div>
+                    {if collections.is_empty() {
+                        view! { <p class="empty-state">"Create a collection to compare owned cards against this wishlist."</p> }.into_any()
+                    } else {
+                        view! {
+                            <div class="list">
+                                {collections.into_iter().map(|collection| view! {
+                                    <article class="list-item">
+                                        <div>
+                                            <h2>{collection.name.clone()}</h2>
+                                            <p>{collection.notes}</p>
+                                        </div>
+                                        <nav class="actions" aria-label="Wishlist collection actions">
+                                            <a class="button secondary" href=format!("/wishlists/{}/collections/{}/missing", wishlist.id, collection.id)>"Needed"</a>
+                                        </nav>
+                                    </article>
+                                }).collect_view()}
+                            </div>
+                        }.into_any()
+                    }}
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_wishlist_missing_cards(
+    wishlist: &WishlistRecord,
+    collection: &CollectionRecord,
+    cards: &[WishlistMissingCardRecord],
+) -> String {
+    let wishlist = wishlist.clone();
+    let collection = collection.clone();
+    let cards = cards.to_vec();
+    let has_cards = !cards.is_empty();
+
+    view! {
+        <AppShell title="Wishlist Needed Cards" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header compact">
+                    <p class="eyebrow">"Wishlist needed"</p>
+                    <h1>{wishlist.name.clone()}</h1>
+                    <p class="lede">{collection.name.clone()}</p>
+                    <nav class="actions" aria-label="Wishlist needed actions">
+                        <a class="button secondary" href=format!("/wishlists/{}", wishlist.id)>"Wishlist"</a>
+                        <a class="button secondary" href=format!("/collections/{}", collection.id)>"Collection"</a>
+                    </nav>
+                </section>
+                <section class="workspace-panel">
+                    <div class="section-heading">
+                        <h2>"Needed after collection"</h2>
+                        <span>{cards.len()} " cards"</span>
+                    </div>
+                    {if has_cards {
+                        view! {
+                            <div class="list">
+                                {cards.into_iter().map(|card| view! {
+                                    <article class="list-item">
+                                        <div>
+                                            <h2>{card.card_name}</h2>
+                                            <p>{card.notes}</p>
+                                        </div>
+                                        <dl class="compact-list inline">
+                                            <div><dt>"Want"</dt><dd>{card.desired_quantity}</dd></div>
+                                            <div><dt>"Owned"</dt><dd>{card.owned_quantity}</dd></div>
+                                            <div><dt>"Needed"</dt><dd>{card.missing_quantity}</dd></div>
+                                            <div><dt>"Priority"</dt><dd>{card.priority}</dd></div>
+                                        </dl>
+                                    </article>
+                                }).collect_view()}
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! { <p class="empty-state">"This collection covers the wishlist."</p> }.into_any()
                     }}
                 </section>
             </main>
@@ -2577,6 +2845,7 @@ fn AppShell(
                         <a href="/decks">"Decks"</a>
                         <a href="/cards">"Cards"</a>
                         <a href="/collections">"Collections"</a>
+                        <a href="/wishlists">"Wishlists"</a>
                         <a href="/meta">"Meta"</a>
                         <a href="/observatory">"Observatory"</a>
                         <a class="nav-login" href=account_href>{account_label}</a>

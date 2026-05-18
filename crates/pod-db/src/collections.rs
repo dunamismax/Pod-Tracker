@@ -58,6 +58,17 @@ pub struct WishlistCardRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WishlistMissingCardRecord {
+    pub oracle_id: Uuid,
+    pub card_name: String,
+    pub desired_quantity: i64,
+    pub owned_quantity: i64,
+    pub missing_quantity: i64,
+    pub priority: String,
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeckMissingCardRecord {
     pub oracle_id: Uuid,
     pub card_name: String,
@@ -495,6 +506,75 @@ impl<'a> CollectionRepository<'a> {
         Ok(wishlists)
     }
 
+    pub async fn get_wishlist_for_user(
+        &self,
+        wishlist_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<WishlistRecord>, DbError> {
+        let wishlist = sqlx::query_as!(
+            WishlistRecord,
+            r#"
+            select distinct w.id, w.owner_user_id, w.playgroup_id, w.name,
+              w.visibility, w.notes, w.created_at, w.updated_at
+            from core.wishlists w
+            left join core.playgroup_memberships m
+              on m.playgroup_id = w.playgroup_id
+             and m.user_id = $2
+            where w.id = $1
+              and (
+                w.owner_user_id = $2
+                or w.visibility = 'public'
+                or (w.visibility = 'playgroup' and m.user_id is not null)
+              )
+            "#,
+            wishlist_id,
+            user_id,
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(wishlist)
+    }
+
+    pub async fn list_wishlist_cards_for_user(
+        &self,
+        wishlist_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Vec<WishlistCardRecord>, DbError> {
+        let cards = sqlx::query_as!(
+            WishlistCardRecord,
+            r#"
+            select wc.id, wc.wishlist_id, wc.oracle_id, wc.card_name,
+              wc.desired_quantity, wc.priority, wc.notes, wc.created_at,
+              wc.updated_at
+            from core.wishlist_cards wc
+            join core.wishlists w on w.id = wc.wishlist_id
+            left join core.playgroup_memberships m
+              on m.playgroup_id = w.playgroup_id
+             and m.user_id = $2
+            where wc.wishlist_id = $1
+              and (
+                w.owner_user_id = $2
+                or w.visibility = 'public'
+                or (w.visibility = 'playgroup' and m.user_id is not null)
+              )
+            order by
+              case wc.priority
+                when 'high' then 0
+                when 'medium' then 1
+                else 2
+              end,
+              wc.card_name asc
+            "#,
+            wishlist_id,
+            user_id,
+        )
+        .fetch_all(self.pool)
+        .await?;
+
+        Ok(cards)
+    }
+
     pub async fn add_wishlist_card(
         &self,
         input: AddWishlistCardInput<'_>,
@@ -537,6 +617,83 @@ impl<'a> CollectionRepository<'a> {
         .await?;
 
         Ok(card)
+    }
+
+    pub async fn missing_wishlist_cards_for_collection(
+        &self,
+        wishlist_id: Uuid,
+        collection_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Vec<WishlistMissingCardRecord>, DbError> {
+        let cards = sqlx::query_as!(
+            WishlistMissingCardRecord,
+            r#"
+            with visible_wishlist as (
+              select w.id
+              from core.wishlists w
+              left join core.playgroup_memberships m
+                on m.playgroup_id = w.playgroup_id
+               and m.user_id = $3
+              where w.id = $1
+                and (
+                  w.owner_user_id = $3
+                  or w.visibility = 'public'
+                  or (w.visibility = 'playgroup' and m.user_id is not null)
+                )
+            ),
+            visible_collection as (
+              select c.id
+              from core.collections c
+              left join core.playgroup_memberships m
+                on m.playgroup_id = c.playgroup_id
+               and m.user_id = $3
+              where c.id = $2
+                and (
+                  c.owner_user_id = $3
+                  or c.visibility = 'public'
+                  or (c.visibility = 'playgroup' and m.user_id is not null)
+                )
+            ),
+            wanted_cards as (
+              select wc.oracle_id, wc.card_name, wc.desired_quantity::bigint,
+                wc.priority, wc.notes
+              from core.wishlist_cards wc
+              join visible_wishlist w on w.id = wc.wishlist_id
+            ),
+            owned_cards as (
+              select cc.oracle_id, sum(cc.quantity)::bigint as owned_quantity
+              from core.collection_cards cc
+              join visible_collection c on c.id = cc.collection_id
+              group by cc.oracle_id
+            )
+            select
+              w.oracle_id as "oracle_id!",
+              w.card_name as "card_name!",
+              w.desired_quantity as "desired_quantity!",
+              coalesce(o.owned_quantity, 0)::bigint as "owned_quantity!",
+              greatest(w.desired_quantity - coalesce(o.owned_quantity, 0), 0)::bigint
+                as "missing_quantity!",
+              w.priority as "priority!",
+              w.notes as "notes!"
+            from wanted_cards w
+            left join owned_cards o on o.oracle_id = w.oracle_id
+            where greatest(w.desired_quantity - coalesce(o.owned_quantity, 0), 0) > 0
+            order by
+              case w.priority
+                when 'high' then 0
+                when 'medium' then 1
+                else 2
+              end,
+              w.card_name asc
+            "#,
+            wishlist_id,
+            collection_id,
+            user_id,
+        )
+        .fetch_all(self.pool)
+        .await?;
+
+        Ok(cards)
     }
 }
 
@@ -864,6 +1021,14 @@ mod tests {
             )
             .await
             .expect("owner");
+        let member = identity
+            .create_user(
+                "wishlist-member@example.test",
+                "Wishlist Member",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("member");
         let outsider = identity
             .create_user(
                 "wishlist-outsider@example.test",
@@ -872,20 +1037,40 @@ mod tests {
             )
             .await
             .expect("outsider");
+        let playgroup = PlaygroupRepository::new(&pool)
+            .create_playgroup(owner.id, "Wishlist Crew", "wishlist-crew", "")
+            .await
+            .expect("playgroup");
+        PlaygroupRepository::new(&pool)
+            .add_membership(playgroup.id, member.id, PlaygroupRole::Member, None)
+            .await
+            .expect("member membership");
         seed_cards(&pool).await;
 
         let repo = CollectionRepository::new(&pool);
         let wishlist = repo
             .create_wishlist(CreateWishlistInput {
                 owner_user_id: owner.id,
-                playgroup_id: None,
+                playgroup_id: Some(playgroup.id),
                 name: "Upgrade Targets",
-                visibility: "private",
+                visibility: "playgroup",
                 notes: "Low priority pickups.",
             })
             .await
             .expect("create wishlist")
             .expect("wishlist");
+        assert!(
+            repo.get_wishlist_for_user(wishlist.id, member.id)
+                .await
+                .expect("member wishlist")
+                .is_some()
+        );
+        assert!(
+            repo.get_wishlist_for_user(wishlist.id, outsider.id)
+                .await
+                .expect("outsider wishlist")
+                .is_none()
+        );
         let card = repo
             .add_wishlist_card(AddWishlistCardInput {
                 wishlist_id: wishlist.id,
@@ -900,6 +1085,19 @@ mod tests {
             .expect("wishlist card");
         assert_eq!(card.card_name, "Counterspell");
         assert_eq!(card.desired_quantity, 2);
+        let sol_ring = repo
+            .add_wishlist_card(AddWishlistCardInput {
+                wishlist_id: wishlist.id,
+                owner_user_id: owner.id,
+                card_name: "Sol Ring",
+                desired_quantity: 2,
+                priority: "medium",
+                notes: "Need one extra.",
+            })
+            .await
+            .expect("add sol ring")
+            .expect("sol ring");
+        assert_eq!(sol_ring.desired_quantity, 2);
         assert!(
             repo.add_wishlist_card(AddWishlistCardInput {
                 wishlist_id: wishlist.id,
@@ -913,6 +1111,16 @@ mod tests {
             .expect("outsider add")
             .is_none()
         );
+        let member_cards = repo
+            .list_wishlist_cards_for_user(wishlist.id, member.id)
+            .await
+            .expect("member wishlist cards");
+        assert_eq!(member_cards.len(), 2);
+        assert!(
+            member_cards
+                .iter()
+                .any(|card| card.card_name == "Counterspell")
+        );
         assert_eq!(
             repo.list_wishlists_for_user(owner.id)
                 .await
@@ -924,6 +1132,56 @@ mod tests {
             repo.list_wishlists_for_user(outsider.id)
                 .await
                 .expect("outsider wishlists")
+                .is_empty()
+        );
+
+        let collection = repo
+            .create_collection(CreateCollectionInput {
+                owner_user_id: owner.id,
+                playgroup_id: Some(playgroup.id),
+                name: "Wishlist Binder",
+                visibility: "playgroup",
+                notes: "",
+            })
+            .await
+            .expect("create collection")
+            .expect("collection");
+        repo.add_collection_card(AddCollectionCardInput {
+            collection_id: collection.id,
+            owner_user_id: owner.id,
+            card_name: "Sol Ring",
+            set_code: None,
+            collector_number: None,
+            quantity: 1,
+            foil: false,
+            condition: "unknown",
+            location: "",
+        })
+        .await
+        .expect("add owned sol ring")
+        .expect("owned sol ring");
+
+        let missing = repo
+            .missing_wishlist_cards_for_collection(wishlist.id, collection.id, member.id)
+            .await
+            .expect("wishlist missing cards");
+        assert_eq!(missing.len(), 2);
+        assert!(missing.iter().any(|card| {
+            card.card_name == "Counterspell"
+                && card.desired_quantity == 2
+                && card.owned_quantity == 0
+                && card.missing_quantity == 2
+        }));
+        assert!(missing.iter().any(|card| {
+            card.card_name == "Sol Ring"
+                && card.desired_quantity == 2
+                && card.owned_quantity == 1
+                && card.missing_quantity == 1
+        }));
+        assert!(
+            repo.missing_wishlist_cards_for_collection(wishlist.id, collection.id, outsider.id)
+                .await
+                .expect("outsider wishlist missing")
                 .is_empty()
         );
     }

@@ -20,7 +20,7 @@ pub mod scryfall;
 pub use collections::{
     AddCollectionCardInput, AddWishlistCardInput, CollectionCardRecord, CollectionRecord,
     CollectionRepository, CreateCollectionInput, CreateWishlistInput, DeckMissingCardRecord,
-    WishlistCardRecord, WishlistRecord,
+    WishlistCardRecord, WishlistMissingCardRecord, WishlistRecord,
 };
 pub use decks::{
     CreateDeckInput, DeckBracketSnapshotRecord, DeckCardRecord, DeckRecord, DeckRepository,

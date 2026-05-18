@@ -11,7 +11,7 @@ use pod_core::auth::{
     verify_password,
 };
 use pod_core::collections::{
-    CardCondition, CollectionVisibility, ProxyPrintEntry, export_proxy_print_list,
+    CardCondition, CollectionVisibility, ProxyPrintEntry, WishlistPriority, export_proxy_print_list,
 };
 use pod_core::config::AppConfig;
 use pod_core::decklists::{
@@ -27,12 +27,12 @@ use pod_core::games::{GameResultType, normalize_game_tags};
 use pod_core::health::{HealthResponse, ReadinessFailure};
 use pod_core::playgroups::{PlaygroupRole, slugify};
 use pod_db::{
-    AddCollectionCardInput, CardSearchFilters, CollectionRepository, CreateCollectionInput,
-    CreateDeckInput, CreateEventInput, DbError, DeckRepository, DecklistImportInput,
-    EventDeckDeclarationInput, EventDeckDeclarationWithDeck, EventLocationInput, EventRepository,
-    EventRsvpRecord, EventWithRole, GameRepository, GameWithPlayers, IdentityRepository,
-    LogGameInput, MetaRepository, PlaygroupRepository, PodRepository, PodWithSeats, RsvpInput,
-    ScryfallRepository, UpdateEventInput, UserRecord,
+    AddCollectionCardInput, AddWishlistCardInput, CardSearchFilters, CollectionRepository,
+    CreateCollectionInput, CreateDeckInput, CreateEventInput, CreateWishlistInput, DbError,
+    DeckRepository, DecklistImportInput, EventDeckDeclarationInput, EventDeckDeclarationWithDeck,
+    EventLocationInput, EventRepository, EventRsvpRecord, EventWithRole, GameRepository,
+    GameWithPlayers, IdentityRepository, LogGameInput, MetaRepository, PlaygroupRepository,
+    PodRepository, PodWithSeats, RsvpInput, ScryfallRepository, UpdateEventInput, UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -102,6 +102,13 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/collections/{id}/decks/{deck_id}/proxy-list",
             get(collection_proxy_list),
+        )
+        .route("/wishlists", get(wishlists).post(create_wishlist))
+        .route("/wishlists/{id}", get(wishlist_detail))
+        .route("/wishlists/{id}/cards", post(add_wishlist_card))
+        .route(
+            "/wishlists/{id}/collections/{collection_id}/missing",
+            get(wishlist_missing_cards),
         )
         .route("/meta", get(meta_dashboard))
         .route("/e/{token}", get(public_event_detail))
@@ -1162,6 +1169,228 @@ async fn collection_proxy_list(
     response
 }
 
+async fn wishlists(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let repo = CollectionRepository::new(pool);
+    let wishlists = match repo.list_wishlists_for_user(user.id).await {
+        Ok(wishlists) => wishlists,
+        Err(err) => {
+            tracing::error!(err = %err, "list wishlists");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let playgroups = match PlaygroupRepository::new(pool).list_for_user(user.id).await {
+        Ok(playgroups) => playgroups,
+        Err(err) => {
+            tracing::error!(err = %err, "list playgroups for wishlist form");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_wishlists(&csrf.token, &wishlists, &playgroups, None, None),
+        csrf.set_cookie,
+    )
+}
+
+async fn create_wishlist(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<WishlistForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let repo = CollectionRepository::new(pool);
+    let playgroups = match PlaygroupRepository::new(pool).list_for_user(user.id).await {
+        Ok(playgroups) => playgroups,
+        Err(err) => {
+            tracing::error!(err = %err, "list playgroups before wishlist create");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let existing = match repo.list_wishlists_for_user(user.id).await {
+        Ok(wishlists) => wishlists,
+        Err(err) => {
+            tracing::error!(err = %err, "list wishlists before create");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    let parsed = match parse_wishlist_form(&playgroups, &form) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            return html_with_cookies(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ui::render_wishlists(
+                    &csrf.token,
+                    &existing,
+                    &playgroups,
+                    Some(message),
+                    Some(&form),
+                ),
+                csrf.set_cookie,
+            );
+        }
+    };
+
+    match repo
+        .create_wishlist(CreateWishlistInput {
+            owner_user_id: user.id,
+            playgroup_id: parsed.playgroup_id,
+            name: &parsed.name,
+            visibility: &parsed.visibility,
+            notes: &parsed.notes,
+        })
+        .await
+    {
+        Ok(Some(wishlist)) => Redirect::to(&format!("/wishlists/{}", wishlist.id)).into_response(),
+        Ok(None) => StatusCode::FORBIDDEN.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "create wishlist");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+async fn wishlist_detail(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    render_wishlist_detail_response(&state, pool, user.id, id, None, &headers).await
+}
+
+async fn add_wishlist_card(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<WishlistCardForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let parsed = match parse_wishlist_card_form(&form) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            return render_wishlist_detail_response(
+                &state,
+                pool,
+                user.id,
+                id,
+                Some(message),
+                &headers,
+            )
+            .await;
+        }
+    };
+
+    let repo = CollectionRepository::new(pool);
+    match repo
+        .add_wishlist_card(AddWishlistCardInput {
+            wishlist_id: id,
+            owner_user_id: user.id,
+            card_name: &parsed.card_name,
+            desired_quantity: parsed.desired_quantity,
+            priority: &parsed.priority,
+            notes: &parsed.notes,
+        })
+        .await
+    {
+        Ok(Some(_card)) => Redirect::to(&format!("/wishlists/{id}")).into_response(),
+        Ok(None) => {
+            render_wishlist_detail_response(
+                &state,
+                pool,
+                user.id,
+                id,
+                Some("Card was not found in the local Scryfall index or wishlist is not owned."),
+                &headers,
+            )
+            .await
+        }
+        Err(err) => {
+            tracing::error!(err = %err, "add wishlist card");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+async fn wishlist_missing_cards(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path((id, collection_id)): axum::extract::Path<(uuid::Uuid, uuid::Uuid)>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let repo = CollectionRepository::new(pool);
+    let wishlist = match repo.get_wishlist_for_user(id, user.id).await {
+        Ok(Some(wishlist)) => wishlist,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get wishlist for missing cards");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let collection = match repo.get_collection_for_user(collection_id, user.id).await {
+        Ok(Some(collection)) => collection,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get collection for wishlist missing cards");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let cards = match repo
+        .missing_wishlist_cards_for_collection(id, collection_id, user.id)
+        .await
+    {
+        Ok(cards) => cards,
+        Err(err) => {
+            tracing::error!(err = %err, "load wishlist missing cards");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Html(ui::render_wishlist_missing_cards(
+        &wishlist,
+        &collection,
+        &cards,
+    ))
+    .into_response()
+}
+
 async fn meta_dashboard(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let Some(user) = require_user(&state, &headers).await else {
         return Redirect::to("/login").into_response();
@@ -2148,6 +2377,30 @@ pub(crate) struct CollectionCardForm {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct WishlistForm {
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) visibility: String,
+    #[serde(default)]
+    pub(crate) playgroup_id: String,
+    #[serde(default)]
+    pub(crate) notes: String,
+    pub(crate) csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct WishlistCardForm {
+    pub(crate) card_name: String,
+    #[serde(default)]
+    pub(crate) desired_quantity: String,
+    #[serde(default)]
+    pub(crate) priority: String,
+    #[serde(default)]
+    pub(crate) notes: String,
+    pub(crate) csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct DeckForm {
     pub(crate) name: String,
     pub(crate) commander: String,
@@ -2278,6 +2531,22 @@ struct ParsedCollectionCardForm {
     foil: bool,
     condition: String,
     location: String,
+}
+
+#[derive(Debug, Clone)]
+struct ParsedWishlistForm {
+    playgroup_id: Option<uuid::Uuid>,
+    name: String,
+    visibility: String,
+    notes: String,
+}
+
+#[derive(Debug, Clone)]
+struct ParsedWishlistCardForm {
+    card_name: String,
+    desired_quantity: i32,
+    priority: String,
+    notes: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2620,6 +2889,56 @@ async fn render_collection_detail_response(
     )
 }
 
+async fn render_wishlist_detail_response(
+    state: &AppState,
+    pool: &PgPool,
+    user_id: uuid::Uuid,
+    wishlist_id: uuid::Uuid,
+    error: Option<&str>,
+    headers: &HeaderMap,
+) -> Response {
+    let repo = CollectionRepository::new(pool);
+    let wishlist = match repo.get_wishlist_for_user(wishlist_id, user_id).await {
+        Ok(Some(wishlist)) => wishlist,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get wishlist");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let cards = match repo
+        .list_wishlist_cards_for_user(wishlist_id, user_id)
+        .await
+    {
+        Ok(cards) => cards,
+        Err(err) => {
+            tracing::error!(err = %err, "list wishlist cards");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let collections = match repo.list_collections_for_user(user_id).await {
+        Ok(collections) => collections,
+        Err(err) => {
+            tracing::error!(err = %err, "list collections for wishlist coverage");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let csrf = ensure_csrf_cookie(headers, &state.config);
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_wishlist_detail(
+            &wishlist,
+            &cards,
+            &collections,
+            &csrf.token,
+            error,
+            wishlist.owner_user_id == user_id,
+        ),
+        csrf.set_cookie,
+    )
+}
+
 fn parse_rsvp_input<'a>(
     event_id: uuid::Uuid,
     user_id: Option<uuid::Uuid>,
@@ -2713,6 +3032,64 @@ fn parse_collection_card_form(
         foil: form.foil,
         condition,
         location: form.location.trim().to_owned(),
+    })
+}
+
+fn parse_wishlist_form(
+    playgroups: &[pod_db::PlaygroupWithRole],
+    form: &WishlistForm,
+) -> Result<ParsedWishlistForm, &'static str> {
+    let name = form.name.trim();
+    if name.is_empty() {
+        return Err("Wishlist name is required.");
+    }
+    let visibility =
+        CollectionVisibility::try_from(default_if_empty(form.visibility.trim(), "private"))
+            .map_err(|()| "Choose a valid wishlist visibility.")?
+            .as_str()
+            .to_owned();
+    let playgroup_id = optional_trimmed(&form.playgroup_id)
+        .map(str::parse)
+        .transpose()
+        .map_err(|_| "Choose a valid playgroup for playgroup-visible wishlists.")?;
+    if playgroup_id.is_some_and(|id| !playgroups.iter().any(|playgroup| playgroup.id == id)) {
+        return Err("Choose a playgroup you belong to.");
+    }
+    if visibility == CollectionVisibility::Playgroup.as_str() && playgroup_id.is_none() {
+        return Err("Playgroup-visible wishlists need a playgroup.");
+    }
+
+    Ok(ParsedWishlistForm {
+        playgroup_id,
+        name: name.to_owned(),
+        visibility,
+        notes: form.notes.trim().to_owned(),
+    })
+}
+
+fn parse_wishlist_card_form(
+    form: &WishlistCardForm,
+) -> Result<ParsedWishlistCardForm, &'static str> {
+    let card_name = form.card_name.trim();
+    if card_name.is_empty() {
+        return Err("Card name is required.");
+    }
+    let desired_quantity = parse_optional_i32(&form.desired_quantity)
+        .unwrap_or(Some(1))
+        .ok_or("Quantity must be a number.")?;
+    if desired_quantity <= 0 {
+        return Err("Quantity must be positive.");
+    }
+    let priority = WishlistPriority::try_from(default_if_empty(form.priority.trim(), "medium"))
+        .map_err(|()| "Choose a valid wishlist priority.")?
+        .as_str()
+        .to_owned();
+
+    Ok(ParsedWishlistCardForm {
+        card_name: card_name.to_owned(),
+        desired_quantity,
+        priority,
+        notes: form.notes.trim().to_owned(),
     })
 }
 
@@ -3166,6 +3543,18 @@ mod tests {
             .trim_start_matches("/collections/")
             .parse()
             .expect("collection uuid")
+    }
+
+    fn redirected_wishlist_id(response: &axum::response::Response) -> uuid::Uuid {
+        response
+            .headers()
+            .get(LOCATION)
+            .expect("wishlist redirect")
+            .to_str()
+            .expect("location str")
+            .trim_start_matches("/wishlists/")
+            .parse()
+            .expect("wishlist uuid")
     }
 
     #[tokio::test]
@@ -4866,6 +5255,206 @@ mod tests {
             .await
             .expect("outsider proxy list");
         assert_eq!(outsider_proxy.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn wishlist_routes_create_update_compare_and_scope_access(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool.clone()));
+        let owner = sign_up(&app, "wishlist-route-owner@example.test", "Owner").await;
+        let outsider = sign_up(&app, "wishlist-route-outsider@example.test", "Outsider").await;
+
+        let scryfall = ScryfallRepository::new(&pool);
+        let metadata = json!({
+            "type": "default_cards",
+            "updated_at": "2026-05-18T09:09:27.689+00:00",
+            "uri": "https://api.scryfall.com/bulk-data/wishlist-route",
+            "download_uri": "https://data.scryfall.io/default-cards/wishlist-route.json"
+        });
+        let import = scryfall
+            .create_import(ScryfallImportInput {
+                bulk_type: "default_cards",
+                source_uri: metadata["uri"].as_str().expect("uri"),
+                download_uri: metadata["download_uri"].as_str().expect("download uri"),
+                source_updated_at: time::OffsetDateTime::now_utc(),
+                content_type: "application/json",
+                content_encoding: None,
+                size_bytes: Some(4096),
+                raw_metadata: &metadata,
+            })
+            .await
+            .expect("create import");
+        for card in [
+            card_json(
+                "00000000-0000-7300-8000-000000000002",
+                "10000000-0000-7300-8000-000000000002",
+                "Sol Ring",
+                &[],
+                "Artifact",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7300-8000-000000000003",
+                "10000000-0000-7300-8000-000000000003",
+                "Counterspell",
+                &["U"],
+                "Instant",
+                false,
+            ),
+        ] {
+            scryfall
+                .upsert_card_from_scryfall_json(import.id, &card)
+                .await
+                .expect("upsert card");
+        }
+
+        let create_wishlist = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/wishlists")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Upgrade+Targets&visibility=private&playgroup_id=&notes=Trade+plans&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create wishlist");
+        assert_eq!(create_wishlist.status(), StatusCode::SEE_OTHER);
+        let wishlist_id = redirected_wishlist_id(&create_wishlist);
+
+        let outsider_detail = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/wishlists/{wishlist_id}"))
+                    .header("cookie", outsider.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider wishlist detail");
+        assert_eq!(outsider_detail.status(), StatusCode::NOT_FOUND);
+
+        for body in [
+            format!(
+                "card_name=Counterspel&desired_quantity=2&priority=high&notes=Need+spares&csrf_token={}",
+                owner.csrf_token
+            ),
+            format!(
+                "card_name=Sol+Ring&desired_quantity=2&priority=medium&notes=Extra+copy&csrf_token={}",
+                owner.csrf_token
+            ),
+            format!(
+                "card_name=Counterspell&desired_quantity=3&priority=high&notes=Updated+target&csrf_token={}",
+                owner.csrf_token
+            ),
+        ] {
+            let add_card = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri(format!("/wishlists/{wishlist_id}/cards"))
+                        .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                        .header("cookie", owner.cookie_header.clone())
+                        .body(Body::from(body))
+                        .expect("request"),
+                )
+                .await
+                .expect("add wishlist card");
+            assert_eq!(add_card.status(), StatusCode::SEE_OTHER);
+        }
+
+        let detail = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/wishlists/{wishlist_id}"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("wishlist detail");
+        assert_eq!(detail.status(), StatusCode::OK);
+        let detail_body = body_string(detail).await;
+        assert!(detail_body.contains("Counterspell"));
+        assert!(detail_body.contains("Updated target"));
+        assert!(detail_body.contains("Collection coverage"));
+
+        let create_collection = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/collections")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Wishlist+Binder&visibility=private&playgroup_id=&notes=Owned+cards&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create collection");
+        assert_eq!(create_collection.status(), StatusCode::SEE_OTHER);
+        let collection_id = redirected_collection_id(&create_collection);
+
+        let add_owned = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/collections/{collection_id}/cards"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "card_name=Sol+Ring&set_code=&collector_number=&quantity=1&foil=false&condition=unknown&location=&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("add owned card");
+        assert_eq!(add_owned.status(), StatusCode::SEE_OTHER);
+
+        let needed = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!(
+                        "/wishlists/{wishlist_id}/collections/{collection_id}/missing"
+                    ))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("wishlist needed");
+        assert_eq!(needed.status(), StatusCode::OK);
+        let needed_body = body_string(needed).await;
+        assert!(needed_body.contains("Counterspell"));
+        assert!(needed_body.contains("Sol Ring"));
+        assert!(needed_body.contains("Needed"));
+
+        let outsider_needed = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!(
+                        "/wishlists/{wishlist_id}/collections/{collection_id}/missing"
+                    ))
+                    .header("cookie", outsider.cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider wishlist needed");
+        assert_eq!(outsider_needed.status(), StatusCode::NOT_FOUND);
     }
 
     fn storm_kiln_artist_card() -> serde_json::Value {

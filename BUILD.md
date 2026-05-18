@@ -455,7 +455,7 @@ state where documented verification passes on a clean checkout.
 - [x] Track printing, foil flag, condition, and location when provided.
 - [x] Show missing cards by deck.
 - [x] Generate proxy/print lists.
-- [ ] Add wishlists.
+- [x] Add wishlists.
 - [x] Add collection visibility and ownership checks.
 - [x] Add tests for collection calculations and privacy.
 
@@ -735,3 +735,8 @@ Trust current primary docs over this file.
   calculations from latest imported decklists, proxy/print text exports,
   first SSR `/collections` surface, and focused PostgreSQL-backed
   calculation, privacy, and route tests.
+- 2026-05-18 - Completed Rust Phase 12 wishlists: added authenticated SSR
+  wishlist list/detail/create flows, owner-scoped card add/update through
+  local Scryfall matching, visibility-scoped wishlist reads, collection
+  coverage calculations for wanted cards, and focused PostgreSQL-backed
+  repository and route tests.
