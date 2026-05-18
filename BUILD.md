@@ -414,16 +414,16 @@ state where documented verification passes on a clean checkout.
 ### Phase 9 - Scryfall Import And Card Search
 
 - [ ] Add Scryfall bulk import job.
-- [ ] Store raw Scryfall JSONB payloads.
-- [ ] Normalize cards, faces, printings, legalities, prices, and search
+- [x] Store raw Scryfall JSONB payloads.
+- [x] Normalize cards, faces, printings, legalities, prices, and search
       documents.
-- [ ] Track import version and source metadata.
-- [ ] Add full-text card search.
-- [ ] Add `pg_trgm` fuzzy name search.
-- [ ] Add filters for color identity, commander legality, mana value,
+- [x] Track import version and source metadata.
+- [x] Add full-text card search.
+- [x] Add `pg_trgm` fuzzy name search.
+- [x] Add filters for color identity, commander legality, mana value,
       type, price, and Game Changer status.
-- [ ] Add SQL Observatory entries for fuzzy and full-text search.
-- [ ] Add tests for imports, search ranking, and legality filters.
+- [x] Add SQL Observatory entries for fuzzy and full-text search.
+- [x] Add tests for imports, search ranking, and legality filters.
 
 ### Phase 10 - Decklist Import, Export, And Bracket Checks
 
@@ -698,3 +698,9 @@ Trust current primary docs over this file.
   focused repository and route assertions. Added `/observatory` and CSRF
   smoke coverage, including a public-safe SQL surface check for sensitive
   fields.
+- 2026-05-18 - Added the Phase 9 local Scryfall card-data foundation:
+  import metadata, raw JSONB payload storage, normalized cards, faces,
+  printings, legalities, prices, and search documents; added full-text and
+  `pg_trgm` card search with color identity, commander legality, mana
+  value, price, type, and Game Changer filters; wired `/cards`, SQL
+  Observatory card-search entries, and focused PostgreSQL-backed tests.

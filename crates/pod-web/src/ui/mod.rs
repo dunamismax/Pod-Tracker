@@ -1,7 +1,8 @@
 use leptos::prelude::*;
 use pod_db::{
-    DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord, EventWithRole,
-    GameWithPlayers, HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
+    CardSearchResult, DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord,
+    EventWithRole, GameWithPlayers, HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole,
+    PodWithSeats,
 };
 use time::{OffsetDateTime, UtcOffset};
 
@@ -625,6 +626,103 @@ pub fn render_deck_detail(deck: &DeckRecord) -> String {
     .to_html()
 }
 
+pub struct CardSearchView<'a> {
+    pub query: &'a str,
+    pub color_identity: &'a str,
+    pub commander_legal: bool,
+    pub max_mana_value: &'a str,
+    pub type_line: &'a str,
+    pub max_usd: &'a str,
+    pub game_changer: bool,
+}
+
+pub fn render_cards(cards: &[CardSearchResult], search: CardSearchView<'_>) -> String {
+    let cards = cards.to_vec();
+    let query = search.query.to_owned();
+    let color_identity = search.color_identity.to_owned();
+    let max_mana_value = search.max_mana_value.to_owned();
+    let type_line = search.type_line.to_owned();
+    let max_usd = search.max_usd.to_owned();
+    let commander_legal = search.commander_legal;
+    let game_changer = search.game_changer;
+    let has_cards = !cards.is_empty();
+
+    view! {
+        <AppShell title="Cards" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header compact">
+                    <p class="eyebrow">"Scryfall local index"</p>
+                    <h1>"Cards"</h1>
+                    <form method="get" action="/cards" class="search-form" role="search">
+                        <label>
+                            "Search"
+                            <input name="q" value=query.clone() placeholder="Name, type, oracle text"/>
+                        </label>
+                        <button class="button secondary" type="submit">"Search"</button>
+                    </form>
+                </section>
+                <section class="split-layout wide-left">
+                    <div class="workspace-panel">
+                        <div class="section-heading">
+                            <h2>"Results"</h2>
+                            <span>{cards.len()} " cards"</span>
+                        </div>
+                        {if has_cards {
+                            view! {
+                                <div class="list">
+                                    {cards.into_iter().map(|card| {
+                                        let colors = display_color_identity(&card.color_identity);
+                                        let price = card.usd
+                                            .map(|usd| format!("${usd:.2}"))
+                                            .unwrap_or_else(|| "No price".to_owned());
+                                        view! {
+                                            <article class="list-item">
+                                                <div>
+                                                    <h2>{card.name}</h2>
+                                                    <p>{card.type_line}</p>
+                                                    <p>{truncate_text(&card.oracle_text, 180)}</p>
+                                                </div>
+                                                <dl class="compact-list inline">
+                                                    <div><dt>"CI"</dt><dd>{colors}</dd></div>
+                                                    <div><dt>"MV"</dt><dd>{card.mana_value.map(display_number).unwrap_or_else(|| "-".to_owned())}</dd></div>
+                                                    <div><dt>"USD"</dt><dd>{price}</dd></div>
+                                                    <div><dt>"Commander"</dt><dd>{yes_no(card.commander_legal)}</dd></div>
+                                                </dl>
+                                            </article>
+                                        }
+                                    }).collect_view()}
+                                </div>
+                            }.into_any()
+                        } else {
+                            view! { <p class="empty-state">"No local cards match those filters."</p> }.into_any()
+                        }}
+                    </div>
+                    <form method="get" action="/cards" class="form-panel">
+                        <h2>"Filters"</h2>
+                        <label>"Query"<input name="q" value=query/></label>
+                        <label>"Color identity"<input name="color_identity" value=color_identity placeholder="WUBRG"/></label>
+                        <label>"Type"<input name="type_line" value=type_line placeholder="Creature, instant"/></label>
+                        <div class="field-grid">
+                            <label>"Max mana value"<input name="max_mana_value" inputmode="decimal" value=max_mana_value/></label>
+                            <label>"Max USD"<input name="max_usd" inputmode="decimal" value=max_usd/></label>
+                        </div>
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="commander_legal" value="true" checked=commander_legal/>
+                            "Commander legal"
+                        </label>
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="game_changer" value="true" checked=game_changer/>
+                            "Game Changer"
+                        </label>
+                        <button class="button primary" type="submit">"Apply filters"</button>
+                    </form>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
 pub fn render_event_form(
     playgroup: &PlaygroupWithRole,
     csrf_token: &str,
@@ -1112,6 +1210,28 @@ where a.user_id = $2
   and prior_pods.event_id <> $1
   and prior_pods.state in ('locked', 'active', 'completed')
   and prior_events.playgroup_id = current_events.playgroup_id;"#;
+    let card_search_sql = r#"select scryfall_id, name, type_line, commander_legal, mana_value, usd
+from search.card_documents
+where (
+    document @@ websearch_to_tsquery('english', $1)
+    or name % $1
+    or normalized_name % lower(regexp_replace($1, '[^a-z0-9]+', '', 'g'))
+  )
+  and ($2::text[] is null or color_identity <@ $2)
+  and ($3::boolean is null or commander_legal = $3)
+  and ($4::double precision is null or mana_value <= $4)
+  and ($5::text is null or type_line ilike '%' || $5 || '%')
+order by
+  ts_rank_cd(document, websearch_to_tsquery('english', $1)) desc,
+  similarity(name, $1) desc,
+  name asc
+limit 50;"#;
+    let jsonb_sql = r#"select p.scryfall_id, p.raw_payload #>> '{prices,usd}' as usd,
+       p.raw_payload #>> '{legalities,commander}' as commander_status
+from mtg.card_printings p
+where p.raw_payload @> '{"layout":"normal"}'::jsonb
+  and p.raw_payload ? 'prices'
+limit 25;"#;
 
     view! {
         <AppShell title="SQL Observatory" account_label="Account" account_href="/settings">
@@ -1147,6 +1267,32 @@ where a.user_id = $2
                             <span class="badge">"scoring SQL"</span>
                         </div>
                         <pre class="sql-block"><code>{scoring_sql}</code></pre>
+                    </article>
+                </section>
+                <section class="split-layout wide-left section-gap">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <h2>"Card search"</h2>
+                            <span class="badge">"full-text + trigram"</span>
+                        </div>
+                        <pre class="sql-block"><code>{card_search_sql}</code></pre>
+                    </article>
+                    <article class="panel">
+                        <h2>"Plan Shape"</h2>
+                        <dl class="compact-list">
+                            <div><dt>"Inputs"</dt><dd>"query, color identity, commander legality, mana value"</dd></div>
+                            <div><dt>"Indexes"</dt><dd>"GIN tsvector, trigram name, trigram normalized name"</dd></div>
+                            <div><dt>"Output"</dt><dd>"local card rows with rank, price, and legality filters"</dd></div>
+                        </dl>
+                    </article>
+                </section>
+                <section class="section-gap">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <h2>"Scryfall JSONB"</h2>
+                            <span class="badge">"raw payload"</span>
+                        </div>
+                        <pre class="sql-block"><code>{jsonb_sql}</code></pre>
                     </article>
                 </section>
             </main>
@@ -1697,6 +1843,30 @@ fn yes_no(value: bool) -> &'static str {
     if value { "yes" } else { "no" }
 }
 
+fn display_color_identity(colors: &[String]) -> String {
+    if colors.is_empty() {
+        "C".to_owned()
+    } else {
+        colors.join("")
+    }
+}
+
+fn display_number(value: f64) -> String {
+    if value.fract() == 0.0 {
+        format!("{value:.0}")
+    } else {
+        format!("{value:.1}")
+    }
+}
+
+fn truncate_text(value: &str, max_chars: usize) -> String {
+    let mut output = value.chars().take(max_chars).collect::<String>();
+    if value.chars().count() > max_chars {
+        output.push_str("...");
+    }
+    output
+}
+
 fn short_id(id: uuid::Uuid) -> String {
     id.to_string().chars().take(8).collect()
 }
@@ -1771,6 +1941,7 @@ fn AppShell(
                         <a href="/playgroups">"Playgroups"</a>
                         <a href="/events">"Events"</a>
                         <a href="/decks">"Decks"</a>
+                        <a href="/cards">"Cards"</a>
                         <a href="/observatory">"Observatory"</a>
                         <a class="nav-login" href=account_href>{account_label}</a>
                     </nav>

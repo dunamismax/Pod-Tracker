@@ -21,10 +21,11 @@ use pod_core::games::{GameResultType, normalize_game_tags};
 use pod_core::health::{HealthResponse, ReadinessFailure};
 use pod_core::playgroups::{PlaygroupRole, slugify};
 use pod_db::{
-    CreateDeckInput, CreateEventInput, DbError, DeckRepository, EventDeckDeclarationInput,
-    EventDeckDeclarationWithDeck, EventLocationInput, EventRepository, EventRsvpRecord,
-    EventWithRole, GameRepository, GameWithPlayers, IdentityRepository, LogGameInput,
-    PlaygroupRepository, PodRepository, PodWithSeats, RsvpInput, UpdateEventInput, UserRecord,
+    CardSearchFilters, CreateDeckInput, CreateEventInput, DbError, DeckRepository,
+    EventDeckDeclarationInput, EventDeckDeclarationWithDeck, EventLocationInput, EventRepository,
+    EventRsvpRecord, EventWithRole, GameRepository, GameWithPlayers, IdentityRepository,
+    LogGameInput, PlaygroupRepository, PodRepository, PodWithSeats, RsvpInput, ScryfallRepository,
+    UpdateEventInput, UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -81,6 +82,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/pods/{id}/seats/{seat_id}/move", post(move_pod_seat))
         .route("/decks", get(decks).post(create_deck))
         .route("/decks/{id}", get(deck_detail))
+        .route("/cards", get(cards))
         .route("/e/{token}", get(public_event_detail))
         .route("/rsvp/{token}", get(guest_rsvp_form).post(save_guest_rsvp))
         .route("/calendar.ics", get(calendar_feed))
@@ -655,6 +657,66 @@ async fn deck_detail(
     };
 
     Html(ui::render_deck_detail(&deck)).into_response()
+}
+
+async fn cards(State(state): State<AppState>, Query(query): Query<CardSearchQuery>) -> Response {
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let color_identity = query
+        .color_identity
+        .as_deref()
+        .map(normalize_color_identity)
+        .unwrap_or_default();
+    let color_filter = color_identity
+        .chars()
+        .map(|color| color.to_string())
+        .collect::<Vec<_>>();
+    let max_mana_value = query
+        .max_mana_value
+        .as_deref()
+        .and_then(parse_optional_f64)
+        .flatten();
+    let max_usd = query
+        .max_usd
+        .as_deref()
+        .and_then(parse_optional_f64)
+        .flatten();
+
+    let filters = CardSearchFilters {
+        query: query.q.as_deref(),
+        color_identity: (!color_filter.is_empty()).then_some(color_filter.as_slice()),
+        commander_legal: query.commander_legal.as_deref().map(|_| true),
+        min_mana_value: None,
+        max_mana_value,
+        type_line: query.type_line.as_deref(),
+        max_usd,
+        game_changer: query.game_changer.as_deref().map(|_| true),
+        limit: Some(50),
+    };
+
+    let cards = match ScryfallRepository::new(pool).search_cards(filters).await {
+        Ok(cards) => cards,
+        Err(err) => {
+            tracing::error!(err = %err, "search cards");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Html(ui::render_cards(
+        &cards,
+        ui::CardSearchView {
+            query: query.q.as_deref().unwrap_or(""),
+            color_identity: &color_identity,
+            commander_legal: query.commander_legal.is_some(),
+            max_mana_value: query.max_mana_value.as_deref().unwrap_or(""),
+            type_line: query.type_line.as_deref().unwrap_or(""),
+            max_usd: query.max_usd.as_deref().unwrap_or(""),
+            game_changer: query.game_changer.is_some(),
+        },
+    ))
+    .into_response()
 }
 
 async fn new_event_form(
@@ -1583,6 +1645,17 @@ struct DeckSearchQuery {
 }
 
 #[derive(Debug, Deserialize)]
+struct CardSearchQuery {
+    q: Option<String>,
+    color_identity: Option<String>,
+    commander_legal: Option<String>,
+    max_mana_value: Option<String>,
+    type_line: Option<String>,
+    max_usd: Option<String>,
+    game_changer: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct DeckForm {
     pub(crate) name: String,
     pub(crate) commander: String,
@@ -2091,6 +2164,15 @@ fn parse_optional_i32(value: &str) -> Option<Option<i32>> {
     }
 }
 
+fn parse_optional_f64(value: &str) -> Option<Option<f64>> {
+    let value = value.trim();
+    if value.is_empty() {
+        Some(None)
+    } else {
+        value.parse::<f64>().ok().map(Some)
+    }
+}
+
 fn parse_elimination_order(form: &GameLogForm) -> Result<Vec<uuid::Uuid>, ()> {
     [
         form.elimination_1_user_id.as_str(),
@@ -2255,7 +2337,11 @@ mod tests {
     use axum::http::{HeaderMap, Request, StatusCode};
     use pod_core::config::AppConfig;
     use pod_core::playgroups::PlaygroupRole;
-    use pod_db::{EventRepository, IdentityRepository, PlaygroupRepository, PodRepository};
+    use pod_db::{
+        EventRepository, IdentityRepository, PlaygroupRepository, PodRepository,
+        ScryfallImportInput, ScryfallRepository,
+    };
+    use serde_json::json;
     use tower::ServiceExt;
 
     use super::{AppState, build_router, session_cookie};
@@ -2482,10 +2568,57 @@ mod tests {
         assert!(body.contains("SQL Observatory"));
         assert!(body.contains("core.event_rsvps"));
         assert!(body.contains("core.pod_seats"));
+        assert!(body.contains("search.card_documents"));
+        assert!(body.contains("mtg.card_printings"));
         assert!(!body.contains("address_line1"));
         assert!(!body.contains("invite_token"));
         assert!(!body.contains("to_address"));
         assert!(!body.contains("pod_tracker_session"));
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn cards_route_searches_local_scryfall_index(pool: sqlx::PgPool) {
+        let repo = ScryfallRepository::new(&pool);
+        let metadata = json!({
+            "type": "default_cards",
+            "updated_at": "2026-05-18T09:09:27.689+00:00",
+            "uri": "https://api.scryfall.com/bulk-data/e2ef41e3-5778-4bc2-af3f-78eca4dd9c23",
+            "download_uri": "https://data.scryfall.io/default-cards/default-cards-20260518090927.json"
+        });
+        let import = repo
+            .create_import(ScryfallImportInput {
+                bulk_type: "default_cards",
+                source_uri: metadata["uri"].as_str().expect("uri"),
+                download_uri: metadata["download_uri"].as_str().expect("download_uri"),
+                source_updated_at: time::OffsetDateTime::now_utc(),
+                content_type: "application/json",
+                content_encoding: Some("gzip"),
+                size_bytes: Some(538_716_896),
+                raw_metadata: &metadata,
+            })
+            .await
+            .expect("create import");
+        repo.upsert_card_from_scryfall_json(import.id, &storm_kiln_artist_card())
+            .await
+            .expect("import card");
+
+        let app = build_router(test_state_with_db(pool));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/cards?q=treasure&commander_legal=true&color_identity=R&type_line=Shaman&max_usd=2")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_string(response).await;
+        assert!(body.contains("Storm-Kiln Artist"));
+        assert!(body.contains("Scryfall local index"));
+        assert!(!body.contains("invite_token"));
+        assert!(!body.contains("address_line1"));
     }
 
     #[tokio::test]
@@ -3577,5 +3710,40 @@ mod tests {
         let event_after_game_body = body_string(event_after_game).await;
         assert!(event_after_game_body.contains("Game history"));
         assert!(event_after_game_body.contains("Clean combat finish"));
+    }
+
+    fn storm_kiln_artist_card() -> serde_json::Value {
+        json!({
+            "id": "00000000-0000-7000-8000-000000000012",
+            "oracle_id": "10000000-0000-7000-8000-000000000012",
+            "name": "Storm-Kiln Artist",
+            "lang": "en",
+            "released_at": "2021-04-23",
+            "layout": "normal",
+            "mana_cost": "{3}{R}",
+            "cmc": 4.0,
+            "type_line": "Creature - Dwarf Shaman",
+            "oracle_text": "Magecraft - Whenever you cast or copy an instant or sorcery spell, create a Treasure token.",
+            "colors": ["R"],
+            "color_identity": ["R"],
+            "keywords": ["Magecraft"],
+            "legalities": {
+                "commander": "legal",
+                "modern": "legal",
+                "standard": "not_legal"
+            },
+            "reserved": false,
+            "game_changer": false,
+            "edhrec_rank": 135,
+            "set": "stx",
+            "collector_number": "115",
+            "rarity": "uncommon",
+            "artist": "Manuel Castanon",
+            "prices": {
+                "usd": "0.25",
+                "eur": "0.12",
+                "tix": "0.03"
+            }
+        })
     }
 }

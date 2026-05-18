@@ -13,6 +13,7 @@ pub mod migrations;
 pub mod ops;
 pub mod playgroups;
 pub mod pods;
+pub mod scryfall;
 
 pub use decks::{
     CreateDeckInput, DeckRecord, DeckRepository, EventDeckDeclarationInput,
@@ -38,6 +39,10 @@ pub use playgroups::{
     PlaygroupRepository, PlaygroupSettingsRecord, PlaygroupWithRole,
 };
 pub use pods::{PodGenerationSummary, PodRecord, PodRepository, PodSeatRecord, PodWithSeats};
+pub use scryfall::{
+    CardSearchFilters, CardSearchResult, ImportedCardRecord, ScryfallImportInput,
+    ScryfallImportRecord, ScryfallRepository,
+};
 
 #[derive(Debug, Error)]
 pub enum DbError {
