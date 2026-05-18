@@ -10,18 +10,56 @@ use crate::server::{EventEditForm, EventForm, EventPageContext, RsvpForm};
 pub fn render_home() -> String {
     view! {
         <AppShell title="Pod Tracker">
-            <main class="shell">
-                <section class="hero">
-                    <p class="eyebrow">"Commander night operations"</p>
-                    <h1>"Pod Tracker"</h1>
-                    <p>
-                        "Plan events, collect RSVPs, form fair pods, log games, and keep the playgroup meta visible."
-                    </p>
-                    <nav class="actions" aria-label="Primary">
-                        <a href="/home">"Dashboard"</a>
-                        <a href="/signup">"Sign up"</a>
-                        <a href="/status">"Status"</a>
-                    </nav>
+            <main class="shell home-shell">
+                <section class="hero" aria-labelledby="home-title">
+                    <div class="hero-copy">
+                        <p class="eyebrow">"Commander night operations"</p>
+                        <h1 id="home-title">"Pod Tracker"</h1>
+                        <p class="lede">
+                            "Run game night from invite to pod assignment to the meta snapshot afterward."
+                        </p>
+                        <nav class="actions" aria-label="Primary">
+                            <a class="button primary" href="/home">"Open dashboard"</a>
+                            <a class="button secondary" href="/signup">"Create account"</a>
+                            <a class="button ghost" href="/status">"System status"</a>
+                        </nav>
+                    </div>
+                    <div class="command-board" aria-label="Game night workflow preview">
+                        <div class="board-header">
+                            <span>"Tonight"</span>
+                            <strong>"14 confirmed"</strong>
+                        </div>
+                        <div class="board-row">
+                            <span>"RSVPs"</span>
+                            <strong>"9 yes · 3 maybe · 2 waitlist"</strong>
+                        </div>
+                        <div class="board-row">
+                            <span>"Decks"</span>
+                            <strong>"11 declared"</strong>
+                        </div>
+                        <div class="board-row">
+                            <span>"Pods"</span>
+                            <strong>"3 proposed · 1 open seat"</strong>
+                        </div>
+                        <div class="board-footer">
+                            <span>"SQL Observatory"</span>
+                            <strong>"Pairing history ready"</strong>
+                        </div>
+                    </div>
+                </section>
+                <section class="ops-strip" aria-label="Product focus">
+                    <div>
+                        <span>"Plan"</span>
+                        <strong>"Events, hosts, and privacy scopes"</strong>
+                    </div>
+                    <div>
+                        <span>"Seat"</span>
+                        <strong>"Fair pods with fewer repeat pairings"</strong>
+                    </div>
+                    <div>
+                        <span>"Learn"</span>
+                        <strong>"Meta health powered by PostgreSQL"</strong>
+                    </div>
                 </section>
             </main>
         </AppShell>
@@ -44,9 +82,10 @@ pub fn render_status(database_configured: bool, smtp_configured: bool) -> String
     view! {
         <AppShell title="Pod Tracker Status">
             <main class="shell">
-                <section class="panel">
+                <section class="page-header compact">
+                    <p class="eyebrow">"Operations"</p>
                     <h1>"Status"</h1>
-                    <dl class="status-list">
+                    <dl class="status-list health-list">
                         <div>
                             <dt>"Database"</dt>
                             <dd>{database}</dd>
@@ -76,8 +115,9 @@ pub fn render_signup(
 
     view! {
         <AppShell title="Sign up">
-            <main class="shell">
-                <section class="panel auth-panel">
+            <main class="shell auth-shell">
+                <section class="auth-panel">
+                    <p class="eyebrow">"Account"</p>
                     <h1>"Sign up"</h1>
                     {error.map(|message| view! { <p class="form-error">{message}</p> })}
                     <form method="post" action="/signup" class="stack">
@@ -110,8 +150,9 @@ pub fn render_login(csrf_token: &str, error: Option<&str>, email: &str) -> Strin
 
     view! {
         <AppShell title="Log in">
-            <main class="shell">
-                <section class="panel auth-panel">
+            <main class="shell auth-shell">
+                <section class="auth-panel">
+                    <p class="eyebrow">"Account"</p>
                     <h1>"Log in"</h1>
                     {error.map(|message| view! { <p class="form-error">{message}</p> })}
                     <form method="post" action="/login" class="stack">
@@ -145,18 +186,24 @@ pub fn render_dashboard(
     view! {
         <AppShell title="Dashboard">
             <main class="shell">
-                <section class="panel">
+                <section class="page-header dashboard-header">
                     <p class="eyebrow">"Dashboard"</p>
                     <h1>{display_name}</h1>
-                    <nav class="actions" aria-label="Dashboard">
-                        <a href="/playgroups">"Playgroups"</a>
-                        <a href="/events">"Events"</a>
-                        <a href="/settings">"Settings"</a>
+                    <nav class="actions" aria-label="Dashboard actions">
+                        <a class="button primary" href="/playgroups">"Playgroups"</a>
+                        <a class="button secondary" href="/events">"Events"</a>
+                        <a class="button ghost" href="/settings">"Settings"</a>
                     </nav>
+                </section>
+                <section class="workspace-panel">
+                    <div class="section-heading">
+                        <h2>"Playgroups"</h2>
+                        <span>{playgroups.len()} " active"</span>
+                    </div>
                     <PlaygroupList playgroups=playgroups/>
                     <form method="post" action="/logout" class="inline-form">
                         <input type="hidden" name="csrf_token" value=csrf_token/>
-                        <button type="submit">"Log out"</button>
+                        <button class="button secondary" type="submit">"Log out"</button>
                     </form>
                 </section>
             </main>
@@ -181,13 +228,16 @@ pub fn render_playgroups(
     view! {
         <AppShell title="Playgroups">
             <main class="shell">
-                <section class="panel">
+                <section class="page-header">
                     <p class="eyebrow">"Commander groups"</p>
                     <h1>"Playgroups"</h1>
                 </section>
                 <section class="split-layout">
-                    <div>
-                        <h2>"Your playgroups"</h2>
+                    <div class="workspace-panel">
+                        <div class="section-heading">
+                            <h2>"Your playgroups"</h2>
+                            <span>{playgroups.len()} " total"</span>
+                        </div>
                         <PlaygroupList playgroups=playgroups/>
                     </div>
                     <form method="post" action="/playgroups" class="form-panel">
@@ -224,13 +274,13 @@ pub fn render_playgroup_detail(
     view! {
         <AppShell title="Playgroup">
             <main class="shell">
-                <section class="panel">
+                <section class="page-header">
                     <p class="eyebrow">"Playgroup"</p>
                     <h1>{playgroup.name.clone()}</h1>
                     <p class="lede">{playgroup.description.clone()}</p>
                     <nav class="actions" aria-label="Playgroup actions">
-                        <a href=format!("/playgroups/{}/events/new", playgroup.slug)>"New event"</a>
-                        <a href="/events">"All events"</a>
+                        <a class="button primary" href=format!("/playgroups/{}/events/new", playgroup.slug)>"New event"</a>
+                        <a class="button secondary" href="/events">"All events"</a>
                     </nav>
                     <dl class="status-list">
                         <div>
@@ -245,8 +295,11 @@ pub fn render_playgroup_detail(
                         })}
                     </dl>
                 </section>
-                <section class="panel section-gap">
-                    <h2>"House rules"</h2>
+                <section class="workspace-panel section-gap">
+                    <div class="section-heading">
+                        <h2>"House rules"</h2>
+                        <span>{house_rules.len()} " visible"</span>
+                    </div>
                     {if has_house_rules {
                         view! {
                             <div class="list">
@@ -284,11 +337,11 @@ pub fn render_events(events: &[EventWithRole]) -> String {
     view! {
         <AppShell title="Events">
             <main class="shell">
-                <section class="panel">
+                <section class="page-header">
                     <p class="eyebrow">"Schedule"</p>
                     <h1>"Events"</h1>
                     <nav class="actions" aria-label="Calendar">
-                        <a href="/calendar.ics">"Calendar"</a>
+                        <a class="button secondary" href="/calendar.ics">"Calendar feed"</a>
                     </nav>
                 </section>
                 {if has_events {
@@ -380,7 +433,7 @@ pub fn render_event_form(
     view! {
         <AppShell title="New Event">
             <main class="shell">
-                <section class="panel">
+                <section class="page-header compact">
                     <p class="eyebrow">{playgroup.name.clone()}</p>
                     <h1>"New event"</h1>
                 </section>
@@ -410,7 +463,7 @@ pub fn render_event_form(
                             </select>
                         </label>
                     </fieldset>
-                    <button type="submit">"Save event"</button>
+                    <button class="button primary" type="submit">"Save event"</button>
                 </form>
             </main>
         </AppShell>
@@ -450,11 +503,12 @@ pub fn render_event_edit(
         <AppShell title="Edit Event">
             <main class="shell">
                 <form method="post" action=format!("/events/{}/edit", event.id) class="form-panel wide-form">
+                    <p class="eyebrow">"Event"</p>
                     <h1>"Edit event"</h1>
                     {error.map(|message| view! { <p class="form-error">{message}</p> })}
                     <input type="hidden" name="csrf_token" value=csrf_token/>
                     <EventFields title=title description=description start_time=start_time end_time=end_time visibility=visibility/>
-                    <button type="submit">"Save changes"</button>
+                    <button class="button primary" type="submit">"Save changes"</button>
                 </form>
             </main>
         </AppShell>
@@ -486,20 +540,16 @@ pub fn render_event_detail(
     view! {
         <AppShell title="Event">
             <main class="shell">
-                <section class="panel">
+                <section class="page-header">
                     <p class="eyebrow">{event.playgroup_name.clone()}</p>
                     <h1>{event.title.clone()}</h1>
                     <p class="lede">{display_datetime(event.start_time)}</p>
                     <nav class="actions" aria-label="Event actions">
-                        {if context.can_edit {
-                            view! { <a href=format!("/events/{}/edit", event.id)>"Edit"</a> }.into_any()
-                        } else {
-                            view! { <span></span> }.into_any()
-                        }}
-                        {public_url.map(|url| view! { <a href=url>"Public page"</a> })}
-                        {invite_url.map(|url| view! { <a href=url>"Invite RSVP"</a> })}
+                        {context.can_edit.then(|| view! { <a class="button primary" href=format!("/events/{}/edit", event.id)>"Edit"</a> })}
+                        {public_url.map(|url| view! { <a class="button secondary" href=url>"Public page"</a> })}
+                        {invite_url.map(|url| view! { <a class="button ghost" href=url>"Invite RSVP"</a> })}
                     </nav>
-                    <p>{event.description.clone()}</p>
+                    <p class="body-copy">{event.description.clone()}</p>
                     <LocationBlock location=context.location.clone() show_address=context.show_address/>
                 </section>
                 <section class="split-layout">
@@ -523,14 +573,14 @@ pub fn render_public_event(event: &EventRecord, context: &EventPageContext) -> S
     view! {
         <AppShell title="Event">
             <main class="shell">
-                <section class="panel">
+                <section class="page-header">
                     <p class="eyebrow">"Event"</p>
                     <h1>{event.title.clone()}</h1>
                     <p class="lede">{display_datetime(event.start_time)}</p>
-                    <p>{event.description.clone()}</p>
+                    <p class="body-copy">{event.description.clone()}</p>
                     <LocationBlock location=context.location show_address=context.show_address/>
                     <nav class="actions" aria-label="Public event">
-                        {invite_url.map(|url| view! { <a href=url>"RSVP"</a> })}
+                        {invite_url.map(|url| view! { <a class="button primary" href=url>"RSVP"</a> })}
                     </nav>
                 </section>
             </main>
@@ -565,8 +615,9 @@ pub fn render_guest_rsvp(
 
     view! {
         <AppShell title="RSVP">
-            <main class="shell">
+            <main class="shell auth-shell">
                 <form method="post" action=format!("/rsvp/{}", event.invite_token.clone().unwrap_or_default()) class="form-panel">
+                    <p class="eyebrow">"Guest RSVP"</p>
                     <h1>{event.title.clone()}</h1>
                     <p class="lede">{display_datetime(event.start_time)}</p>
                     <LocationBlock location=context.location show_address=context.show_address/>
@@ -574,7 +625,7 @@ pub fn render_guest_rsvp(
                     <input type="hidden" name="csrf_token" value=csrf_token/>
                     <label>"Name"<input name="guest_name" required value=guest_name/></label>
                     <RsvpFields status=status arrival_time="".to_owned() leaving_time="".to_owned() guest_count="0".to_owned() travel_buffer_minutes="".to_owned() notes=notes/>
-                    <button type="submit">"Save RSVP"</button>
+                    <button class="button primary" type="submit">"Save RSVP"</button>
                 </form>
             </main>
         </AppShell>
@@ -590,7 +641,7 @@ pub fn render_settings(email: &str, display_name: &str, csrf_token: &str) -> Str
     view! {
         <AppShell title="Settings">
             <main class="shell">
-                <section class="panel">
+                <section class="page-header compact">
                     <p class="eyebrow">"Settings"</p>
                     <h1>{display_name}</h1>
                     <dl class="status-list">
@@ -601,7 +652,7 @@ pub fn render_settings(email: &str, display_name: &str, csrf_token: &str) -> Str
                     </dl>
                     <form method="post" action="/logout" class="inline-form">
                         <input type="hidden" name="csrf_token" value=csrf_token/>
-                        <button type="submit">"Log out"</button>
+                        <button class="button secondary" type="submit">"Log out"</button>
                     </form>
                 </section>
             </main>
@@ -614,7 +665,7 @@ pub fn render_placeholder(title: &'static str) -> String {
     view! {
         <AppShell title=title>
             <main class="shell">
-                <section class="panel">
+                <section class="page-header compact">
                     <h1>{title}</h1>
                 </section>
             </main>
@@ -727,7 +778,7 @@ fn RsvpPanel(
                 travel_buffer_minutes=travel_buffer_minutes
                 notes=notes
             />
-            <button type="submit">"Save RSVP"</button>
+            <button class="button primary" type="submit">"Save RSVP"</button>
         </form>
     }
 }
@@ -882,13 +933,16 @@ fn AppShell(title: &'static str, children: Children) -> impl IntoView {
             </head>
             <body>
                 <header class="topbar">
-                    <a class="brand" href="/">"Pod Tracker"</a>
-                    <nav aria-label="Main">
+                    <a class="brand" href="/">
+                        <span class="brand-mark" aria-hidden="true">"PT"</span>
+                        <span>"Pod Tracker"</span>
+                    </a>
+                    <nav class="main-nav" aria-label="Main">
                         <a href="/home">"Home"</a>
                         <a href="/playgroups">"Playgroups"</a>
                         <a href="/events">"Events"</a>
-                        <a href="/login">"Login"</a>
                         <a href="/observatory">"Observatory"</a>
+                        <a class="nav-login" href="/login">"Login"</a>
                     </nav>
                 </header>
                 {children()}
