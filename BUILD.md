@@ -405,7 +405,7 @@ state where documented verification passes on a clean checkout.
 - [x] Add games, game players, results, notes, and event completion.
 - [x] Support result types: normal win, combo win, combat win,
       concession, draw, time called, unfinished, archenemy win, team win.
-- [ ] Capture winner, turn count, duration, first player, elimination
+- [x] Capture winner, turn count, duration, first player, elimination
       order, tags, and notes where provided.
 - [x] Keep logging fast enough to use between games.
 - [x] Update matchup history after each logged game.
@@ -461,13 +461,13 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 13 - SQL Observatory
 
-- [ ] Build `/observatory`.
+- [x] Build `/observatory`.
 - [ ] Show real SQL for pod generation, avoid-repeat pairing, bracket
       compatibility, fuzzy card search, Game Changers count, reminders,
       matchup history, and Scryfall JSONB exploration.
 - [ ] Explain inputs, indexes, query plan shape, and output.
 - [ ] Add safe sample data or scrubbed fixtures.
-- [ ] Never expose private addresses, emails, phone numbers, invite
+- [x] Never expose private addresses, emails, phone numbers, invite
       tokens, or production logs.
 
 ### Phase 14 - Operations And Deployment
@@ -497,7 +497,7 @@ state where documented verification passes on a clean checkout.
 - [ ] Revisit config loading with `figment` or `config` if deployment,
       worker, email, and tenant settings become too broad for explicit env
       parsing.
-- [ ] Add CSRF tests.
+- [x] Add CSRF tests.
 - [x] Add security header checks.
 - [x] Add privacy model in `docs/privacy.md`.
 - [ ] Add RLS or equivalent scoped-query tests for tenant, guest, public
@@ -691,5 +691,10 @@ Trust current primary docs over this file.
 - 2026-05-18 - Added the Rust Phase 8 game logging foundation: games,
   game players, game results, game notes, event completion, supported
   result types, fast event-page logging, matchup-history writes, and
-  focused repository and route tests. Elimination-order capture remains
-  unchecked until there is a real input path for it.
+  focused repository and route tests.
+- 2026-05-18 - Completed the remaining Rust game logging metadata path:
+  wired elimination-order capture through the SSR game log form, route
+  parser, repository validation/storage, and game history display; added
+  focused repository and route assertions. Added `/observatory` and CSRF
+  smoke coverage, including a public-safe SQL surface check for sensitive
+  fields.

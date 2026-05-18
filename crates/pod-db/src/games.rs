@@ -1,4 +1,5 @@
 use sqlx::PgPool;
+use std::collections::HashSet;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
@@ -68,6 +69,7 @@ pub struct LogGameInput<'a> {
     pub turn_count: Option<i32>,
     pub duration_minutes: Option<i32>,
     pub first_player_user_id: Option<Uuid>,
+    pub elimination_order_user_ids: &'a [Uuid],
     pub tags: &'a [String],
     pub notes: &'a str,
     pub winning_team: Option<&'a str>,
@@ -147,6 +149,20 @@ impl<'a> GameRepository<'a> {
             tx.commit().await?;
             return Ok(None);
         }
+        let seated_user_ids = seats
+            .iter()
+            .filter_map(|seat| seat.user_id)
+            .collect::<HashSet<_>>();
+        let mut seen_eliminations = HashSet::new();
+        for user_id in input.elimination_order_user_ids {
+            if input.winner_user_id == Some(*user_id)
+                || !seated_user_ids.contains(user_id)
+                || !seen_eliminations.insert(*user_id)
+            {
+                tx.commit().await?;
+                return Ok(None);
+            }
+        }
 
         let game = sqlx::query_as!(
             GameRecord,
@@ -178,14 +194,21 @@ impl<'a> GameRepository<'a> {
             let is_winner = input
                 .winner_user_id
                 .is_some_and(|winner_user_id| seat.user_id == Some(winner_user_id));
+            let elimination_order = seat.user_id.and_then(|user_id| {
+                input
+                    .elimination_order_user_ids
+                    .iter()
+                    .position(|eliminated_user_id| *eliminated_user_id == user_id)
+                    .map(|index| index as i32 + 1)
+            });
             let player = sqlx::query_as!(
                 GamePlayerRecord,
                 r#"
                 insert into core.game_players (
                   game_id, pod_seat_id, user_id, guest_name, deck_id,
-                  seat_position, finish_position, is_winner, team
+                  seat_position, finish_position, elimination_order, is_winner, team
                 )
-                values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 returning id, game_id, pod_seat_id, user_id, guest_name, deck_id,
                   seat_position, finish_position, elimination_order, eliminated_turn,
                   is_winner, team, created_at, updated_at
@@ -197,6 +220,7 @@ impl<'a> GameRepository<'a> {
                 seat.deck_id,
                 seat.seat_position,
                 is_winner.then_some(1),
+                elimination_order,
                 is_winner,
                 input.winning_team,
             )
@@ -442,6 +466,7 @@ mod tests {
             .expect("publish");
 
         let tags = vec!["combo".to_owned(), "turn six".to_owned()];
+        let elimination_order_user_ids = vec![member.id];
         let logged = GameRepository::new(&pool)
             .log_game_from_pod(LogGameInput {
                 event_id: event.id,
@@ -452,6 +477,7 @@ mod tests {
                 turn_count: Some(6),
                 duration_minutes: Some(52),
                 first_player_user_id: Some(member.id),
+                elimination_order_user_ids: &elimination_order_user_ids,
                 tags: &tags,
                 notes: "Food break after this one.",
                 winning_team: None,
@@ -465,6 +491,9 @@ mod tests {
         assert_eq!(logged.players.len(), 2);
         assert_eq!(logged.result.winner_user_id, Some(owner.id));
         assert!(logged.players.iter().any(|player| player.is_winner));
+        assert!(logged.players.iter().any(|player| {
+            player.user_id == Some(member.id) && player.elimination_order == Some(1)
+        }));
 
         let note_count = sqlx::query_scalar!(
             "select count(*)::int from core.game_notes where game_id = $1",

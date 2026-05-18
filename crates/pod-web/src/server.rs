@@ -1363,6 +1363,10 @@ async fn log_event_game(
         Ok(first_player_user_id) => first_player_user_id,
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
+    let elimination_order_user_ids = match parse_elimination_order(&form) {
+        Ok(user_ids) => user_ids,
+        Err(()) => return StatusCode::BAD_REQUEST.into_response(),
+    };
     let turn_count = parse_optional_i32(&form.turn_count)
         .unwrap_or(None)
         .filter(|turns| *turns > 0);
@@ -1382,6 +1386,7 @@ async fn log_event_game(
             turn_count,
             duration_minutes,
             first_player_user_id,
+            elimination_order_user_ids: &elimination_order_user_ids,
             tags: &tags,
             notes: form.notes.trim(),
             winning_team,
@@ -1643,6 +1648,16 @@ struct GameLogForm {
     duration_minutes: String,
     #[serde(default)]
     first_player_user_id: String,
+    #[serde(default)]
+    elimination_1_user_id: String,
+    #[serde(default)]
+    elimination_2_user_id: String,
+    #[serde(default)]
+    elimination_3_user_id: String,
+    #[serde(default)]
+    elimination_4_user_id: String,
+    #[serde(default)]
+    elimination_5_user_id: String,
     #[serde(default)]
     winning_team: String,
     #[serde(default)]
@@ -2076,6 +2091,20 @@ fn parse_optional_i32(value: &str) -> Option<Option<i32>> {
     }
 }
 
+fn parse_elimination_order(form: &GameLogForm) -> Result<Vec<uuid::Uuid>, ()> {
+    [
+        form.elimination_1_user_id.as_str(),
+        form.elimination_2_user_id.as_str(),
+        form.elimination_3_user_id.as_str(),
+        form.elimination_4_user_id.as_str(),
+        form.elimination_5_user_id.as_str(),
+    ]
+    .into_iter()
+    .filter_map(optional_trimmed)
+    .map(|value| value.parse::<uuid::Uuid>().map_err(|_| ()))
+    .collect()
+}
+
 fn parse_optional_datetime_local(value: &str) -> Option<OffsetDateTime> {
     let value = value.trim();
     if value.is_empty() {
@@ -2435,6 +2464,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn observatory_renders_safe_sql_surface() {
+        let app = build_router(test_state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/observatory")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_string(response).await;
+        assert!(body.contains("SQL Observatory"));
+        assert!(body.contains("core.event_rsvps"));
+        assert!(body.contains("core.pod_seats"));
+        assert!(!body.contains("address_line1"));
+        assert!(!body.contains("invite_token"));
+        assert!(!body.contains("to_address"));
+        assert!(!body.contains("pod_tracker_session"));
+    }
+
+    #[tokio::test]
     async fn static_css_asset_is_served() {
         let app = build_router(test_state_with_static_dir(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -2525,6 +2579,29 @@ mod tests {
                     .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
                     .body(Body::from(
                         "email=player%40example.test&password=correcthorse&csrf_token=",
+                    ))
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn state_changing_app_routes_reject_missing_csrf(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool));
+        let signed_in = sign_up(&app, "csrf-owner@example.test", "Csrf Owner").await;
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", signed_in.cookie_header)
+                    .body(Body::from(
+                        "name=Blocked+Group&description=Missing+token&csrf_token=",
                     ))
                     .expect("request"),
             )
@@ -3434,9 +3511,10 @@ mod tests {
                     .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
                     .header("cookie", owner.cookie_header.clone())
                     .body(Body::from(format!(
-                        "pod_id={}&result_type=normal_win&winner_user_id={}&turn_count=7&duration_minutes=45&first_player_user_id={}&tags=midrange%2Clong+game&notes=Clean+combat+finish&complete_event=true&csrf_token={}",
+                        "pod_id={}&result_type=normal_win&winner_user_id={}&turn_count=7&duration_minutes=45&first_player_user_id={}&elimination_1_user_id={}&tags=midrange%2Clong+game&notes=Clean+combat+finish&complete_event=true&csrf_token={}",
                         active[0].pod.id,
                         owner_user.id,
+                        member_user.id,
                         member_user.id,
                         owner.csrf_token
                     )))
@@ -3472,6 +3550,18 @@ mod tests {
         .await
         .expect("completed");
         assert!(completed_at.is_some());
+        let elimination_order = sqlx::query_scalar!(
+            r#"
+            select elimination_order
+            from core.game_players
+            where user_id = $1
+            "#,
+            member_user.id
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("elimination order");
+        assert_eq!(elimination_order, Some(1));
 
         let event_after_game = app
             .oneshot(

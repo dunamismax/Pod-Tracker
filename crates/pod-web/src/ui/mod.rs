@@ -1364,11 +1364,58 @@ fn GameLogPanel(
                             "First player"
                             <select name="first_player_user_id">
                                 <option value="">"Not recorded"</option>
-                                {player_choices.into_iter().map(|(id, label)| view! {
-                                    <option value=id.to_string()>{label}</option>
+                                {player_choices.iter().map(|(id, label)| view! {
+                                    <option value=id.to_string()>{label.clone()}</option>
                                 }).collect_view()}
                             </select>
                         </label>
+                        <div class="field-grid">
+                            <label>
+                                "First out"
+                                <select name="elimination_1_user_id">
+                                    <option value="">"Not recorded"</option>
+                                    {player_choices.iter().map(|(id, label)| view! {
+                                        <option value=id.to_string()>{label.clone()}</option>
+                                    }).collect_view()}
+                                </select>
+                            </label>
+                            <label>
+                                "Second out"
+                                <select name="elimination_2_user_id">
+                                    <option value="">"Not recorded"</option>
+                                    {player_choices.iter().map(|(id, label)| view! {
+                                        <option value=id.to_string()>{label.clone()}</option>
+                                    }).collect_view()}
+                                </select>
+                            </label>
+                            <label>
+                                "Third out"
+                                <select name="elimination_3_user_id">
+                                    <option value="">"Not recorded"</option>
+                                    {player_choices.iter().map(|(id, label)| view! {
+                                        <option value=id.to_string()>{label.clone()}</option>
+                                    }).collect_view()}
+                                </select>
+                            </label>
+                            <label>
+                                "Fourth out"
+                                <select name="elimination_4_user_id">
+                                    <option value="">"Not recorded"</option>
+                                    {player_choices.iter().map(|(id, label)| view! {
+                                        <option value=id.to_string()>{label.clone()}</option>
+                                    }).collect_view()}
+                                </select>
+                            </label>
+                            <label>
+                                "Fifth out"
+                                <select name="elimination_5_user_id">
+                                    <option value="">"Not recorded"</option>
+                                    {player_choices.iter().map(|(id, label)| view! {
+                                        <option value=id.to_string()>{label.clone()}</option>
+                                    }).collect_view()}
+                                </select>
+                            </label>
+                        </div>
                         <label>"Team"<input name="winning_team"/></label>
                         <label>"Tags"<input name="tags" placeholder="combo, long game"/></label>
                         <label>"Notes"<textarea name="notes" rows="3"></textarea></label>
@@ -1410,11 +1457,34 @@ fn GameHistoryList(games: Vec<GameWithPlayers>) -> impl IntoView {
                                 game.players.len(),
                                 display_datetime(game.game.completed_at)
                             );
+                            let mut eliminated = game
+                                .players
+                                .iter()
+                                .filter_map(|player| {
+                                    player.elimination_order.map(|order| {
+                                        let label = player
+                                            .user_id
+                                            .map(|id| format!("Member {}", short_id(id)))
+                                            .or_else(|| player.guest_name.clone())
+                                            .unwrap_or_else(|| "Unknown".to_owned());
+                                        (order, label)
+                                    })
+                                })
+                                .collect::<Vec<_>>();
+                            eliminated.sort_by_key(|(order, _)| *order);
+                            let elimination_summary = (!eliminated.is_empty()).then(|| {
+                                eliminated
+                                    .into_iter()
+                                    .map(|(order, label)| format!("{order}. {label}"))
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            });
                             view! {
                                 <article class="list-item">
                                     <div>
                                         <h3>{winner}</h3>
                                         <p>{summary}</p>
+                                        {elimination_summary.map(|summary| view! { <p>"Eliminations: " {summary}</p> })}
                                         {(!game.game.notes.is_empty()).then(|| view! { <p>{game.game.notes}</p> })}
                                     </div>
                                     <span class="badge">
