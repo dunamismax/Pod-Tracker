@@ -17,13 +17,14 @@ use pod_core::decks::{
 use pod_core::events::{
     AddressVisibility, EventVisibility, RsvpStatus, can_manage_event, can_show_event_address,
 };
+use pod_core::games::{GameResultType, normalize_game_tags};
 use pod_core::health::{HealthResponse, ReadinessFailure};
 use pod_core::playgroups::{PlaygroupRole, slugify};
 use pod_db::{
     CreateDeckInput, CreateEventInput, DbError, DeckRepository, EventDeckDeclarationInput,
     EventDeckDeclarationWithDeck, EventLocationInput, EventRepository, EventRsvpRecord,
-    EventWithRole, IdentityRepository, PlaygroupRepository, PodRepository, RsvpInput,
-    UpdateEventInput, UserRecord,
+    EventWithRole, GameRepository, GameWithPlayers, IdentityRepository, LogGameInput,
+    PlaygroupRepository, PodRepository, PodWithSeats, RsvpInput, UpdateEventInput, UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -75,6 +76,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/events/{id}/edit", get(edit_event_form).post(update_event))
         .route("/events/{id}/rsvp", post(save_user_rsvp))
         .route("/events/{id}/decks", post(declare_event_deck))
+        .route("/events/{id}/games", post(log_event_game))
         .route("/pods/{id}/lock", post(lock_pod))
         .route("/pods/{id}/seats/{seat_id}/move", post(move_pod_seat))
         .route("/decks", get(decks).post(create_deck))
@@ -850,6 +852,20 @@ async fn event_detail(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
+    context.pods = match PodRepository::new(pool).list_for_event(event.id).await {
+        Ok(pods) => pods,
+        Err(err) => {
+            tracing::error!(err = %err, "list pods for event detail");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    context.games = match GameRepository::new(pool).list_for_event(event.id).await {
+        Ok(games) => games,
+        Err(err) => {
+            tracing::error!(err = %err, "list games for event detail");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
     let csrf = ensure_csrf_cookie(&headers, &state.config);
     html_with_cookies(
         StatusCode::OK,
@@ -1294,6 +1310,94 @@ async fn declare_event_deck(
     }
 }
 
+async fn log_event_game(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<GameLogForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let event = match EventRepository::new(pool).get_for_user(id, user.id).await {
+        Ok(Some(event)) => event,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event before game log");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let role = PlaygroupRole::try_from(event.member_role.as_str()).ok();
+    if !role.is_some_and(can_manage_event) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let result_type = match GameResultType::try_from(form.result_type.trim()) {
+        Ok(result_type) => result_type,
+        Err(()) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    let pod_id = match form.pod_id.parse() {
+        Ok(pod_id) => pod_id,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    let winner_user_id = match optional_trimmed(&form.winner_user_id)
+        .map(str::parse)
+        .transpose()
+    {
+        Ok(winner_user_id) => winner_user_id,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    if result_type.needs_winner() && winner_user_id.is_none() {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let first_player_user_id = match optional_trimmed(&form.first_player_user_id)
+        .map(str::parse)
+        .transpose()
+    {
+        Ok(first_player_user_id) => first_player_user_id,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    let turn_count = parse_optional_i32(&form.turn_count)
+        .unwrap_or(None)
+        .filter(|turns| *turns > 0);
+    let duration_minutes = parse_optional_i32(&form.duration_minutes)
+        .unwrap_or(None)
+        .filter(|minutes| *minutes > 0);
+    let tags = normalize_game_tags(&form.tags);
+    let winning_team = optional_trimmed(&form.winning_team);
+
+    match GameRepository::new(pool)
+        .log_game_from_pod(LogGameInput {
+            event_id: id,
+            pod_id,
+            logged_by_user_id: user.id,
+            result_type: result_type.as_str(),
+            winner_user_id,
+            turn_count,
+            duration_minutes,
+            first_player_user_id,
+            tags: &tags,
+            notes: form.notes.trim(),
+            winning_team,
+            complete_event: form.complete_event,
+        })
+        .await
+    {
+        Ok(Some(_)) => Redirect::to(&format!("/events/{id}")).into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "log game");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
 async fn public_event_detail(
     State(state): State<AppState>,
     axum::extract::Path(token): axum::extract::Path<String>,
@@ -1527,6 +1631,29 @@ struct PodMoveForm {
     csrf_token: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct GameLogForm {
+    pod_id: String,
+    result_type: String,
+    #[serde(default)]
+    winner_user_id: String,
+    #[serde(default)]
+    turn_count: String,
+    #[serde(default)]
+    duration_minutes: String,
+    #[serde(default)]
+    first_player_user_id: String,
+    #[serde(default)]
+    winning_team: String,
+    #[serde(default)]
+    tags: String,
+    #[serde(default)]
+    notes: String,
+    #[serde(default)]
+    complete_event: bool,
+    csrf_token: String,
+}
+
 #[derive(Debug, Clone)]
 struct ParsedDeckForm {
     playgroup_id: Option<uuid::Uuid>,
@@ -1613,6 +1740,8 @@ pub(crate) struct EventPageContext {
     pub user_rsvp: Option<EventRsvpRecord>,
     pub deck_declarations: Vec<EventDeckDeclarationWithDeck>,
     pub user_decks: Vec<pod_db::DeckRecord>,
+    pub pods: Vec<PodWithSeats>,
+    pub games: Vec<GameWithPlayers>,
     pub show_address: bool,
     pub can_edit: bool,
 }
@@ -1801,6 +1930,8 @@ async fn event_page_context(
         user_rsvp,
         deck_declarations: Vec::new(),
         user_decks: Vec::new(),
+        pods: Vec::new(),
+        games: Vec::new(),
         show_address,
         can_edit: role.is_some_and(can_manage_event),
     })
@@ -1824,6 +1955,8 @@ async fn public_event_page_context(
         user_rsvp: None,
         deck_declarations: Vec::new(),
         user_decks: Vec::new(),
+        pods: Vec::new(),
+        games: Vec::new(),
         show_address,
         can_edit: false,
     })
@@ -3251,6 +3384,7 @@ mod tests {
         assert_eq!(owner_lock.status(), StatusCode::SEE_OTHER);
 
         let owner_publish = app
+            .clone()
             .oneshot(
                 Request::builder()
                     .method("POST")
@@ -3269,5 +3403,89 @@ mod tests {
             .await
             .expect("active pods");
         assert_eq!(active[0].pod.state, "active");
+
+        let member_log = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/events/{event_id}/games"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", member.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "pod_id={}&result_type=normal_win&winner_user_id={}&turn_count=7&duration_minutes=45&first_player_user_id={}&tags=midrange&notes=Member+attempt&csrf_token={}",
+                        active[0].pod.id,
+                        member_user.id,
+                        owner_user.id,
+                        member.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("member log");
+        assert_eq!(member_log.status(), StatusCode::FORBIDDEN);
+
+        let owner_log = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/events/{event_id}/games"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "pod_id={}&result_type=normal_win&winner_user_id={}&turn_count=7&duration_minutes=45&first_player_user_id={}&tags=midrange%2Clong+game&notes=Clean+combat+finish&complete_event=true&csrf_token={}",
+                        active[0].pod.id,
+                        owner_user.id,
+                        member_user.id,
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("owner log");
+        assert_eq!(owner_log.status(), StatusCode::SEE_OTHER);
+
+        let game_count = sqlx::query_scalar!(
+            "select count(*)::int from core.games where event_id = $1",
+            event_id
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("game count")
+        .unwrap_or(0);
+        assert_eq!(game_count, 1);
+        let matchup_count = sqlx::query_scalar!(
+            "select count(*)::int from meta.matchup_history where event_id = $1",
+            event_id
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("matchup count")
+        .unwrap_or(0);
+        assert_eq!(matchup_count, 1);
+        let completed_at = sqlx::query_scalar!(
+            "select completed_at from core.events where id = $1",
+            event_id
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("completed");
+        assert!(completed_at.is_some());
+
+        let event_after_game = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/events/{event_id}"))
+                    .header("cookie", owner.cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("event after game");
+        assert_eq!(event_after_game.status(), StatusCode::OK);
+        let event_after_game_body = body_string(event_after_game).await;
+        assert!(event_after_game_body.contains("Game history"));
+        assert!(event_after_game_body.contains("Clean combat finish"));
     }
 }

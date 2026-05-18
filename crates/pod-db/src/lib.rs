@@ -6,6 +6,7 @@ use thiserror::Error;
 
 pub mod decks;
 pub mod events;
+pub mod games;
 pub mod health;
 pub mod identity;
 pub mod migrations;
@@ -21,6 +22,9 @@ pub use events::{
     CalendarEventRecord, CreateEventInput, CreateEventReminderInput, EventHostRecord,
     EventLocationInput, EventLocationRecord, EventRecord, EventReminderRecord, EventRepository,
     EventRsvpRecord, EventWithRole, RsvpInput, UpdateEventInput,
+};
+pub use games::{
+    GamePlayerRecord, GameRecord, GameRepository, GameResultRecord, GameWithPlayers, LogGameInput,
 };
 pub use health::HealthRepository;
 pub use identity::{

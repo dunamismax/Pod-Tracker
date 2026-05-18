@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 use pod_db::{
     DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord, EventWithRole,
-    HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
+    GameWithPlayers, HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
 };
 use time::{OffsetDateTime, UtcOffset};
 
@@ -816,8 +816,17 @@ pub fn render_event_detail(
                     <AttendeeList rsvps=context.rsvps/>
                 </section>
                 <section class="split-layout section-gap">
-                    <DeckDeclarationPanel event_id=event.id csrf_token=csrf_token decks=context.user_decks/>
+                    <DeckDeclarationPanel event_id=event.id csrf_token=csrf_token.clone() decks=context.user_decks/>
                     <EventDeckDeclarationList declarations=context.deck_declarations/>
+                </section>
+                <section class="split-layout section-gap">
+                    <GameLogPanel
+                        event_id=event.id
+                        csrf_token=csrf_token.clone()
+                        pods=context.pods
+                        can_edit=context.can_edit
+                    />
+                    <GameHistoryList games=context.games/>
                 </section>
             </main>
         </AppShell>
@@ -1281,6 +1290,149 @@ fn EventDeckDeclarationList(declarations: Vec<EventDeckDeclarationWithDeck>) -> 
 }
 
 #[component]
+fn GameLogPanel(
+    event_id: uuid::Uuid,
+    csrf_token: String,
+    pods: Vec<PodWithSeats>,
+    can_edit: bool,
+) -> impl IntoView {
+    let pod_choices = pods
+        .iter()
+        .filter(|pod| pod.pod.state == "active" || pod.pod.state == "locked")
+        .map(|pod| (pod.pod.id, pod.pod.name.clone(), pod.pod.state.clone()))
+        .collect::<Vec<_>>();
+    let player_choices = pods
+        .iter()
+        .filter(|pod| pod.pod.state == "active" || pod.pod.state == "locked")
+        .flat_map(|pod| {
+            pod.seats.iter().filter_map(|seat| {
+                seat.user_id.map(|user_id| {
+                    let label = seat
+                        .guest_name
+                        .clone()
+                        .unwrap_or_else(|| format!("Member {}", short_id(user_id)));
+                    (user_id, format!("{} - {}", pod.pod.name, label))
+                })
+            })
+        })
+        .collect::<Vec<_>>();
+    let can_log = can_edit && !pod_choices.is_empty();
+
+    view! {
+        <form method="post" action=format!("/events/{event_id}/games") class="form-panel">
+            <h2>"Log game"</h2>
+            {if can_log {
+                view! {
+                    <>
+                        <input type="hidden" name="csrf_token" value=csrf_token/>
+                        <label>
+                            "Pod"
+                            <select name="pod_id">
+                                {pod_choices.into_iter().map(|(id, name, state)| view! {
+                                    <option value=id.to_string()>{name} " - " {state}</option>
+                                }).collect_view()}
+                            </select>
+                        </label>
+                        <label>
+                            "Result"
+                            <select name="result_type">
+                                <option value="normal_win">"Normal win"</option>
+                                <option value="combo_win">"Combo win"</option>
+                                <option value="combat_win">"Combat win"</option>
+                                <option value="concession">"Concession"</option>
+                                <option value="draw">"Draw"</option>
+                                <option value="time_called">"Time called"</option>
+                                <option value="unfinished">"Unfinished"</option>
+                                <option value="archenemy_win">"Archenemy win"</option>
+                                <option value="team_win">"Team win"</option>
+                            </select>
+                        </label>
+                        <label>
+                            "Winner"
+                            <select name="winner_user_id">
+                                <option value="">"No single winner"</option>
+                                {player_choices.iter().map(|(id, label)| view! {
+                                    <option value=id.to_string()>{label.clone()}</option>
+                                }).collect_view()}
+                            </select>
+                        </label>
+                        <div class="field-grid">
+                            <label>"Turns"<input type="number" min="1" name="turn_count"/></label>
+                            <label>"Minutes"<input type="number" min="1" name="duration_minutes"/></label>
+                        </div>
+                        <label>
+                            "First player"
+                            <select name="first_player_user_id">
+                                <option value="">"Not recorded"</option>
+                                {player_choices.into_iter().map(|(id, label)| view! {
+                                    <option value=id.to_string()>{label}</option>
+                                }).collect_view()}
+                            </select>
+                        </label>
+                        <label>"Team"<input name="winning_team"/></label>
+                        <label>"Tags"<input name="tags" placeholder="combo, long game"/></label>
+                        <label>"Notes"<textarea name="notes" rows="3"></textarea></label>
+                        <label class="checkbox-row">
+                            <input type="checkbox" name="complete_event" value="true"/>
+                            "Complete event"
+                        </label>
+                        <button class="button primary" type="submit">"Log game"</button>
+                    </>
+                }.into_any()
+            } else if can_edit {
+                view! { <p class="empty-state">"Publish or lock pods before logging games."</p> }.into_any()
+            } else {
+                view! { <p class="empty-state">"Game logging is limited to hosts and admins."</p> }.into_any()
+            }}
+        </form>
+    }
+}
+
+#[component]
+fn GameHistoryList(games: Vec<GameWithPlayers>) -> impl IntoView {
+    let has_games = !games.is_empty();
+
+    view! {
+        <section class="panel">
+            <h2>"Game history"</h2>
+            {if has_games {
+                view! {
+                    <div class="list">
+                        {games.into_iter().map(|game| {
+                            let winner = game
+                                .result
+                                .winner_user_id
+                                .map(|id| format!("Winner {}", short_id(id)))
+                                .unwrap_or_else(|| "No single winner".to_owned());
+                            let summary = format!(
+                                "{} · {} players · {}",
+                                result_type_label(&game.game.result_type),
+                                game.players.len(),
+                                display_datetime(game.game.completed_at)
+                            );
+                            view! {
+                                <article class="list-item">
+                                    <div>
+                                        <h3>{winner}</h3>
+                                        <p>{summary}</p>
+                                        {(!game.game.notes.is_empty()).then(|| view! { <p>{game.game.notes}</p> })}
+                                    </div>
+                                    <span class="badge">
+                                        {game.game.turn_count.map(|turns| format!("{turns} turns")).unwrap_or_else(|| "logged".to_owned())}
+                                    </span>
+                                </article>
+                            }
+                        }).collect_view()}
+                    </div>
+                }.into_any()
+            } else {
+                view! { <p class="empty-state">"No games logged yet."</p> }.into_any()
+            }}
+        </section>
+    }
+}
+
+#[component]
 fn EventFields(
     title: String,
     description: String,
@@ -1477,6 +1629,21 @@ fn yes_no(value: bool) -> &'static str {
 
 fn short_id(id: uuid::Uuid) -> String {
     id.to_string().chars().take(8).collect()
+}
+
+fn result_type_label(value: &str) -> &'static str {
+    match value {
+        "normal_win" => "Normal win",
+        "combo_win" => "Combo win",
+        "combat_win" => "Combat win",
+        "concession" => "Concession",
+        "draw" => "Draw",
+        "time_called" => "Time called",
+        "unfinished" => "Unfinished",
+        "archenemy_win" => "Archenemy win",
+        "team_win" => "Team win",
+        _ => "Game",
+    }
 }
 
 fn city_line(

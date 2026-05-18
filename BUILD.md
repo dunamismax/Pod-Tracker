@@ -402,14 +402,14 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 8 - Game Logging
 
-- [ ] Add games, game players, results, notes, and event completion.
-- [ ] Support result types: normal win, combo win, combat win,
+- [x] Add games, game players, results, notes, and event completion.
+- [x] Support result types: normal win, combo win, combat win,
       concession, draw, time called, unfinished, archenemy win, team win.
 - [ ] Capture winner, turn count, duration, first player, elimination
       order, tags, and notes where provided.
-- [ ] Keep logging fast enough to use between games.
-- [ ] Update matchup history after each logged game.
-- [ ] Add tests for game logging and event history.
+- [x] Keep logging fast enough to use between games.
+- [x] Update matchup history after each logged game.
+- [x] Add tests for game logging and event history.
 
 ### Phase 9 - Scryfall Import And Card Search
 
@@ -688,3 +688,8 @@ Trust current primary docs over this file.
   notification jobs, SQL Observatory pod query entries, and focused
   repository and route tests for generation, locks, movement, publishing,
   and permissions.
+- 2026-05-18 - Added the Rust Phase 8 game logging foundation: games,
+  game players, game results, game notes, event completion, supported
+  result types, fast event-page logging, matchup-history writes, and
+  focused repository and route tests. Elimination-order capture remains
+  unchecked until there is a real input path for it.
