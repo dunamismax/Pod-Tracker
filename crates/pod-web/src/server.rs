@@ -1497,6 +1497,20 @@ mod tests {
         )
     }
 
+    fn test_state_with_static_dir(static_dir: &str) -> AppState {
+        AppState::new(
+            AppConfig {
+                addr: "127.0.0.1:0".to_owned(),
+                database_url: None,
+                environment: "test".to_owned(),
+                static_dir: static_dir.to_owned(),
+                smtp2go_api_key: None,
+                smtp_sender: "pod-tracker@example.test".to_owned(),
+            },
+            None,
+        )
+    }
+
     fn test_state_with_db(pool: sqlx::PgPool) -> AppState {
         AppState::new(
             AppConfig {
@@ -1658,6 +1672,28 @@ mod tests {
             .expect("response");
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn static_css_asset_is_served() {
+        let app = build_router(test_state_with_static_dir(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/assets"
+        )));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/static/app.css")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = body_string(response).await;
+        assert!(body.contains(":root"));
     }
 
     #[tokio::test]
