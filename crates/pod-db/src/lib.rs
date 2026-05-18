@@ -4,6 +4,7 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use thiserror::Error;
 
+pub mod collections;
 pub mod decks;
 pub mod events;
 pub mod games;
@@ -16,6 +17,11 @@ pub mod playgroups;
 pub mod pods;
 pub mod scryfall;
 
+pub use collections::{
+    AddCollectionCardInput, AddWishlistCardInput, CollectionCardRecord, CollectionRecord,
+    CollectionRepository, CreateCollectionInput, CreateWishlistInput, DeckMissingCardRecord,
+    WishlistCardRecord, WishlistRecord,
+};
 pub use decks::{
     CreateDeckInput, DeckBracketSnapshotRecord, DeckCardRecord, DeckRecord, DeckRepository,
     DeckVersionRecord, DecklistExportRecord, DecklistImportInput, DecklistImportSummary,

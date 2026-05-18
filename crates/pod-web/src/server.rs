@@ -10,6 +10,9 @@ use pod_core::auth::{
     AuthError, SESSION_COOKIE_NAME, hash_password, hash_session_token, new_session_token,
     verify_password,
 };
+use pod_core::collections::{
+    CardCondition, CollectionVisibility, ProxyPrintEntry, export_proxy_print_list,
+};
 use pod_core::config::AppConfig;
 use pod_core::decklists::{
     DecklistExportEntry, DecklistExportFormat, DecklistSection, export_decklist,
@@ -24,11 +27,12 @@ use pod_core::games::{GameResultType, normalize_game_tags};
 use pod_core::health::{HealthResponse, ReadinessFailure};
 use pod_core::playgroups::{PlaygroupRole, slugify};
 use pod_db::{
-    CardSearchFilters, CreateDeckInput, CreateEventInput, DbError, DeckRepository,
-    DecklistImportInput, EventDeckDeclarationInput, EventDeckDeclarationWithDeck,
-    EventLocationInput, EventRepository, EventRsvpRecord, EventWithRole, GameRepository,
-    GameWithPlayers, IdentityRepository, LogGameInput, MetaRepository, PlaygroupRepository,
-    PodRepository, PodWithSeats, RsvpInput, ScryfallRepository, UpdateEventInput, UserRecord,
+    AddCollectionCardInput, CardSearchFilters, CollectionRepository, CreateCollectionInput,
+    CreateDeckInput, CreateEventInput, DbError, DeckRepository, DecklistImportInput,
+    EventDeckDeclarationInput, EventDeckDeclarationWithDeck, EventLocationInput, EventRepository,
+    EventRsvpRecord, EventWithRole, GameRepository, GameWithPlayers, IdentityRepository,
+    LogGameInput, MetaRepository, PlaygroupRepository, PodRepository, PodWithSeats, RsvpInput,
+    ScryfallRepository, UpdateEventInput, UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -88,6 +92,17 @@ pub fn build_router(state: AppState) -> Router {
         .route("/decks/{id}/import", post(import_decklist))
         .route("/decks/{id}/export/{format}", get(export_decklist_route))
         .route("/cards", get(cards))
+        .route("/collections", get(collections).post(create_collection))
+        .route("/collections/{id}", get(collection_detail))
+        .route("/collections/{id}/cards", post(add_collection_card))
+        .route(
+            "/collections/{id}/decks/{deck_id}/missing",
+            get(collection_missing_cards),
+        )
+        .route(
+            "/collections/{id}/decks/{deck_id}/proxy-list",
+            get(collection_proxy_list),
+        )
         .route("/meta", get(meta_dashboard))
         .route("/e/{token}", get(public_event_detail))
         .route("/rsvp/{token}", get(guest_rsvp_form).post(save_guest_rsvp))
@@ -880,6 +895,271 @@ async fn cards(State(state): State<AppState>, Query(query): Query<CardSearchQuer
         },
     ))
     .into_response()
+}
+
+async fn collections(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let repo = CollectionRepository::new(pool);
+    let collections = match repo.list_collections_for_user(user.id).await {
+        Ok(collections) => collections,
+        Err(err) => {
+            tracing::error!(err = %err, "list collections");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let playgroups = match PlaygroupRepository::new(pool).list_for_user(user.id).await {
+        Ok(playgroups) => playgroups,
+        Err(err) => {
+            tracing::error!(err = %err, "list playgroups for collection form");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_collections(&csrf.token, &collections, &playgroups, None, None),
+        csrf.set_cookie,
+    )
+}
+
+async fn create_collection(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<CollectionForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let repo = CollectionRepository::new(pool);
+    let playgroups = match PlaygroupRepository::new(pool).list_for_user(user.id).await {
+        Ok(playgroups) => playgroups,
+        Err(err) => {
+            tracing::error!(err = %err, "list playgroups before collection create");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let existing = match repo.list_collections_for_user(user.id).await {
+        Ok(collections) => collections,
+        Err(err) => {
+            tracing::error!(err = %err, "list collections before create");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    let parsed = match parse_collection_form(&playgroups, &form) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            return html_with_cookies(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ui::render_collections(
+                    &csrf.token,
+                    &existing,
+                    &playgroups,
+                    Some(message),
+                    Some(&form),
+                ),
+                csrf.set_cookie,
+            );
+        }
+    };
+
+    match repo
+        .create_collection(CreateCollectionInput {
+            owner_user_id: user.id,
+            playgroup_id: parsed.playgroup_id,
+            name: &parsed.name,
+            visibility: &parsed.visibility,
+            notes: &parsed.notes,
+        })
+        .await
+    {
+        Ok(Some(collection)) => {
+            Redirect::to(&format!("/collections/{}", collection.id)).into_response()
+        }
+        Ok(None) => StatusCode::FORBIDDEN.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "create collection");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+async fn collection_detail(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    render_collection_detail_response(&state, pool, user.id, id, None, &headers).await
+}
+
+async fn add_collection_card(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<CollectionCardForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let parsed = match parse_collection_card_form(&form) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            return render_collection_detail_response(
+                &state,
+                pool,
+                user.id,
+                id,
+                Some(message),
+                &headers,
+            )
+            .await;
+        }
+    };
+
+    let repo = CollectionRepository::new(pool);
+    match repo
+        .add_collection_card(AddCollectionCardInput {
+            collection_id: id,
+            owner_user_id: user.id,
+            card_name: &parsed.card_name,
+            set_code: parsed.set_code.as_deref(),
+            collector_number: parsed.collector_number.as_deref(),
+            quantity: parsed.quantity,
+            foil: parsed.foil,
+            condition: &parsed.condition,
+            location: &parsed.location,
+        })
+        .await
+    {
+        Ok(Some(_card)) => Redirect::to(&format!("/collections/{id}")).into_response(),
+        Ok(None) => {
+            render_collection_detail_response(
+                &state,
+                pool,
+                user.id,
+                id,
+                Some("Card was not found in the local Scryfall index or collection is not owned."),
+                &headers,
+            )
+            .await
+        }
+        Err(err) => {
+            tracing::error!(err = %err, "add collection card");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
+}
+
+async fn collection_missing_cards(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path((id, deck_id)): axum::extract::Path<(uuid::Uuid, uuid::Uuid)>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let repo = CollectionRepository::new(pool);
+    let collection = match repo.get_collection_for_user(id, user.id).await {
+        Ok(Some(collection)) => collection,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get collection for missing cards");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let cards = match repo.missing_cards_for_deck(deck_id, id, user.id).await {
+        Ok(cards) => cards,
+        Err(err) => {
+            tracing::error!(err = %err, "load missing cards");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Html(ui::render_collection_missing_cards(
+        &collection,
+        deck_id,
+        &cards,
+    ))
+    .into_response()
+}
+
+async fn collection_proxy_list(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path((id, deck_id)): axum::extract::Path<(uuid::Uuid, uuid::Uuid)>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    let repo = CollectionRepository::new(pool);
+    let collection = match repo.get_collection_for_user(id, user.id).await {
+        Ok(Some(collection)) => collection,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get collection for proxy list");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let cards = match repo.missing_cards_for_deck(deck_id, id, user.id).await {
+        Ok(cards) => cards,
+        Err(err) => {
+            tracing::error!(err = %err, "load proxy list cards");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let entries = cards
+        .iter()
+        .map(|card| ProxyPrintEntry {
+            quantity: card.missing_quantity,
+            card_name: &card.card_name,
+            section: &card.section,
+            is_commander: card.is_commander,
+        })
+        .collect::<Vec<_>>();
+    let filename = text_export_filename(&collection.name, "proxy-list");
+
+    let mut response = Response::new(Body::from(export_proxy_print_list(&entries)));
+    response.headers_mut().insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    if let Ok(value) = HeaderValue::from_str(&format!("attachment; filename=\"{filename}\"")) {
+        response.headers_mut().insert(CONTENT_DISPOSITION, value);
+    }
+    response
 }
 
 async fn meta_dashboard(State(state): State<AppState>, headers: HeaderMap) -> Response {
@@ -1838,6 +2118,36 @@ struct CardSearchQuery {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct CollectionForm {
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) visibility: String,
+    #[serde(default)]
+    pub(crate) playgroup_id: String,
+    #[serde(default)]
+    pub(crate) notes: String,
+    pub(crate) csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CollectionCardForm {
+    pub(crate) card_name: String,
+    #[serde(default)]
+    pub(crate) set_code: String,
+    #[serde(default)]
+    pub(crate) collector_number: String,
+    #[serde(default)]
+    pub(crate) quantity: String,
+    #[serde(default)]
+    pub(crate) foil: bool,
+    #[serde(default)]
+    pub(crate) condition: String,
+    #[serde(default)]
+    pub(crate) location: String,
+    pub(crate) csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct DeckForm {
     pub(crate) name: String,
     pub(crate) commander: String,
@@ -1949,6 +2259,25 @@ struct ParsedDeckForm {
     has_mass_land_denial: bool,
     salt_notes: String,
     notes: String,
+}
+
+#[derive(Debug, Clone)]
+struct ParsedCollectionForm {
+    playgroup_id: Option<uuid::Uuid>,
+    name: String,
+    visibility: String,
+    notes: String,
+}
+
+#[derive(Debug, Clone)]
+struct ParsedCollectionCardForm {
+    card_name: String,
+    set_code: Option<String>,
+    collector_number: Option<String>,
+    quantity: i32,
+    foil: bool,
+    condition: String,
+    location: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2238,6 +2567,59 @@ async fn public_event_page_context(
     })
 }
 
+async fn render_collection_detail_response(
+    state: &AppState,
+    pool: &PgPool,
+    user_id: uuid::Uuid,
+    collection_id: uuid::Uuid,
+    error: Option<&str>,
+    headers: &HeaderMap,
+) -> Response {
+    let repo = CollectionRepository::new(pool);
+    let collection = match repo.get_collection_for_user(collection_id, user_id).await {
+        Ok(Some(collection)) => collection,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get collection");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let cards = match repo
+        .list_collection_cards_for_user(collection_id, user_id)
+        .await
+    {
+        Ok(cards) => cards,
+        Err(err) => {
+            tracing::error!(err = %err, "list collection cards");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let decks = match DeckRepository::new(pool)
+        .list_owned_active_for_user(user_id)
+        .await
+    {
+        Ok(decks) => decks,
+        Err(err) => {
+            tracing::error!(err = %err, "list active decks for collection");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let csrf = ensure_csrf_cookie(headers, &state.config);
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_collection_detail(
+            &collection,
+            &cards,
+            &decks,
+            &csrf.token,
+            error,
+            collection.owner_user_id == user_id,
+        ),
+        csrf.set_cookie,
+    )
+}
+
 fn parse_rsvp_input<'a>(
     event_id: uuid::Uuid,
     user_id: Option<uuid::Uuid>,
@@ -2271,6 +2653,67 @@ fn parse_rsvp_input<'a>(
 
 fn default_address_visibility() -> String {
     AddressVisibility::Rsvps.as_str().to_owned()
+}
+
+fn parse_collection_form(
+    playgroups: &[pod_db::PlaygroupWithRole],
+    form: &CollectionForm,
+) -> Result<ParsedCollectionForm, &'static str> {
+    let name = form.name.trim();
+    if name.is_empty() {
+        return Err("Collection name is required.");
+    }
+    let visibility =
+        CollectionVisibility::try_from(default_if_empty(form.visibility.trim(), "private"))
+            .map_err(|()| "Choose a valid collection visibility.")?
+            .as_str()
+            .to_owned();
+    let playgroup_id = optional_trimmed(&form.playgroup_id)
+        .map(str::parse)
+        .transpose()
+        .map_err(|_| "Choose a valid playgroup for playgroup-visible collections.")?;
+    if playgroup_id.is_some_and(|id| !playgroups.iter().any(|playgroup| playgroup.id == id)) {
+        return Err("Choose a playgroup you belong to.");
+    }
+    if visibility == CollectionVisibility::Playgroup.as_str() && playgroup_id.is_none() {
+        return Err("Playgroup-visible collections need a playgroup.");
+    }
+
+    Ok(ParsedCollectionForm {
+        playgroup_id,
+        name: name.to_owned(),
+        visibility,
+        notes: form.notes.trim().to_owned(),
+    })
+}
+
+fn parse_collection_card_form(
+    form: &CollectionCardForm,
+) -> Result<ParsedCollectionCardForm, &'static str> {
+    let card_name = form.card_name.trim();
+    if card_name.is_empty() {
+        return Err("Card name is required.");
+    }
+    let quantity = parse_optional_i32(&form.quantity)
+        .unwrap_or(Some(1))
+        .ok_or("Quantity must be a number.")?;
+    if quantity <= 0 {
+        return Err("Quantity must be positive.");
+    }
+    let condition = CardCondition::try_from(default_if_empty(form.condition.trim(), "unknown"))
+        .map_err(|()| "Choose a valid card condition.")?
+        .as_str()
+        .to_owned();
+
+    Ok(ParsedCollectionCardForm {
+        card_name: card_name.to_owned(),
+        set_code: optional_trimmed(&form.set_code).map(str::to_owned),
+        collector_number: optional_trimmed(&form.collector_number).map(str::to_owned),
+        quantity,
+        foil: form.foil,
+        condition,
+        location: form.location.trim().to_owned(),
+    })
 }
 
 fn parse_deck_form(
@@ -2353,9 +2796,13 @@ fn decklist_section_from_db(value: &str) -> DecklistSection {
 }
 
 fn decklist_export_filename(deck_name: &str, format: DecklistExportFormat) -> String {
+    text_export_filename(deck_name, format.slug())
+}
+
+fn text_export_filename(name: &str, suffix: &str) -> String {
     let mut slug = String::new();
     let mut last_was_dash = false;
-    for character in deck_name.chars().flat_map(char::to_lowercase) {
+    for character in name.chars().flat_map(char::to_lowercase) {
         if character.is_ascii_alphanumeric() {
             slug.push(character);
             last_was_dash = false;
@@ -2368,9 +2815,9 @@ fn decklist_export_filename(deck_name: &str, format: DecklistExportFormat) -> St
         slug.pop();
     }
     if slug.is_empty() {
-        slug.push_str("decklist");
+        slug.push_str("export");
     }
-    format!("{}-{}.{}", slug, format.slug(), format.extension())
+    format!("{slug}-{suffix}.txt")
 }
 
 fn optional_trimmed(value: &str) -> Option<&str> {
@@ -2565,8 +3012,9 @@ mod tests {
     use pod_core::config::AppConfig;
     use pod_core::playgroups::PlaygroupRole;
     use pod_db::{
-        EventRepository, IdentityRepository, MetaRepository, PlaygroupRepository, PodRepository,
-        ScryfallImportInput, ScryfallRepository,
+        CreateDeckInput, DeckRepository, DecklistImportInput, EventRepository, IdentityRepository,
+        MetaRepository, PlaygroupRepository, PodRepository, ScryfallImportInput,
+        ScryfallRepository,
     };
     use serde_json::json;
     use tower::ServiceExt;
@@ -2706,6 +3154,18 @@ mod tests {
             .trim_start_matches("/decks/")
             .parse()
             .expect("deck uuid")
+    }
+
+    fn redirected_collection_id(response: &axum::response::Response) -> uuid::Uuid {
+        response
+            .headers()
+            .get(LOCATION)
+            .expect("collection redirect")
+            .to_str()
+            .expect("location str")
+            .trim_start_matches("/collections/")
+            .parse()
+            .expect("collection uuid")
     }
 
     #[tokio::test]
@@ -4182,6 +4642,230 @@ mod tests {
         let event_after_game_body = body_string(event_after_game).await;
         assert!(event_after_game_body.contains("Game history"));
         assert!(event_after_game_body.contains("Clean combat finish"));
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn collection_routes_track_cards_missing_lists_and_scope_access(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool.clone()));
+        let owner = sign_up(&app, "collection-route-owner@example.test", "Owner").await;
+        let outsider = sign_up(&app, "collection-route-outsider@example.test", "Outsider").await;
+
+        let scryfall = ScryfallRepository::new(&pool);
+        let metadata = json!({
+            "type": "default_cards",
+            "updated_at": "2026-05-18T09:09:27.689+00:00",
+            "uri": "https://api.scryfall.com/bulk-data/collection-route",
+            "download_uri": "https://data.scryfall.io/default-cards/collection-route.json"
+        });
+        let import = scryfall
+            .create_import(ScryfallImportInput {
+                bulk_type: "default_cards",
+                source_uri: metadata["uri"].as_str().expect("uri"),
+                download_uri: metadata["download_uri"].as_str().expect("download uri"),
+                source_updated_at: time::OffsetDateTime::now_utc(),
+                content_type: "application/json",
+                content_encoding: None,
+                size_bytes: Some(4096),
+                raw_metadata: &metadata,
+            })
+            .await
+            .expect("create import");
+        for card in [
+            card_json(
+                "00000000-0000-7200-8000-000000000001",
+                "10000000-0000-7200-8000-000000000001",
+                "Atraxa, Praetors' Voice",
+                &["W", "U", "B", "G"],
+                "Legendary Creature - Phyrexian Angel Horror",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7200-8000-000000000002",
+                "10000000-0000-7200-8000-000000000002",
+                "Sol Ring",
+                &[],
+                "Artifact",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7200-8000-000000000003",
+                "10000000-0000-7200-8000-000000000003",
+                "Counterspell",
+                &["U"],
+                "Instant",
+                false,
+            ),
+        ] {
+            scryfall
+                .upsert_card_from_scryfall_json(import.id, &card)
+                .await
+                .expect("upsert card");
+        }
+
+        let create_collection = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/collections")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Route+Binder&visibility=private&playgroup_id=&notes=Blue+binder&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create collection");
+        assert_eq!(create_collection.status(), StatusCode::SEE_OTHER);
+        let collection_id = redirected_collection_id(&create_collection);
+
+        let outsider_detail = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/collections/{collection_id}"))
+                    .header("cookie", outsider.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider collection detail");
+        assert_eq!(outsider_detail.status(), StatusCode::NOT_FOUND);
+
+        let add_card = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/collections/{collection_id}/cards"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "card_name=Sol+Ring&set_code=&collector_number=&quantity=1&foil=true&condition=near_mint&location=Blue+binder&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("add card");
+        assert_eq!(add_card.status(), StatusCode::SEE_OTHER);
+
+        let detail = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/collections/{collection_id}"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("collection detail");
+        assert_eq!(detail.status(), StatusCode::OK);
+        let detail_body = body_string(detail).await;
+        assert!(detail_body.contains("Sol Ring"));
+        assert!(detail_body.contains("Blue binder"));
+        assert!(detail_body.contains("Deck gaps"));
+
+        let owner_user = IdentityRepository::new(&pool)
+            .find_user_by_email("collection-route-owner@example.test")
+            .await
+            .expect("owner")
+            .expect("owner");
+        let tags = Vec::new();
+        let deck = DeckRepository::new(&pool)
+            .create_deck(CreateDeckInput {
+                owner_user_id: owner_user.id,
+                playgroup_id: None,
+                name: "Collection Route Deck",
+                commander: "Atraxa, Praetors' Voice",
+                color_identity: "WUBG",
+                claimed_bracket: "3",
+                archetype: "Midrange",
+                tags: &tags,
+                visibility: "private",
+                status: "active",
+                game_changers_count: 0,
+                has_infinite_combo: false,
+                has_fast_mana: false,
+                tutor_density: "none",
+                has_extra_turns: false,
+                has_mass_land_denial: false,
+                salt_notes: "",
+                notes: "",
+            })
+            .await
+            .expect("deck");
+        DeckRepository::new(&pool)
+            .import_plain_text_decklist(DecklistImportInput {
+                deck_id: deck.id,
+                owner_user_id: owner_user.id,
+                source_text:
+                    "Commander\n1 Atraxa, Praetors' Voice\n\nDeck\n2 Sol Ring\n1 Counterspell\n",
+            })
+            .await
+            .expect("import")
+            .expect("summary");
+
+        let missing = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!(
+                        "/collections/{collection_id}/decks/{}/missing",
+                        deck.id
+                    ))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("missing cards");
+        assert_eq!(missing.status(), StatusCode::OK);
+        let missing_body = body_string(missing).await;
+        assert!(missing_body.contains("Atraxa"));
+        assert!(missing_body.contains("Counterspell"));
+        assert!(missing_body.contains("Sol Ring"));
+
+        let proxy = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!(
+                        "/collections/{collection_id}/decks/{}/proxy-list",
+                        deck.id
+                    ))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("proxy list");
+        assert_eq!(proxy.status(), StatusCode::OK);
+        assert_eq!(
+            proxy.headers().get(CONTENT_TYPE).expect("content type"),
+            "text/plain; charset=utf-8"
+        );
+        let proxy_body = body_string(proxy).await;
+        assert!(proxy_body.contains("Commander\n1 Atraxa, Praetors' Voice"));
+        assert!(proxy_body.contains("Deck\n1 Counterspell\n1 Sol Ring"));
+
+        let outsider_proxy = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!(
+                        "/collections/{collection_id}/decks/{}/proxy-list",
+                        deck.id
+                    ))
+                    .header("cookie", outsider.cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider proxy list");
+        assert_eq!(outsider_proxy.status(), StatusCode::NOT_FOUND);
     }
 
     fn storm_kiln_artist_card() -> serde_json::Value {

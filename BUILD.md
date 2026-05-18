@@ -451,13 +451,13 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 12 - Collection Tracking
 
-- [ ] Add collections and collection card quantities.
-- [ ] Track printing, foil flag, condition, and location when provided.
-- [ ] Show missing cards by deck.
-- [ ] Generate proxy/print lists.
+- [x] Add collections and collection card quantities.
+- [x] Track printing, foil flag, condition, and location when provided.
+- [x] Show missing cards by deck.
+- [x] Generate proxy/print lists.
 - [ ] Add wishlists.
-- [ ] Add collection visibility and ownership checks.
-- [ ] Add tests for collection calculations and privacy.
+- [x] Add collection visibility and ownership checks.
+- [x] Add tests for collection calculations and privacy.
 
 ### Phase 13 - SQL Observatory
 
@@ -729,3 +729,9 @@ Trust current primary docs over this file.
   wired refresh jobs through the worker; added an authenticated SSR
   `/meta` dashboard, SQL Observatory materialized-view entries, and
   focused PostgreSQL-backed metrics, refresh, worker, and route tests.
+- 2026-05-18 - Added the Rust Phase 12 collection tracking foundation:
+  collections, collection cards with printing/foil/condition/location
+  fields, owner and visibility-scoped repository access, missing-card
+  calculations from latest imported decklists, proxy/print text exports,
+  first SSR `/collections` surface, and focused PostgreSQL-backed
+  calculation, privacy, and route tests.

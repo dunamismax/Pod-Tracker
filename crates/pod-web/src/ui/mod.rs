@@ -1,12 +1,15 @@
 use leptos::prelude::*;
 use pod_db::{
-    CardSearchResult, DeckBracketSnapshotRecord, DeckRecord, EventDeckDeclarationWithDeck,
-    EventRecord, EventRsvpRecord, EventWithRole, GameWithPlayers, HouseRuleRecord, MetaDashboard,
-    MetaDistributionMetric, PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
+    CardSearchResult, CollectionCardRecord, CollectionRecord, DeckBracketSnapshotRecord,
+    DeckMissingCardRecord, DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord,
+    EventWithRole, GameWithPlayers, HouseRuleRecord, MetaDashboard, MetaDistributionMetric,
+    PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
 };
 use time::{OffsetDateTime, UtcOffset};
 
-use crate::server::{DeckForm, EventEditForm, EventForm, EventPageContext, RsvpForm};
+use crate::server::{
+    CollectionForm, DeckForm, EventEditForm, EventForm, EventPageContext, RsvpForm,
+};
 
 pub fn render_home() -> String {
     view! {
@@ -771,6 +774,279 @@ pub fn render_cards(cards: &[CardSearchResult], search: CardSearchView<'_>) -> S
                         </label>
                         <button class="button primary" type="submit">"Apply filters"</button>
                     </form>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_collections(
+    csrf_token: &str,
+    collections: &[CollectionRecord],
+    playgroups: &[PlaygroupWithRole],
+    error: Option<&str>,
+    form: Option<&CollectionForm>,
+) -> String {
+    let csrf_token = csrf_token.to_owned();
+    let collections = collections.to_vec();
+    let playgroups = playgroups.to_vec();
+    let error = error.map(str::to_owned);
+    let name = form.map(|form| form.name.as_str()).unwrap_or("").to_owned();
+    let visibility = form
+        .map(|form| form.visibility.as_str())
+        .unwrap_or("private")
+        .to_owned();
+    let playgroup_id = form
+        .map(|form| form.playgroup_id.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let notes = form
+        .map(|form| form.notes.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let has_collections = !collections.is_empty();
+
+    view! {
+        <AppShell title="Collections" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header compact">
+                    <p class="eyebrow">"Collection tracking"</p>
+                    <h1>"Collections"</h1>
+                </section>
+                <section class="split-layout wide-left">
+                    <div class="workspace-panel">
+                        <div class="section-heading">
+                            <h2>"Visible collections"</h2>
+                            <span>{collections.len()} " collections"</span>
+                        </div>
+                        {if has_collections {
+                            view! {
+                                <div class="list">
+                                    {collections.into_iter().map(|collection| view! {
+                                        <article class="list-item">
+                                            <div>
+                                                <h2><a href=format!("/collections/{}", collection.id)>{collection.name}</a></h2>
+                                                <p>{collection.notes}</p>
+                                            </div>
+                                            <dl class="compact-list inline">
+                                                <div><dt>"Visibility"</dt><dd>{collection.visibility}</dd></div>
+                                            </dl>
+                                        </article>
+                                    }).collect_view()}
+                                </div>
+                            }.into_any()
+                        } else {
+                            view! { <p class="empty-state">"No visible collections yet."</p> }.into_any()
+                        }}
+                    </div>
+                    <form method="post" action="/collections" class="form-panel">
+                        <h2>"New collection"</h2>
+                        {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                        <input type="hidden" name="csrf_token" value=csrf_token/>
+                        <label>"Name"<input name="name" required value=name/></label>
+                        <div class="field-grid">
+                            <label>
+                                "Visibility"
+                                <select name="visibility">
+                                    <option value="private" selected=visibility == "private">"Private"</option>
+                                    <option value="playgroup" selected=visibility == "playgroup">"Playgroup"</option>
+                                    <option value="public" selected=visibility == "public">"Public"</option>
+                                </select>
+                            </label>
+                            <label>
+                                "Playgroup"
+                                <select name="playgroup_id">
+                                    <option value="" selected=playgroup_id.is_empty()>"None"</option>
+                                    {playgroups.into_iter().map(|playgroup| {
+                                        let id = playgroup.id.to_string();
+                                        view! {
+                                            <option value=id.clone() selected=playgroup_id == id>
+                                                {playgroup.name}
+                                            </option>
+                                        }
+                                    }).collect_view()}
+                                </select>
+                            </label>
+                        </div>
+                        <label>"Notes"<textarea name="notes" rows="3">{notes}</textarea></label>
+                        <button class="button primary" type="submit">"Save collection"</button>
+                    </form>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_collection_detail(
+    collection: &CollectionRecord,
+    cards: &[CollectionCardRecord],
+    decks: &[DeckRecord],
+    csrf_token: &str,
+    error: Option<&str>,
+    can_edit: bool,
+) -> String {
+    let collection = collection.clone();
+    let cards = cards.to_vec();
+    let decks = decks.to_vec();
+    let csrf_token = csrf_token.to_owned();
+    let error = error.map(str::to_owned);
+    let has_cards = !cards.is_empty();
+    view! {
+        <AppShell title="Collection" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header">
+                    <p class="eyebrow">"Collection"</p>
+                    <h1>{collection.name.clone()}</h1>
+                    <p class="lede">{collection.notes.clone()}</p>
+                    <nav class="actions" aria-label="Collection actions">
+                        <a class="button secondary" href="/collections">"All collections"</a>
+                    </nav>
+                    <dl class="status-list">
+                        <div><dt>"Visibility"</dt><dd>{collection.visibility.clone()}</dd></div>
+                    </dl>
+                </section>
+                <section class="split-layout wide-left">
+                    <div class="workspace-panel">
+                        <div class="section-heading">
+                            <h2>"Cards"</h2>
+                            <span>{cards.iter().map(|card| card.quantity).sum::<i32>()} " total"</span>
+                        </div>
+                        {if has_cards {
+                            view! {
+                                <div class="list">
+                                    {cards.into_iter().map(|card| view! {
+                                        <article class="list-item">
+                                            <div>
+                                                <h2>{card.card_name}</h2>
+                                                <p>{card.location}</p>
+                                            </div>
+                                            <dl class="compact-list inline">
+                                                <div><dt>"Qty"</dt><dd>{card.quantity}</dd></div>
+                                                <div><dt>"Foil"</dt><dd>{yes_no(card.foil)}</dd></div>
+                                                <div><dt>"Condition"</dt><dd>{card.condition}</dd></div>
+                                            </dl>
+                                        </article>
+                                    }).collect_view()}
+                                </div>
+                            }.into_any()
+                        } else {
+                            view! { <p class="empty-state">"No cards tracked yet."</p> }.into_any()
+                        }}
+                    </div>
+                    {can_edit.then(|| view! {
+                        <form method="post" action=format!("/collections/{}/cards", collection.id) class="form-panel">
+                            <h2>"Add cards"</h2>
+                            {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                            <input type="hidden" name="csrf_token" value=csrf_token/>
+                            <label>"Card"<input name="card_name" required placeholder="Sol Ring"/></label>
+                            <div class="field-grid">
+                                <label>"Set"<input name="set_code" placeholder="cmm"/></label>
+                                <label>"Collector #"<input name="collector_number" placeholder="400"/></label>
+                            </div>
+                            <div class="field-grid">
+                                <label>"Quantity"<input name="quantity" inputmode="numeric" value="1"/></label>
+                                <label>
+                                    "Condition"
+                                    <select name="condition">
+                                        <option value="unknown">"Unknown"</option>
+                                        <option value="mint">"Mint"</option>
+                                        <option value="near_mint">"Near mint"</option>
+                                        <option value="lightly_played">"Lightly played"</option>
+                                        <option value="moderately_played">"Moderately played"</option>
+                                        <option value="heavily_played">"Heavily played"</option>
+                                        <option value="damaged">"Damaged"</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <label>"Location"<input name="location" placeholder="Blue binder"/></label>
+                            <label class="checkbox-row">
+                                <input type="checkbox" name="foil" value="true"/>
+                                "Foil"
+                            </label>
+                            <button class="button primary" type="submit">"Add card"</button>
+                        </form>
+                    })}
+                </section>
+                <section class="workspace-panel section-gap">
+                    <div class="section-heading">
+                        <h2>"Deck gaps"</h2>
+                        <span>{decks.len()} " active decks"</span>
+                    </div>
+                    {if decks.is_empty() {
+                        view! { <p class="empty-state">"Import a decklist to compare it with this collection."</p> }.into_any()
+                    } else {
+                        view! {
+                            <div class="list">
+                                {decks.into_iter().map(|deck| view! {
+                                    <article class="list-item">
+                                        <div>
+                                            <h2>{deck.name.clone()}</h2>
+                                            <p>{deck.commander}</p>
+                                        </div>
+                                        <nav class="actions" aria-label="Deck collection actions">
+                                            <a class="button secondary" href=format!("/collections/{}/decks/{}/missing", collection.id, deck.id)>"Missing"</a>
+                                            <a class="button secondary" href=format!("/collections/{}/decks/{}/proxy-list", collection.id, deck.id)>"Proxy list"</a>
+                                        </nav>
+                                    </article>
+                                }).collect_view()}
+                            </div>
+                        }.into_any()
+                    }}
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_collection_missing_cards(
+    collection: &CollectionRecord,
+    deck_id: uuid::Uuid,
+    cards: &[DeckMissingCardRecord],
+) -> String {
+    let collection = collection.clone();
+    let cards = cards.to_vec();
+    let has_cards = !cards.is_empty();
+
+    view! {
+        <AppShell title="Missing Cards" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header compact">
+                    <p class="eyebrow">"Missing cards"</p>
+                    <h1>{collection.name.clone()}</h1>
+                    <nav class="actions" aria-label="Missing card actions">
+                        <a class="button secondary" href=format!("/collections/{}", collection.id)>"Collection"</a>
+                        <a class="button secondary" href=format!("/collections/{}/decks/{}/proxy-list", collection.id, deck_id)>"Proxy list"</a>
+                    </nav>
+                </section>
+                <section class="workspace-panel">
+                    <div class="section-heading">
+                        <h2>"Needed"</h2>
+                        <span>{cards.len()} " cards"</span>
+                    </div>
+                    {if has_cards {
+                        view! {
+                            <div class="list">
+                                {cards.into_iter().map(|card| view! {
+                                    <article class="list-item">
+                                        <div>
+                                            <h2>{card.card_name}</h2>
+                                            <p>{card.section}</p>
+                                        </div>
+                                        <dl class="compact-list inline">
+                                            <div><dt>"Need"</dt><dd>{card.required_quantity}</dd></div>
+                                            <div><dt>"Owned"</dt><dd>{card.owned_quantity}</dd></div>
+                                            <div><dt>"Missing"</dt><dd>{card.missing_quantity}</dd></div>
+                                        </dl>
+                                    </article>
+                                }).collect_view()}
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! { <p class="empty-state">"This collection covers the latest imported decklist."</p> }.into_any()
+                    }}
                 </section>
             </main>
         </AppShell>
@@ -2300,6 +2576,7 @@ fn AppShell(
                         <a href="/events">"Events"</a>
                         <a href="/decks">"Decks"</a>
                         <a href="/cards">"Cards"</a>
+                        <a href="/collections">"Collections"</a>
                         <a href="/meta">"Meta"</a>
                         <a href="/observatory">"Observatory"</a>
                         <a class="nav-login" href=account_href>{account_label}</a>
