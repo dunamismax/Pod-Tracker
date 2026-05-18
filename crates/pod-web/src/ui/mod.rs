@@ -1,8 +1,8 @@
 use leptos::prelude::*;
 use pod_db::{
-    CardSearchResult, DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord,
-    EventWithRole, GameWithPlayers, HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole,
-    PodWithSeats,
+    CardSearchResult, DeckBracketSnapshotRecord, DeckRecord, EventDeckDeclarationWithDeck,
+    EventRecord, EventRsvpRecord, EventWithRole, GameWithPlayers, HouseRuleRecord,
+    PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
 };
 use time::{OffsetDateTime, UtcOffset};
 
@@ -577,9 +577,17 @@ pub fn render_decks(
     .to_html()
 }
 
-pub fn render_deck_detail(deck: &DeckRecord) -> String {
+pub fn render_deck_detail(
+    deck: &DeckRecord,
+    csrf_token: &str,
+    snapshot: Option<&DeckBracketSnapshotRecord>,
+    import_error: Option<&str>,
+) -> String {
     let deck = deck.clone();
     let tags = deck.tags.join(", ");
+    let csrf_token = csrf_token.to_owned();
+    let snapshot = snapshot.cloned();
+    let import_error = import_error.map(str::to_owned);
 
     view! {
         <AppShell title="Deck" account_label="Account" account_href="/settings">
@@ -618,6 +626,43 @@ pub fn render_deck_detail(deck: &DeckRecord) -> String {
                             <div><dt>"Mass land denial"</dt><dd>{yes_no(deck.has_mass_land_denial)}</dd></div>
                         </dl>
                         {(!deck.salt_notes.is_empty()).then(|| view! { <p class="body-copy">{deck.salt_notes}</p> })}
+                    </div>
+                </section>
+                <section class="split-layout wide-left section-gap">
+                    <form method="post" action=format!("/decks/{}/import", deck.id) class="form-panel">
+                        <h2>"Decklist import"</h2>
+                        {import_error.map(|message| view! { <p class="form-error">{message}</p> })}
+                        <input type="hidden" name="csrf_token" value=csrf_token/>
+                        <label>
+                            "Plain text"
+                            <textarea name="decklist" rows="12" placeholder={"Commander\n1 Atraxa, Praetors' Voice\n\nDeck\n1 Sol Ring"}></textarea>
+                        </label>
+                        <button class="button primary" type="submit">"Import list"</button>
+                    </form>
+                    <div class="panel">
+                        <h2>"Bracket check"</h2>
+                        {if let Some(snapshot) = snapshot {
+                            view! {
+                                <dl class="compact-list">
+                                    <div><dt>"Color identity"</dt><dd>{snapshot.color_identity.clone()}</dd></div>
+                                    <div><dt>"Commanders"</dt><dd>{snapshot.commander_names.join(" / ")}</dd></div>
+                                    <div><dt>"Game Changers"</dt><dd>{snapshot.game_changers_count}</dd></div>
+                                </dl>
+                                {if snapshot.warnings.is_empty() {
+                                    view! { <p class="empty-state">"No bracket warnings for the latest import."</p> }.into_any()
+                                } else {
+                                    view! {
+                                        <ul class="plain-list">
+                                            {snapshot.warnings.into_iter().map(|warning| view! {
+                                                <li>{warning}</li>
+                                            }).collect_view()}
+                                        </ul>
+                                    }.into_any()
+                                }}
+                            }.into_any()
+                        } else {
+                            view! { <p class="empty-state">"No imported decklist snapshot yet."</p> }.into_any()
+                        }}
                     </div>
                 </section>
             </main>
@@ -1215,7 +1260,7 @@ from search.card_documents
 where (
     document @@ websearch_to_tsquery('english', $1)
     or name % $1
-    or normalized_name % lower(regexp_replace($1, '[^a-z0-9]+', '', 'g'))
+    or normalized_name % regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
   )
   and ($2::text[] is null or color_identity <@ $2)
   and ($3::boolean is null or commander_legal = $3)
@@ -1232,6 +1277,17 @@ from mtg.card_printings p
 where p.raw_payload @> '{"layout":"normal"}'::jsonb
   and p.raw_payload ? 'prices'
 limit 25;"#;
+    let game_changer_sql = r#"select v.deck_id,
+       s.deck_version_id,
+       s.game_changers_count,
+       s.commander_names,
+       s.color_identity,
+       s.warning_codes
+from mtg.deck_bracket_snapshots s
+join mtg.deck_versions v on v.id = s.deck_version_id
+where v.deck_id = $1
+order by v.version_number desc
+limit 1;"#;
 
     view! {
         <AppShell title="SQL Observatory" account_label="Account" account_href="/settings">
@@ -1293,6 +1349,23 @@ limit 25;"#;
                             <span class="badge">"raw payload"</span>
                         </div>
                         <pre class="sql-block"><code>{jsonb_sql}</code></pre>
+                    </article>
+                </section>
+                <section class="split-layout wide-left section-gap">
+                    <article class="panel">
+                        <div class="section-heading">
+                            <h2>"Game Changers count"</h2>
+                            <span class="badge">"deck snapshot"</span>
+                        </div>
+                        <pre class="sql-block"><code>{game_changer_sql}</code></pre>
+                    </article>
+                    <article class="panel">
+                        <h2>"Plan Shape"</h2>
+                        <dl class="compact-list">
+                            <div><dt>"Inputs"</dt><dd>"deck_id"</dd></div>
+                            <div><dt>"Indexes"</dt><dd>"deck versions by deck, snapshot version key"</dd></div>
+                            <div><dt>"Output"</dt><dd>"latest imported bracket snapshot and warning codes"</dd></div>
+                        </dl>
                     </article>
                 </section>
             </main>

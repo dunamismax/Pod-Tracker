@@ -4,6 +4,7 @@ use uuid::Uuid;
 use sqlx::PgPool;
 
 use crate::DbError;
+use pod_core::decklists::{DecklistEntry, parse_plain_text_decklist};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeckRecord {
@@ -59,6 +60,60 @@ pub struct EventDeckDeclarationWithDeck {
     pub updated_at: OffsetDateTime,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeckVersionRecord {
+    pub id: Uuid,
+    pub deck_id: Uuid,
+    pub version_number: i32,
+    pub source_format: String,
+    pub source_text: String,
+    pub imported_at: OffsetDateTime,
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DeckCardRecord {
+    pub id: Uuid,
+    pub deck_version_id: Uuid,
+    pub oracle_id: Option<Uuid>,
+    pub quantity: i32,
+    pub card_name: String,
+    pub matched_name: Option<String>,
+    pub section: String,
+    pub match_status: String,
+    pub match_method: String,
+    pub name_similarity: Option<f32>,
+    pub is_commander: bool,
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeckBracketSnapshotRecord {
+    pub id: Uuid,
+    pub deck_version_id: Uuid,
+    pub bracket_version_id: Option<Uuid>,
+    pub game_changers_count: i32,
+    pub commander_names: Vec<String>,
+    pub color_identity: String,
+    pub warning_codes: Vec<String>,
+    pub warnings: Vec<String>,
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct DecklistImportInput<'a> {
+    pub deck_id: Uuid,
+    pub owner_user_id: Uuid,
+    pub source_text: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecklistImportSummary {
+    pub version: DeckVersionRecord,
+    pub cards: Vec<DeckCardRecord>,
+    pub snapshot: DeckBracketSnapshotRecord,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct CreateDeckInput<'a> {
     pub owner_user_id: Uuid,
@@ -88,6 +143,22 @@ pub struct EventDeckDeclarationInput<'a> {
     pub deck_id: Uuid,
     pub preference: i32,
     pub testing_notes: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct CardNameCandidate {
+    oracle_id: Uuid,
+    name: String,
+    name_similarity: f32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct CardNameResolution {
+    oracle_id: Option<Uuid>,
+    matched_name: Option<String>,
+    match_status: &'static str,
+    match_method: &'static str,
+    name_similarity: Option<f32>,
 }
 
 pub struct DeckRepository<'a> {
@@ -313,15 +384,431 @@ impl<'a> DeckRepository<'a> {
 
         Ok(declarations)
     }
+
+    pub async fn import_plain_text_decklist(
+        &self,
+        input: DecklistImportInput<'_>,
+    ) -> Result<Option<DecklistImportSummary>, DbError> {
+        let parsed = parse_plain_text_decklist(input.source_text);
+        if parsed.entries.is_empty() {
+            return Ok(None);
+        }
+
+        let mut tx = self.pool.begin().await?;
+        let deck_exists = sqlx::query_scalar!(
+            r#"
+            select exists(
+              select 1
+              from core.decks
+              where id = $1 and owner_user_id = $2
+            ) as "exists!"
+            "#,
+            input.deck_id,
+            input.owner_user_id,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+        if !deck_exists {
+            tx.rollback().await?;
+            return Ok(None);
+        }
+
+        let version_number = sqlx::query_scalar!(
+            r#"
+            select coalesce(max(version_number), 0)::int + 1 as "version_number!"
+            from mtg.deck_versions
+            where deck_id = $1
+            "#,
+            input.deck_id,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let version = sqlx::query_as!(
+            DeckVersionRecord,
+            r#"
+            insert into mtg.deck_versions (
+              deck_id, version_number, source_format, source_text
+            )
+            values ($1, $2, 'plain_text', $3)
+            returning id, deck_id, version_number, source_format, source_text,
+              imported_at, created_at
+            "#,
+            input.deck_id,
+            version_number,
+            input.source_text,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let mut cards = Vec::with_capacity(parsed.entries.len());
+        for entry in &parsed.entries {
+            let resolution = resolve_card_name(&mut tx, &entry.name).await?;
+            cards.push(insert_deck_card(&mut tx, version.id, entry, resolution).await?);
+        }
+
+        let bracket_version_id = sqlx::query_scalar!(
+            r#"
+            select id
+            from mtg.commander_bracket_versions
+            where status = 'active'
+            order by effective_date desc nulls last, created_at desc
+            limit 1
+            "#
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let game_changers_count = sqlx::query_scalar!(
+            r#"
+            select coalesce(sum(dc.quantity), 0)::int as "count!"
+            from mtg.deck_cards dc
+            join mtg.cards c on c.oracle_id = dc.oracle_id
+            where dc.deck_version_id = $1
+              and dc.match_status = 'matched'
+              and (
+                c.game_changer
+                or exists (
+                  select 1
+                  from mtg.game_changer_lists gcl
+                  join mtg.game_changer_cards gcc on gcc.list_id = gcl.id
+                  where gcl.bracket_version_id = $2
+                    and gcc.oracle_id = dc.oracle_id
+                )
+              )
+            "#,
+            version.id,
+            bracket_version_id,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let color_identity = sqlx::query_scalar!(
+            r#"
+            with colors as (
+              select distinct unnest(c.color_identity) as color
+              from mtg.deck_cards dc
+              join mtg.cards c on c.oracle_id = dc.oracle_id
+              where dc.deck_version_id = $1
+                and dc.match_status = 'matched'
+            )
+            select coalesce(
+              string_agg(
+                color,
+                ''
+                order by case color
+                  when 'W' then 1
+                  when 'U' then 2
+                  when 'B' then 3
+                  when 'R' then 4
+                  when 'G' then 5
+                  else 6
+                end
+              ),
+              ''
+            ) as "color_identity!"
+            from colors
+            "#,
+            version.id,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let commander_names = parsed.commander_names();
+        let unmatched_count = cards
+            .iter()
+            .filter(|card| card.match_status == "unmatched")
+            .count();
+        let ambiguous_count = cards
+            .iter()
+            .filter(|card| card.match_status == "ambiguous")
+            .count();
+        let (warning_codes, warnings) = bracket_warnings(
+            game_changers_count,
+            unmatched_count,
+            ambiguous_count,
+            commander_names.len(),
+        );
+
+        let snapshot = sqlx::query_as!(
+            DeckBracketSnapshotRecord,
+            r#"
+            insert into mtg.deck_bracket_snapshots (
+              deck_version_id, bracket_version_id, game_changers_count,
+              commander_names, color_identity, warning_codes, warnings
+            )
+            values ($1, $2, $3, $4, $5, $6, $7)
+            returning id, deck_version_id, bracket_version_id,
+              game_changers_count, commander_names, color_identity,
+              warning_codes, warnings, created_at
+            "#,
+            version.id,
+            bracket_version_id,
+            game_changers_count,
+            &commander_names,
+            color_identity,
+            &warning_codes,
+            &warnings,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let commander = commander_names.join(" / ");
+        let commander = (!commander.is_empty()).then_some(commander);
+        sqlx::query!(
+            r#"
+            update core.decks
+            set commander = coalesce($2, commander),
+                color_identity = $3,
+                game_changers_count = $4,
+                updated_at = now()
+            where id = $1
+            "#,
+            input.deck_id,
+            commander,
+            snapshot.color_identity,
+            snapshot.game_changers_count,
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(Some(DecklistImportSummary {
+            version,
+            cards,
+            snapshot,
+        }))
+    }
+
+    pub async fn latest_bracket_snapshot_for_user(
+        &self,
+        deck_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<DeckBracketSnapshotRecord>, DbError> {
+        let snapshot = sqlx::query_as!(
+            DeckBracketSnapshotRecord,
+            r#"
+            select s.id, s.deck_version_id, s.bracket_version_id,
+              s.game_changers_count, s.commander_names, s.color_identity,
+              s.warning_codes, s.warnings, s.created_at
+            from mtg.deck_bracket_snapshots s
+            join mtg.deck_versions v on v.id = s.deck_version_id
+            join core.decks d on d.id = v.deck_id
+            left join core.playgroup_memberships m
+              on m.playgroup_id = d.playgroup_id
+             and m.user_id = $2
+            where d.id = $1
+              and (
+                d.owner_user_id = $2
+                or d.visibility = 'public'
+                or (d.visibility = 'playgroup' and m.user_id is not null)
+              )
+            order by v.version_number desc
+            limit 1
+            "#,
+            deck_id,
+            user_id,
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(snapshot)
+    }
+}
+
+async fn insert_deck_card(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    deck_version_id: Uuid,
+    entry: &DecklistEntry,
+    resolution: CardNameResolution,
+) -> Result<DeckCardRecord, DbError> {
+    let card = sqlx::query_as!(
+        DeckCardRecord,
+        r#"
+        insert into mtg.deck_cards (
+          deck_version_id, oracle_id, quantity, card_name, matched_name,
+          section, match_status, match_method, name_similarity, is_commander
+        )
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        returning id, deck_version_id, oracle_id, quantity, card_name,
+          matched_name, section, match_status, match_method, name_similarity,
+          is_commander, created_at
+        "#,
+        deck_version_id,
+        resolution.oracle_id,
+        entry.quantity,
+        entry.name,
+        resolution.matched_name,
+        entry.section.as_str(),
+        resolution.match_status,
+        resolution.match_method,
+        resolution.name_similarity,
+        entry.is_commander,
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+
+    Ok(card)
+}
+
+async fn resolve_card_name(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    name: &str,
+) -> Result<CardNameResolution, DbError> {
+    let exact = sqlx::query_as!(
+        CardNameCandidate,
+        r#"
+        select distinct on (oracle_id)
+          oracle_id,
+          name,
+          1::real as "name_similarity!"
+        from search.card_documents
+        where lower(name) = lower($1)
+        order by oracle_id, name asc
+        "#,
+        name,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    if let Some(resolution) = resolve_candidates(exact, "exact") {
+        return Ok(resolution);
+    }
+
+    let normalized = pod_core::decklists::normalize_card_name(name);
+    if !normalized.is_empty() {
+        let normalized_matches = sqlx::query_as!(
+            CardNameCandidate,
+            r#"
+            select distinct on (oracle_id)
+              oracle_id,
+              name,
+              1::real as "name_similarity!"
+            from search.card_documents
+            where normalized_name = $1
+            order by oracle_id, name asc
+            "#,
+            normalized,
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+        if let Some(resolution) = resolve_candidates(normalized_matches, "normalized") {
+            return Ok(resolution);
+        }
+    }
+
+    let fuzzy = sqlx::query_as!(
+        CardNameCandidate,
+        r#"
+        with candidates as (
+          select
+            oracle_id,
+            name,
+            greatest(
+              similarity(name, $1),
+              similarity(normalized_name, regexp_replace(lower($1), '[^a-z0-9]+', '', 'g'))
+            )::real as name_similarity
+          from search.card_documents
+          where name % $1
+            or normalized_name % regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
+        )
+        select distinct on (oracle_id)
+          oracle_id,
+          name,
+          name_similarity as "name_similarity!"
+        from candidates
+        order by oracle_id, name_similarity desc, name asc
+        limit 5
+        "#,
+        name,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(
+        resolve_candidates(fuzzy, "fuzzy").unwrap_or(CardNameResolution {
+            oracle_id: None,
+            matched_name: None,
+            match_status: "unmatched",
+            match_method: "",
+            name_similarity: None,
+        }),
+    )
+}
+
+fn resolve_candidates(
+    candidates: Vec<CardNameCandidate>,
+    method: &'static str,
+) -> Option<CardNameResolution> {
+    match candidates.as_slice() {
+        [] => None,
+        [candidate] => Some(CardNameResolution {
+            oracle_id: Some(candidate.oracle_id),
+            matched_name: Some(candidate.name.clone()),
+            match_status: "matched",
+            match_method: method,
+            name_similarity: Some(candidate.name_similarity),
+        }),
+        [first, ..] => Some(CardNameResolution {
+            oracle_id: None,
+            matched_name: Some(first.name.clone()),
+            match_status: "ambiguous",
+            match_method: method,
+            name_similarity: Some(first.name_similarity),
+        }),
+    }
+}
+
+fn bracket_warnings(
+    game_changers_count: i32,
+    unmatched_count: usize,
+    ambiguous_count: usize,
+    commander_count: usize,
+) -> (Vec<String>, Vec<String>) {
+    let mut codes = Vec::new();
+    let mut warnings = Vec::new();
+
+    if commander_count == 0 {
+        codes.push("missing_commander".to_owned());
+        warnings
+            .push("No commander was detected from a section header or commander tag.".to_owned());
+    } else if commander_count > 2 {
+        codes.push("too_many_commanders".to_owned());
+        warnings.push(
+            "More than two commanders were detected; review partner/background assumptions."
+                .to_owned(),
+        );
+    }
+    if game_changers_count > 0 {
+        codes.push("game_changers_present".to_owned());
+        warnings.push(format!(
+            "{game_changers_count} Game Changer card(s) were matched in this list."
+        ));
+    }
+    if unmatched_count > 0 {
+        codes.push("unmatched_cards".to_owned());
+        warnings.push(format!(
+            "{unmatched_count} decklist line(s) did not match the local Scryfall index."
+        ));
+    }
+    if ambiguous_count > 0 {
+        codes.push("ambiguous_cards".to_owned());
+        warnings.push(format!(
+            "{ambiguous_count} decklist line(s) matched multiple local cards and need review."
+        ));
+    }
+
+    (codes, warnings)
 }
 
 #[cfg(test)]
 mod tests {
     use pod_core::playgroups::PlaygroupRole;
+    use serde_json::json;
 
     use crate::{
         CreateDeckInput, CreateEventInput, DeckRepository, EventDeckDeclarationInput,
-        EventRepository, IdentityRepository, PlaygroupRepository,
+        EventRepository, IdentityRepository, PlaygroupRepository, ScryfallImportInput,
+        ScryfallRepository,
     };
 
     fn deck_input<'a>(
@@ -497,5 +984,293 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn imports_plain_text_decklists_with_matching_snapshots_and_owner_scope(
+        pool: sqlx::PgPool,
+    ) {
+        let identity = IdentityRepository::new(&pool);
+        let owner = identity
+            .create_user(
+                "deck-import-owner@example.test",
+                "Deck Import Owner",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("owner");
+        let outsider = identity
+            .create_user(
+                "deck-import-outsider@example.test",
+                "Deck Import Outsider",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("outsider");
+
+        let scryfall = ScryfallRepository::new(&pool);
+        let metadata = json!({
+            "type": "default_cards",
+            "updated_at": "2026-05-18T09:09:27.689+00:00",
+            "uri": "https://api.scryfall.com/bulk-data/e2ef41e3-5778-4bc2-af3f-78eca4dd9c23",
+            "download_uri": "https://data.scryfall.io/default-cards/default-cards-20260518090927.json"
+        });
+        let import = scryfall
+            .create_import(ScryfallImportInput {
+                bulk_type: "default_cards",
+                source_uri: metadata["uri"].as_str().expect("uri"),
+                download_uri: metadata["download_uri"].as_str().expect("download_uri"),
+                source_updated_at: time::OffsetDateTime::now_utc(),
+                content_type: "application/json",
+                content_encoding: Some("gzip"),
+                size_bytes: Some(538_716_896),
+                raw_metadata: &metadata,
+            })
+            .await
+            .expect("create import");
+        for card in [
+            card_json(
+                "00000000-0000-7000-8000-000000000101",
+                "10000000-0000-7000-8000-000000000101",
+                "Atraxa, Praetors' Voice",
+                &["W", "U", "B", "G"],
+                "Legendary Creature - Phyrexian Angel Horror",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7000-8000-000000000102",
+                "10000000-0000-7000-8000-000000000102",
+                "Sol Ring",
+                &[],
+                "Artifact",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7000-8000-000000000103",
+                "10000000-0000-7000-8000-000000000103",
+                "Storm-Kiln Artist",
+                &["R"],
+                "Creature - Dwarf Shaman",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7000-8000-000000000104",
+                "10000000-0000-7000-8000-000000000104",
+                "Counterspell",
+                &["U"],
+                "Instant",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7000-8000-000000000105",
+                "10000000-0000-7000-8000-000000000105",
+                "Fire/Ice",
+                &["U", "R"],
+                "Instant",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7000-8000-000000000106",
+                "10000000-0000-7000-8000-000000000106",
+                "Fire Ice",
+                &["U", "R"],
+                "Instant",
+                false,
+            ),
+        ] {
+            scryfall
+                .upsert_card_from_scryfall_json(import.id, &card)
+                .await
+                .expect("upsert card");
+        }
+        let bracket_version_id = sqlx::query_scalar!(
+            r#"
+            insert into mtg.commander_bracket_versions (name, source_uri, status)
+            values ('Fixture Brackets', 'https://example.test/game-changers', 'active')
+            returning id
+            "#
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("bracket version");
+        let game_changer_list_id = sqlx::query_scalar!(
+            r#"
+            insert into mtg.game_changer_lists (bracket_version_id, name, source_uri)
+            values ($1, 'Fixture Game Changers', 'https://example.test/game-changers')
+            returning id
+            "#,
+            bracket_version_id
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("game changer list");
+        sqlx::query!(
+            r#"
+            insert into mtg.game_changer_cards (list_id, oracle_id, card_name)
+            values ($1, $2, 'Sol Ring')
+            "#,
+            game_changer_list_id,
+            uuid::Uuid::parse_str("10000000-0000-7000-8000-000000000102")
+                .expect("sol ring oracle id"),
+        )
+        .execute(&pool)
+        .await
+        .expect("game changer card");
+
+        let repo = DeckRepository::new(&pool);
+        let tags = Vec::new();
+        let deck = repo
+            .create_deck(CreateDeckInput {
+                owner_user_id: owner.id,
+                playgroup_id: None,
+                name: "Import Test Deck",
+                commander: "Unreviewed Commander",
+                color_identity: "",
+                claimed_bracket: "3",
+                archetype: "Midrange",
+                tags: &tags,
+                visibility: "private",
+                status: "active",
+                game_changers_count: 0,
+                has_infinite_combo: false,
+                has_fast_mana: false,
+                tutor_density: "none",
+                has_extra_turns: false,
+                has_mass_land_denial: false,
+                salt_notes: "",
+                notes: "",
+            })
+            .await
+            .expect("deck");
+
+        let source = r#"
+Commander
+1 Atraxa, Praetors' Voice
+
+Deck
+1 Sol Ring
+1 Storm Kiln Artist
+1 Counterspel
+1 Missing Card
+1 Fire // Ice
+"#;
+        let denied = repo
+            .import_plain_text_decklist(super::DecklistImportInput {
+                deck_id: deck.id,
+                owner_user_id: outsider.id,
+                source_text: source,
+            })
+            .await
+            .expect("outsider import");
+        assert!(denied.is_none());
+
+        let summary = repo
+            .import_plain_text_decklist(super::DecklistImportInput {
+                deck_id: deck.id,
+                owner_user_id: owner.id,
+                source_text: source,
+            })
+            .await
+            .expect("owner import")
+            .expect("summary");
+        assert_eq!(summary.version.version_number, 1);
+        assert_eq!(
+            summary.snapshot.commander_names,
+            vec!["Atraxa, Praetors' Voice"]
+        );
+        assert_eq!(summary.snapshot.color_identity, "WUBRG");
+        assert_eq!(summary.snapshot.game_changers_count, 1);
+        assert!(
+            summary
+                .snapshot
+                .warning_codes
+                .contains(&"game_changers_present".to_owned())
+        );
+        assert!(
+            summary
+                .snapshot
+                .warning_codes
+                .contains(&"unmatched_cards".to_owned())
+        );
+        assert!(
+            summary
+                .snapshot
+                .warning_codes
+                .contains(&"ambiguous_cards".to_owned())
+        );
+
+        assert!(summary.cards.iter().any(|card| {
+            card.card_name == "Atraxa, Praetors' Voice"
+                && card.match_status == "matched"
+                && card.match_method == "exact"
+                && card.is_commander
+        }));
+        assert!(summary.cards.iter().any(|card| {
+            card.card_name == "Storm Kiln Artist"
+                && card.match_status == "matched"
+                && card.match_method == "normalized"
+        }));
+        assert!(summary.cards.iter().any(|card| {
+            card.card_name == "Counterspel"
+                && card.match_status == "matched"
+                && card.match_method == "fuzzy"
+        }));
+        assert!(
+            summary.cards.iter().any(|card| {
+                card.card_name == "Missing Card" && card.match_status == "unmatched"
+            })
+        );
+        assert!(
+            summary.cards.iter().any(|card| {
+                card.card_name == "Fire // Ice" && card.match_status == "ambiguous"
+            })
+        );
+
+        let updated = repo
+            .get_for_user(deck.id, owner.id)
+            .await
+            .expect("updated deck")
+            .expect("updated deck");
+        assert_eq!(updated.commander, "Atraxa, Praetors' Voice");
+        assert_eq!(updated.color_identity, "WUBRG");
+        assert_eq!(updated.game_changers_count, 1);
+    }
+
+    fn card_json(
+        scryfall_id: &str,
+        oracle_id: &str,
+        name: &str,
+        color_identity: &[&str],
+        type_line: &str,
+        game_changer: bool,
+    ) -> serde_json::Value {
+        json!({
+            "id": scryfall_id,
+            "oracle_id": oracle_id,
+            "name": name,
+            "lang": "en",
+            "released_at": "2026-01-01",
+            "layout": "normal",
+            "mana_cost": "",
+            "cmc": 1.0,
+            "type_line": type_line,
+            "oracle_text": "Fixture card.",
+            "colors": color_identity,
+            "color_identity": color_identity,
+            "keywords": [],
+            "legalities": {
+                "commander": "legal"
+            },
+            "reserved": false,
+            "game_changer": game_changer,
+            "edhrec_rank": 100,
+            "set": "tst",
+            "collector_number": "1",
+            "rarity": "rare",
+            "artist": "Fixture Artist",
+            "prices": {
+                "usd": "1.00"
+            }
+        })
     }
 }

@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod config;
+pub mod decklists;
 pub mod decks;
 pub mod events;
 pub mod games;

@@ -416,7 +416,7 @@ impl<'a> ScryfallRepository<'a> {
             document_input as (
               select
                 raw->>'name' as name,
-                lower(regexp_replace(coalesce(raw->>'name', ''), '[^a-z0-9]+', '', 'g')) as normalized_name,
+                regexp_replace(lower(coalesce(raw->>'name', '')), '[^a-z0-9]+', '', 'g') as normalized_name,
                 coalesce(raw->>'type_line', '') as type_line,
                 coalesce(raw->>'oracle_text', face_text.oracle_text, '') as oracle_text,
                 coalesce(
@@ -508,7 +508,7 @@ impl<'a> ScryfallRepository<'a> {
                 when $1::text is null then 0::real
                 else greatest(
                   similarity(name, $1),
-                  similarity(normalized_name, lower(regexp_replace($1, '[^a-z0-9]+', '', 'g')))
+                  similarity(normalized_name, regexp_replace(lower($1), '[^a-z0-9]+', '', 'g'))
                 )::real
               end as "name_similarity!"
             from search.card_documents
@@ -516,7 +516,7 @@ impl<'a> ScryfallRepository<'a> {
                 $1::text is null
                 or document @@ websearch_to_tsquery('english', $1)
                 or name % $1
-                or normalized_name % lower(regexp_replace($1, '[^a-z0-9]+', '', 'g'))
+                or normalized_name % regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
               )
               and ($2::text[] is null or color_identity <@ $2)
               and ($3::boolean is null or commander_legal = $3)

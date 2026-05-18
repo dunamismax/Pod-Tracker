@@ -427,15 +427,15 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 10 - Decklist Import, Export, And Bracket Checks
 
-- [ ] Add plain-text decklist paste/import.
-- [ ] Match card names through exact, normalized, and fuzzy lookup.
-- [ ] Detect commander(s) and color identity.
-- [ ] Add Game Changers version tables.
-- [ ] Count Game Changers per deck version.
-- [ ] Show bracket-relevant warnings.
+- [x] Add plain-text decklist paste/import.
+- [x] Match card names through exact, normalized, and fuzzy lookup.
+- [x] Detect commander(s) and color identity.
+- [x] Add Game Changers version tables.
+- [x] Count Game Changers per deck version.
+- [x] Show bracket-relevant warnings.
 - [ ] Export plain-text, Moxfield-compatible, and
       Archidekt-compatible lists.
-- [ ] Snapshot deck bracket analysis over time.
+- [x] Snapshot deck bracket analysis over time.
 - [ ] Add tests for parsing, matching, warnings, and exports.
 
 ### Phase 11 - Meta Dashboard
@@ -711,3 +711,10 @@ Trust current primary docs over this file.
   through the existing card repository, import status/error tracking,
   enqueue coverage, and fixture-backed worker tests that prove imported
   cards remain searchable.
+- 2026-05-18 - Added the first Rust Phase 10 decklist import and bracket
+  check slice: plain-text decklist parsing, deck version/card tables,
+  exact/normalized/fuzzy local Scryfall matching, commander detection,
+  color identity derivation, Game Changers version/list tables, per-version
+  bracket snapshots, owner-scoped import route/UI, SQL Observatory Game
+  Changers snapshot entry, and focused parser, repository, route, and
+  browser smoke coverage.

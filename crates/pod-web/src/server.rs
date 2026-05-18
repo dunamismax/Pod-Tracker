@@ -22,10 +22,10 @@ use pod_core::health::{HealthResponse, ReadinessFailure};
 use pod_core::playgroups::{PlaygroupRole, slugify};
 use pod_db::{
     CardSearchFilters, CreateDeckInput, CreateEventInput, DbError, DeckRepository,
-    EventDeckDeclarationInput, EventDeckDeclarationWithDeck, EventLocationInput, EventRepository,
-    EventRsvpRecord, EventWithRole, GameRepository, GameWithPlayers, IdentityRepository,
-    LogGameInput, PlaygroupRepository, PodRepository, PodWithSeats, RsvpInput, ScryfallRepository,
-    UpdateEventInput, UserRecord,
+    DecklistImportInput, EventDeckDeclarationInput, EventDeckDeclarationWithDeck,
+    EventLocationInput, EventRepository, EventRsvpRecord, EventWithRole, GameRepository,
+    GameWithPlayers, IdentityRepository, LogGameInput, PlaygroupRepository, PodRepository,
+    PodWithSeats, RsvpInput, ScryfallRepository, UpdateEventInput, UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -82,6 +82,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/pods/{id}/seats/{seat_id}/move", post(move_pod_seat))
         .route("/decks", get(decks).post(create_deck))
         .route("/decks/{id}", get(deck_detail))
+        .route("/decks/{id}/import", post(import_decklist))
         .route("/cards", get(cards))
         .route("/e/{token}", get(public_event_detail))
         .route("/rsvp/{token}", get(guest_rsvp_form).post(save_guest_rsvp))
@@ -647,7 +648,8 @@ async fn deck_detail(
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     };
 
-    let deck = match DeckRepository::new(pool).get_for_user(id, user.id).await {
+    let deck_repo = DeckRepository::new(pool);
+    let deck = match deck_repo.get_for_user(id, user.id).await {
         Ok(Some(deck)) => deck,
         Ok(None) => return StatusCode::NOT_FOUND.into_response(),
         Err(err) => {
@@ -655,8 +657,99 @@ async fn deck_detail(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
+    let snapshot = match deck_repo
+        .latest_bracket_snapshot_for_user(id, user.id)
+        .await
+    {
+        Ok(snapshot) => snapshot,
+        Err(err) => {
+            tracing::error!(err = %err, "get latest deck bracket snapshot");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
-    Html(ui::render_deck_detail(&deck)).into_response()
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_deck_detail(&deck, &csrf.token, snapshot.as_ref(), None),
+        csrf.set_cookie,
+    )
+}
+
+async fn import_decklist(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<DecklistImportForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let deck_repo = DeckRepository::new(pool);
+    let deck = match deck_repo.get_for_user(id, user.id).await {
+        Ok(Some(deck)) if deck.owner_user_id == user.id => deck,
+        Ok(Some(_)) | Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get deck before import");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    if form.decklist.trim().is_empty() {
+        let snapshot = match deck_repo
+            .latest_bracket_snapshot_for_user(id, user.id)
+            .await
+        {
+            Ok(snapshot) => snapshot,
+            Err(err) => {
+                tracing::error!(err = %err, "get latest deck bracket snapshot before import error");
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        return html_with_cookies(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ui::render_deck_detail(
+                &deck,
+                &csrf.token,
+                snapshot.as_ref(),
+                Some("Paste a plain-text decklist before importing."),
+            ),
+            csrf.set_cookie,
+        );
+    }
+
+    match deck_repo
+        .import_plain_text_decklist(DecklistImportInput {
+            deck_id: id,
+            owner_user_id: user.id,
+            source_text: form.decklist.trim(),
+        })
+        .await
+    {
+        Ok(Some(_summary)) => Redirect::to(&format!("/decks/{id}")).into_response(),
+        Ok(None) => html_with_cookies(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            ui::render_deck_detail(
+                &deck,
+                &csrf.token,
+                None,
+                Some("No decklist cards were found to import."),
+            ),
+            csrf.set_cookie,
+        ),
+        Err(err) => {
+            tracing::error!(err = %err, "import decklist");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 async fn cards(State(state): State<AppState>, Query(query): Query<CardSearchQuery>) -> Response {
@@ -1690,6 +1783,12 @@ pub(crate) struct DeckForm {
     #[serde(default)]
     pub(crate) notes: String,
     pub(crate) csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DecklistImportForm {
+    decklist: String,
+    csrf_token: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -3365,13 +3464,115 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .uri(format!("/decks/{deck_id}"))
-                    .header("cookie", outsider.cookie_header)
+                    .header("cookie", outsider.cookie_header.clone())
                     .body(Body::empty())
                     .expect("request"),
             )
             .await
             .expect("outsider deck detail");
         assert_eq!(outsider_detail.status(), StatusCode::NOT_FOUND);
+
+        let scryfall = ScryfallRepository::new(&pool);
+        let metadata = json!({
+            "type": "default_cards",
+            "updated_at": "2026-05-18T09:09:27.689+00:00",
+            "uri": "https://api.scryfall.com/bulk-data/e2ef41e3-5778-4bc2-af3f-78eca4dd9c23",
+            "download_uri": "https://data.scryfall.io/default-cards/default-cards-20260518090927.json"
+        });
+        let import = scryfall
+            .create_import(ScryfallImportInput {
+                bulk_type: "default_cards",
+                source_uri: metadata["uri"].as_str().expect("uri"),
+                download_uri: metadata["download_uri"].as_str().expect("download_uri"),
+                source_updated_at: time::OffsetDateTime::now_utc(),
+                content_type: "application/json",
+                content_encoding: Some("gzip"),
+                size_bytes: Some(538_716_896),
+                raw_metadata: &metadata,
+            })
+            .await
+            .expect("create import");
+        scryfall
+            .upsert_card_from_scryfall_json(
+                import.id,
+                &card_json(
+                    "00000000-0000-7000-8000-000000000201",
+                    "10000000-0000-7000-8000-000000000201",
+                    "Atraxa, Praetors' Voice",
+                    &["W", "U", "B", "G"],
+                    "Legendary Creature - Phyrexian Angel Horror",
+                    false,
+                ),
+            )
+            .await
+            .expect("import atraxa");
+        scryfall
+            .upsert_card_from_scryfall_json(
+                import.id,
+                &card_json(
+                    "00000000-0000-7000-8000-000000000202",
+                    "10000000-0000-7000-8000-000000000202",
+                    "Sol Ring",
+                    &[],
+                    "Artifact",
+                    true,
+                ),
+            )
+            .await
+            .expect("import sol ring");
+
+        let outsider_import = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/decks/{deck_id}/import"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", outsider.cookie_header)
+                    .body(Body::from(format!(
+                        "decklist=Commander%0A1+Atraxa%2C+Praetors%27+Voice&csrf_token={}",
+                        outsider.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider import");
+        assert_eq!(outsider_import.status(), StatusCode::NOT_FOUND);
+
+        let import_decklist = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/decks/{deck_id}/import"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "decklist=Commander%0A1+Atraxa%2C+Praetors%27+Voice%0ADeck%0A1+Sol+Ring%0A1+Missing+Card&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("import decklist");
+        assert_eq!(import_decklist.status(), StatusCode::SEE_OTHER);
+
+        let imported_detail = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/decks/{deck_id}"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("imported deck detail");
+        assert_eq!(imported_detail.status(), StatusCode::OK);
+        let imported_detail_body = body_string(imported_detail).await;
+        assert!(imported_detail_body.contains("Bracket check"));
+        assert!(imported_detail_body.contains("1 Game Changer"));
+        assert!(imported_detail_body.contains("1 decklist line(s) did not match"));
 
         let create_event = app
             .clone()
@@ -3743,6 +3944,44 @@ mod tests {
                 "usd": "0.25",
                 "eur": "0.12",
                 "tix": "0.03"
+            }
+        })
+    }
+
+    fn card_json(
+        scryfall_id: &str,
+        oracle_id: &str,
+        name: &str,
+        color_identity: &[&str],
+        type_line: &str,
+        game_changer: bool,
+    ) -> serde_json::Value {
+        json!({
+            "id": scryfall_id,
+            "oracle_id": oracle_id,
+            "name": name,
+            "lang": "en",
+            "released_at": "2026-01-01",
+            "layout": "normal",
+            "mana_cost": "",
+            "cmc": 1.0,
+            "type_line": type_line,
+            "oracle_text": "Fixture card.",
+            "colors": color_identity,
+            "color_identity": color_identity,
+            "keywords": [],
+            "legalities": {
+                "commander": "legal"
+            },
+            "reserved": false,
+            "game_changer": game_changer,
+            "edhrec_rank": 100,
+            "set": "tst",
+            "collector_number": "1",
+            "rarity": "rare",
+            "artist": "Fixture Artist",
+            "prices": {
+                "usd": "1.00"
             }
         })
     }
