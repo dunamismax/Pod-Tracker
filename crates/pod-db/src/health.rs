@@ -132,6 +132,8 @@ mod tests {
             "event_rsvps",
             "event_guests",
             "event_reminders",
+            "decks",
+            "event_deck_declarations",
         ] {
             assert!(
                 repo.schema_table_exists("core", table)

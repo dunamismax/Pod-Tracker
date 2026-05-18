@@ -4,6 +4,7 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use thiserror::Error;
 
+pub mod decks;
 pub mod events;
 pub mod health;
 pub mod identity;
@@ -11,6 +12,10 @@ pub mod migrations;
 pub mod ops;
 pub mod playgroups;
 
+pub use decks::{
+    CreateDeckInput, DeckRecord, DeckRepository, EventDeckDeclarationInput,
+    EventDeckDeclarationRecord, EventDeckDeclarationWithDeck,
+};
 pub use events::{
     CalendarEventRecord, CreateEventInput, CreateEventReminderInput, EventHostRecord,
     EventLocationInput, EventLocationRecord, EventRecord, EventReminderRecord, EventRepository,

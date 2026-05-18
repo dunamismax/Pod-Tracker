@@ -8,7 +8,7 @@ verification.
 Treat unchecked boxes as plan. Move stable material into `docs/`,
 `README.md`, or runbooks as the implementation matures.
 
-Last reviewed: 2026-05-17.
+Last reviewed: 2026-05-18.
 
 ---
 
@@ -379,14 +379,14 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 6 - Deck Registry And Event Declarations
 
-- [ ] Add deck registry with commander, color identity, claimed bracket,
+- [x] Add deck registry with commander, color identity, claimed bracket,
       archetype, tags, visibility, active/retired state, and notes.
-- [ ] Add deck metadata flags: Game Changers count, infinite combo, fast
+- [x] Add deck metadata flags: Game Changers count, infinite combo, fast
       mana, tutors density, extra turns, mass land denial, and salt notes.
-- [ ] Add deck visibility: private, playgroup, public.
-- [ ] Add event deck declarations with preference and testing notes.
-- [ ] Add basic deck search.
-- [ ] Add tests for deck ownership, visibility, and declarations.
+- [x] Add deck visibility: private, playgroup, public.
+- [x] Add event deck declarations with preference and testing notes.
+- [x] Add basic deck search.
+- [x] Add tests for deck ownership, visibility, and declarations.
 
 ### Phase 7 - Pod Generation
 
@@ -676,3 +676,8 @@ Trust current primary docs over this file.
   membership and guest scopes, address visibility, calendar privacy,
   logging boundaries, database authorization expectations, and
   backup/restore handling without overstating unimplemented guarantees.
+- 2026-05-18 - Completed the Rust Phase 6 deck registry slice: added deck
+  and event declaration migrations, deck domain validation, SQLx
+  repository access with ownership and visibility checks, SSR deck
+  registry/search/detail pages, event deck declaration UI, and focused
+  repository, route, and browser smoke coverage.

@@ -1,11 +1,11 @@
 use leptos::prelude::*;
 use pod_db::{
-    EventRecord, EventRsvpRecord, EventWithRole, HouseRuleRecord, PlaygroupSettingsRecord,
-    PlaygroupWithRole,
+    DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord, EventWithRole,
+    HouseRuleRecord, PlaygroupSettingsRecord, PlaygroupWithRole,
 };
 use time::{OffsetDateTime, UtcOffset};
 
-use crate::server::{EventEditForm, EventForm, EventPageContext, RsvpForm};
+use crate::server::{DeckForm, EventEditForm, EventForm, EventPageContext, RsvpForm};
 
 pub fn render_home() -> String {
     view! {
@@ -233,6 +233,7 @@ pub fn render_dashboard(
                     <nav class="actions" aria-label="Dashboard actions">
                         <a class="button primary" href="/playgroups">"Playgroups"</a>
                         <a class="button secondary" href="/events">"Events"</a>
+                        <a class="button secondary" href="/decks">"Decks"</a>
                         <a class="button ghost" href="/settings">"Settings"</a>
                     </nav>
                 </section>
@@ -403,6 +404,221 @@ pub fn render_events(events: &[EventWithRole]) -> String {
                 } else {
                     view! { <p class="empty-state">"No events yet. Create one from a playgroup page."</p> }.into_any()
                 }}
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_decks(
+    csrf_token: &str,
+    decks: &[DeckRecord],
+    playgroups: &[PlaygroupWithRole],
+    search: &str,
+    error: Option<&str>,
+    form: Option<&DeckForm>,
+) -> String {
+    let csrf_token = csrf_token.to_owned();
+    let decks = decks.to_vec();
+    let playgroups = playgroups.to_vec();
+    let search = search.to_owned();
+    let error = error.map(str::to_owned);
+    let name = form.map(|form| form.name.as_str()).unwrap_or("").to_owned();
+    let commander = form
+        .map(|form| form.commander.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let color_identity = form
+        .map(|form| form.color_identity.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let claimed_bracket = form
+        .map(|form| form.claimed_bracket.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let archetype = form
+        .map(|form| form.archetype.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let tags = form.map(|form| form.tags.as_str()).unwrap_or("").to_owned();
+    let visibility = form
+        .map(|form| form.visibility.as_str())
+        .unwrap_or("private")
+        .to_owned();
+    let playgroup_id = form
+        .map(|form| form.playgroup_id.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let status = form
+        .map(|form| form.status.as_str())
+        .unwrap_or("active")
+        .to_owned();
+    let game_changers_count = form
+        .map(|form| form.game_changers_count.as_str())
+        .unwrap_or("0")
+        .to_owned();
+    let tutor_density = form
+        .map(|form| form.tutor_density.as_str())
+        .unwrap_or("none")
+        .to_owned();
+    let has_infinite_combo = form.is_some_and(|form| form.has_infinite_combo);
+    let has_fast_mana = form.is_some_and(|form| form.has_fast_mana);
+    let has_extra_turns = form.is_some_and(|form| form.has_extra_turns);
+    let has_mass_land_denial = form.is_some_and(|form| form.has_mass_land_denial);
+    let salt_notes = form
+        .map(|form| form.salt_notes.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let notes = form
+        .map(|form| form.notes.as_str())
+        .unwrap_or("")
+        .to_owned();
+    let has_decks = !decks.is_empty();
+
+    view! {
+        <AppShell title="Decks" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header">
+                    <p class="eyebrow">"Deck registry"</p>
+                    <h1>"Decks"</h1>
+                    <form method="get" action="/decks" class="search-form" role="search">
+                        <label>
+                            "Search"
+                            <input name="q" value=search placeholder="Commander, archetype, tag"/>
+                        </label>
+                        <button class="button secondary" type="submit">"Search"</button>
+                    </form>
+                </section>
+                <section class="split-layout wide-left">
+                    <div class="workspace-panel">
+                        <div class="section-heading">
+                            <h2>"Registry"</h2>
+                            <span>{decks.len()} " visible"</span>
+                        </div>
+                        {if has_decks {
+                            view! { <DeckList decks=decks/> }.into_any()
+                        } else {
+                            view! { <p class="empty-state">"No visible decks yet."</p> }.into_any()
+                        }}
+                    </div>
+                    <form method="post" action="/decks" class="form-panel">
+                        <h2>"New deck"</h2>
+                        {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                        <input type="hidden" name="csrf_token" value=csrf_token/>
+                        <label>"Name"<input name="name" required value=name/></label>
+                        <label>"Commander"<input name="commander" required value=commander/></label>
+                        <div class="field-grid">
+                            <label>"Color identity"<input name="color_identity" value=color_identity placeholder="WUBRG"/></label>
+                            <label>"Claimed bracket"<input name="claimed_bracket" value=claimed_bracket/></label>
+                        </div>
+                        <label>"Archetype"<input name="archetype" value=archetype/></label>
+                        <label>"Tags"<input name="tags" value=tags placeholder="tokens, midrange"/></label>
+                        <div class="field-grid">
+                            <label>
+                                "Visibility"
+                                <select name="visibility">
+                                    <option value="private" selected=visibility == "private">"Private"</option>
+                                    <option value="playgroup" selected=visibility == "playgroup">"Playgroup"</option>
+                                    <option value="public" selected=visibility == "public">"Public"</option>
+                                </select>
+                            </label>
+                            <label>
+                                "Status"
+                                <select name="status">
+                                    <option value="active" selected=status == "active">"Active"</option>
+                                    <option value="retired" selected=status == "retired">"Retired"</option>
+                                </select>
+                            </label>
+                        </div>
+                        <label>
+                            "Playgroup"
+                            <select name="playgroup_id">
+                                <option value="" selected=playgroup_id.is_empty()>"None"</option>
+                                {playgroups.into_iter().map(|playgroup| {
+                                    let id = playgroup.id.to_string();
+                                    view! {
+                                        <option value=id.clone() selected=playgroup_id == id>
+                                            {playgroup.name}
+                                        </option>
+                                    }
+                                }).collect_view()}
+                            </select>
+                        </label>
+                        <fieldset>
+                            <legend>"Metadata"</legend>
+                            <div class="field-grid">
+                                <label>"Game Changers"<input type="number" min="0" name="game_changers_count" value=game_changers_count/></label>
+                                <label>
+                                    "Tutor density"
+                                    <select name="tutor_density">
+                                        <option value="none" selected=tutor_density == "none">"None"</option>
+                                        <option value="low" selected=tutor_density == "low">"Low"</option>
+                                        <option value="medium" selected=tutor_density == "medium">"Medium"</option>
+                                        <option value="high" selected=tutor_density == "high">"High"</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <div class="check-grid">
+                                <label><input type="checkbox" name="has_infinite_combo" value="true" checked=has_infinite_combo/>"Infinite combo"</label>
+                                <label><input type="checkbox" name="has_fast_mana" value="true" checked=has_fast_mana/>"Fast mana"</label>
+                                <label><input type="checkbox" name="has_extra_turns" value="true" checked=has_extra_turns/>"Extra turns"</label>
+                                <label><input type="checkbox" name="has_mass_land_denial" value="true" checked=has_mass_land_denial/>"Mass land denial"</label>
+                            </div>
+                            <label>"Salt notes"<textarea name="salt_notes" rows="2">{salt_notes}</textarea></label>
+                        </fieldset>
+                        <label>"Notes"<textarea name="notes" rows="3">{notes}</textarea></label>
+                        <button class="button primary" type="submit">"Save deck"</button>
+                    </form>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
+pub fn render_deck_detail(deck: &DeckRecord) -> String {
+    let deck = deck.clone();
+    let tags = deck.tags.join(", ");
+
+    view! {
+        <AppShell title="Deck" account_label="Account" account_href="/settings">
+            <main id="main" class="shell">
+                <section class="page-header">
+                    <p class="eyebrow">"Deck"</p>
+                    <h1>{deck.name.clone()}</h1>
+                    <p class="lede">{deck.commander.clone()}</p>
+                    <nav class="actions" aria-label="Deck actions">
+                        <a class="button secondary" href="/decks">"All decks"</a>
+                    </nav>
+                    <dl class="status-list">
+                        <div><dt>"Color identity"</dt><dd>{deck.color_identity.clone()}</dd></div>
+                        <div><dt>"Claimed bracket"</dt><dd>{deck.claimed_bracket.clone()}</dd></div>
+                        <div><dt>"Archetype"</dt><dd>{deck.archetype.clone()}</dd></div>
+                        <div><dt>"Visibility"</dt><dd>{deck.visibility.clone()}</dd></div>
+                        <div><dt>"Status"</dt><dd>{deck.status.clone()}</dd></div>
+                        <div><dt>"Tags"</dt><dd>{tags}</dd></div>
+                    </dl>
+                </section>
+                <section class="split-layout">
+                    <div class="workspace-panel">
+                        <div class="section-heading">
+                            <h2>"Deck notes"</h2>
+                            <span>{deck.game_changers_count} " Game Changers"</span>
+                        </div>
+                        <p class="body-copy">{deck.notes.clone()}</p>
+                    </div>
+                    <div class="panel">
+                        <h2>"Flags"</h2>
+                        <dl class="compact-list">
+                            <div><dt>"Infinite combo"</dt><dd>{yes_no(deck.has_infinite_combo)}</dd></div>
+                            <div><dt>"Fast mana"</dt><dd>{yes_no(deck.has_fast_mana)}</dd></div>
+                            <div><dt>"Tutor density"</dt><dd>{deck.tutor_density.clone()}</dd></div>
+                            <div><dt>"Extra turns"</dt><dd>{yes_no(deck.has_extra_turns)}</dd></div>
+                            <div><dt>"Mass land denial"</dt><dd>{yes_no(deck.has_mass_land_denial)}</dd></div>
+                        </dl>
+                        {(!deck.salt_notes.is_empty()).then(|| view! { <p class="body-copy">{deck.salt_notes}</p> })}
+                    </div>
+                </section>
             </main>
         </AppShell>
     }
@@ -595,8 +811,12 @@ pub fn render_event_detail(
                     <LocationBlock location=context.location.clone() show_address=context.show_address/>
                 </section>
                 <section class="split-layout">
-                    <RsvpPanel event_id=event.id csrf_token=csrf_token user_rsvp=context.user_rsvp.clone()/>
+                    <RsvpPanel event_id=event.id csrf_token=csrf_token.clone() user_rsvp=context.user_rsvp.clone()/>
                     <AttendeeList rsvps=context.rsvps/>
+                </section>
+                <section class="split-layout section-gap">
+                    <DeckDeclarationPanel event_id=event.id csrf_token=csrf_token decks=context.user_decks/>
+                    <EventDeckDeclarationList declarations=context.deck_declarations/>
                 </section>
             </main>
         </AppShell>
@@ -765,6 +985,109 @@ fn PlaygroupList(playgroups: Vec<PlaygroupWithRole>) -> impl IntoView {
         } else {
             view! { <p class="empty-state">"No playgroups yet."</p> }.into_any()
         }}
+    }
+}
+
+#[component]
+fn DeckList(decks: Vec<DeckRecord>) -> impl IntoView {
+    view! {
+        <div class="list">
+            {decks
+                .into_iter()
+                .map(|deck| {
+                    let meta = format!(
+                        "{} · {} · {}",
+                        deck.commander, deck.color_identity, deck.archetype
+                    );
+                    view! {
+                        <article class="list-item">
+                            <div>
+                                <h3><a href=format!("/decks/{}", deck.id)>{deck.name}</a></h3>
+                                <p>{meta}</p>
+                            </div>
+                            <span class="badge">{deck.visibility}</span>
+                        </article>
+                    }
+                })
+                .collect_view()}
+        </div>
+    }
+}
+
+#[component]
+fn DeckDeclarationPanel(
+    event_id: uuid::Uuid,
+    csrf_token: String,
+    decks: Vec<DeckRecord>,
+) -> impl IntoView {
+    let has_decks = !decks.is_empty();
+
+    view! {
+        <form method="post" action=format!("/events/{event_id}/decks") class="form-panel">
+            <h2>"Deck declaration"</h2>
+            {if has_decks {
+                view! {
+                    <>
+                        <input type="hidden" name="csrf_token" value=csrf_token/>
+                        <label>
+                            "Deck"
+                            <select name="deck_id">
+                                {decks.into_iter().map(|deck| view! {
+                                    <option value=deck.id.to_string()>{deck.name} " - " {deck.commander}</option>
+                                }).collect_view()}
+                            </select>
+                        </label>
+                        <label>"Preference"<input type="number" name="preference" min="1" max="5" value="1"/></label>
+                        <label>"Testing notes"<textarea name="testing_notes" rows="3"></textarea></label>
+                        <button class="button primary" type="submit">"Declare deck"</button>
+                    </>
+                }.into_any()
+            } else {
+                view! {
+                    <>
+                        <p class="empty-state">"No active owned decks available."</p>
+                        <a class="button secondary" href="/decks">"Add deck"</a>
+                    </>
+                }.into_any()
+            }}
+        </form>
+    }
+}
+
+#[component]
+fn EventDeckDeclarationList(declarations: Vec<EventDeckDeclarationWithDeck>) -> impl IntoView {
+    let has_declarations = !declarations.is_empty();
+
+    view! {
+        <section class="panel">
+            <h2>"Declared decks"</h2>
+            {if has_declarations {
+                view! {
+                    <div class="list">
+                        {declarations.into_iter().map(|declaration| {
+                            let meta = format!(
+                                "{} · {} · preference {}",
+                                declaration.commander,
+                                declaration.color_identity,
+                                declaration.preference
+                            );
+                            view! {
+                                <article class="list-item">
+                                    <div>
+                                        <h3>{declaration.deck_name}</h3>
+                                        <p>{meta}</p>
+                                        {(!declaration.testing_notes.is_empty()).then(|| view! { <p>{declaration.testing_notes}</p> })}
+                                    </div>
+                                    <span class="badge">{declaration.claimed_bracket}</span>
+                                </article>
+                            }
+                        }).collect_view()}
+                    </div>
+                }.into_any()
+            } else {
+                view! { <p class="empty-state">"No decks declared yet."</p> }.into_any()
+            }}
+        </section>
     }
 }
 
@@ -959,6 +1282,10 @@ fn display_datetime(value: OffsetDateTime) -> String {
     )
 }
 
+fn yes_no(value: bool) -> &'static str {
+    if value { "yes" } else { "no" }
+}
+
 fn city_line(
     city: &Option<String>,
     state: &Option<String>,
@@ -1013,6 +1340,7 @@ fn AppShell(
                         <a href="/home">"Home"</a>
                         <a href="/playgroups">"Playgroups"</a>
                         <a href="/events">"Events"</a>
+                        <a href="/decks">"Decks"</a>
                         <a href="/observatory">"Observatory"</a>
                         <a class="nav-login" href=account_href>{account_label}</a>
                     </nav>

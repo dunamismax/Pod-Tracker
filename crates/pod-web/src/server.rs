@@ -1,5 +1,5 @@
 use axum::body::Body;
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE, USER_AGENT};
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Request, StatusCode};
 use axum::middleware::{self, Next};
@@ -11,14 +11,19 @@ use pod_core::auth::{
     verify_password,
 };
 use pod_core::config::AppConfig;
+use pod_core::decks::{
+    DeckStatus, DeckVisibility, TutorDensity, normalize_color_identity, normalize_tags,
+};
 use pod_core::events::{
     AddressVisibility, EventVisibility, RsvpStatus, can_manage_event, can_show_event_address,
 };
 use pod_core::health::{HealthResponse, ReadinessFailure};
 use pod_core::playgroups::{PlaygroupRole, slugify};
 use pod_db::{
-    CreateEventInput, DbError, EventLocationInput, EventRepository, EventRsvpRecord, EventWithRole,
-    IdentityRepository, PlaygroupRepository, RsvpInput, UpdateEventInput, UserRecord,
+    CreateDeckInput, CreateEventInput, DbError, DeckRepository, EventDeckDeclarationInput,
+    EventDeckDeclarationWithDeck, EventLocationInput, EventRepository, EventRsvpRecord,
+    EventWithRole, IdentityRepository, PlaygroupRepository, RsvpInput, UpdateEventInput,
+    UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -66,6 +71,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/events/{id}", get(event_detail))
         .route("/events/{id}/edit", get(edit_event_form).post(update_event))
         .route("/events/{id}/rsvp", post(save_user_rsvp))
+        .route("/events/{id}/decks", post(declare_event_deck))
+        .route("/decks", get(decks).post(create_deck))
+        .route("/decks/{id}", get(deck_detail))
         .route("/e/{token}", get(public_event_detail))
         .route("/rsvp/{token}", get(guest_rsvp_form).post(save_guest_rsvp))
         .route("/calendar.ics", get(calendar_feed))
@@ -493,6 +501,155 @@ async fn events(State(state): State<AppState>, headers: HeaderMap) -> Response {
     Html(ui::render_events(&events)).into_response()
 }
 
+async fn decks(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<DeckSearchQuery>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let deck_repo = DeckRepository::new(pool);
+    let decks = match deck_repo.list_for_user(user.id, query.q.as_deref()).await {
+        Ok(decks) => decks,
+        Err(err) => {
+            tracing::error!(err = %err, "list decks");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let playgroups = match PlaygroupRepository::new(pool).list_for_user(user.id).await {
+        Ok(playgroups) => playgroups,
+        Err(err) => {
+            tracing::error!(err = %err, "list playgroups for deck form");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+
+    html_with_cookies(
+        StatusCode::OK,
+        ui::render_decks(
+            &csrf.token,
+            &decks,
+            &playgroups,
+            query.q.as_deref().unwrap_or(""),
+            None,
+            None,
+        ),
+        csrf.set_cookie,
+    )
+}
+
+async fn create_deck(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<DeckForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let deck_repo = DeckRepository::new(pool);
+    let playgroups = match PlaygroupRepository::new(pool).list_for_user(user.id).await {
+        Ok(playgroups) => playgroups,
+        Err(err) => {
+            tracing::error!(err = %err, "list playgroups before deck create");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let existing_decks = match deck_repo.list_for_user(user.id, None).await {
+        Ok(decks) => decks,
+        Err(err) => {
+            tracing::error!(err = %err, "list decks before create");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    let parsed = match parse_deck_form(&playgroups, &form) {
+        Ok(input) => input,
+        Err(message) => {
+            return html_with_cookies(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ui::render_decks(
+                    &csrf.token,
+                    &existing_decks,
+                    &playgroups,
+                    "",
+                    Some(message),
+                    Some(&form),
+                ),
+                csrf.set_cookie,
+            );
+        }
+    };
+
+    let deck = match deck_repo
+        .create_deck(CreateDeckInput {
+            owner_user_id: user.id,
+            playgroup_id: parsed.playgroup_id,
+            name: &parsed.name,
+            commander: &parsed.commander,
+            color_identity: &parsed.color_identity,
+            claimed_bracket: &parsed.claimed_bracket,
+            archetype: &parsed.archetype,
+            tags: &parsed.tags,
+            visibility: &parsed.visibility,
+            status: &parsed.status,
+            game_changers_count: parsed.game_changers_count,
+            has_infinite_combo: parsed.has_infinite_combo,
+            has_fast_mana: parsed.has_fast_mana,
+            tutor_density: &parsed.tutor_density,
+            has_extra_turns: parsed.has_extra_turns,
+            has_mass_land_denial: parsed.has_mass_land_denial,
+            salt_notes: &parsed.salt_notes,
+            notes: &parsed.notes,
+        })
+        .await
+    {
+        Ok(deck) => deck,
+        Err(err) => {
+            tracing::error!(err = %err, "create deck");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Redirect::to(&format!("/decks/{}", deck.id)).into_response()
+}
+
+async fn deck_detail(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+) -> Response {
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let deck = match DeckRepository::new(pool).get_for_user(id, user.id).await {
+        Ok(Some(deck)) => deck,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get deck");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    Html(ui::render_deck_detail(&deck)).into_response()
+}
+
 async fn new_event_form(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -666,10 +823,25 @@ async fn event_detail(
         }
     };
 
-    let context = match event_page_context(&repo, &event, Some(user.id), false).await {
+    let mut context = match event_page_context(&repo, &event, Some(user.id), false).await {
         Ok(context) => context,
         Err(err) => {
             tracing::error!(err = %err, "load event context");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let deck_repo = DeckRepository::new(pool);
+    context.deck_declarations = match deck_repo.list_event_declarations(event.id).await {
+        Ok(declarations) => declarations,
+        Err(err) => {
+            tracing::error!(err = %err, "list event deck declarations");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    context.user_decks = match deck_repo.list_owned_active_for_user(user.id).await {
+        Ok(decks) => decks,
+        Err(err) => {
+            tracing::error!(err = %err, "list user decks for event declaration");
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
@@ -828,6 +1000,60 @@ async fn save_user_rsvp(
     }
 
     Redirect::to(&format!("/events/{id}")).into_response()
+}
+
+async fn declare_event_deck(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Form(form): Form<DeckDeclarationForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    match EventRepository::new(pool).get_for_user(id, user.id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "get event before deck declaration");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    }
+    let preference = parse_optional_i32(&form.preference)
+        .unwrap_or(Some(1))
+        .filter(|preference| (1..=5).contains(preference));
+    let Some(preference) = preference else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    let deck_id = match form.deck_id.parse() {
+        Ok(deck_id) => deck_id,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+
+    match DeckRepository::new(pool)
+        .declare_event_deck(EventDeckDeclarationInput {
+            event_id: id,
+            user_id: user.id,
+            deck_id,
+            preference,
+            testing_notes: form.testing_notes.trim(),
+        })
+        .await
+    {
+        Ok(Some(_)) => Redirect::to(&format!("/events/{id}")).into_response(),
+        Ok(None) => StatusCode::FORBIDDEN.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "declare event deck");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 async fn public_event_detail(
@@ -1005,6 +1231,79 @@ struct PlaygroupForm {
 }
 
 #[derive(Debug, Deserialize)]
+struct DeckSearchQuery {
+    q: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct DeckForm {
+    pub(crate) name: String,
+    pub(crate) commander: String,
+    #[serde(default)]
+    pub(crate) color_identity: String,
+    #[serde(default)]
+    pub(crate) claimed_bracket: String,
+    #[serde(default)]
+    pub(crate) archetype: String,
+    #[serde(default)]
+    pub(crate) tags: String,
+    #[serde(default)]
+    pub(crate) visibility: String,
+    #[serde(default)]
+    pub(crate) playgroup_id: String,
+    #[serde(default)]
+    pub(crate) status: String,
+    #[serde(default)]
+    pub(crate) game_changers_count: String,
+    #[serde(default)]
+    pub(crate) has_infinite_combo: bool,
+    #[serde(default)]
+    pub(crate) has_fast_mana: bool,
+    #[serde(default)]
+    pub(crate) tutor_density: String,
+    #[serde(default)]
+    pub(crate) has_extra_turns: bool,
+    #[serde(default)]
+    pub(crate) has_mass_land_denial: bool,
+    #[serde(default)]
+    pub(crate) salt_notes: String,
+    #[serde(default)]
+    pub(crate) notes: String,
+    pub(crate) csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeckDeclarationForm {
+    deck_id: String,
+    #[serde(default)]
+    preference: String,
+    #[serde(default)]
+    testing_notes: String,
+    csrf_token: String,
+}
+
+#[derive(Debug, Clone)]
+struct ParsedDeckForm {
+    playgroup_id: Option<uuid::Uuid>,
+    name: String,
+    commander: String,
+    color_identity: String,
+    claimed_bracket: String,
+    archetype: String,
+    tags: Vec<String>,
+    visibility: String,
+    status: String,
+    game_changers_count: i32,
+    has_infinite_combo: bool,
+    has_fast_mana: bool,
+    tutor_density: String,
+    has_extra_turns: bool,
+    has_mass_land_denial: bool,
+    salt_notes: String,
+    notes: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct EventForm {
     pub(crate) title: String,
     pub(crate) description: String,
@@ -1067,6 +1366,8 @@ pub(crate) struct EventPageContext {
     pub location: Option<pod_db::EventLocationRecord>,
     pub rsvps: Vec<EventRsvpRecord>,
     pub user_rsvp: Option<EventRsvpRecord>,
+    pub deck_declarations: Vec<EventDeckDeclarationWithDeck>,
+    pub user_decks: Vec<pod_db::DeckRecord>,
     pub show_address: bool,
     pub can_edit: bool,
 }
@@ -1253,6 +1554,8 @@ async fn event_page_context(
         location,
         rsvps,
         user_rsvp,
+        deck_declarations: Vec::new(),
+        user_decks: Vec::new(),
         show_address,
         can_edit: role.is_some_and(can_manage_event),
     })
@@ -1274,6 +1577,8 @@ async fn public_event_page_context(
         location,
         rsvps: Vec::new(),
         user_rsvp: None,
+        deck_declarations: Vec::new(),
+        user_decks: Vec::new(),
         show_address,
         can_edit: false,
     })
@@ -1314,9 +1619,74 @@ fn default_address_visibility() -> String {
     AddressVisibility::Rsvps.as_str().to_owned()
 }
 
+fn parse_deck_form(
+    playgroups: &[pod_db::PlaygroupWithRole],
+    form: &DeckForm,
+) -> Result<ParsedDeckForm, &'static str> {
+    let name = form.name.trim();
+    let commander = form.commander.trim();
+    if name.is_empty() || commander.is_empty() {
+        return Err("Deck name and commander are required.");
+    }
+
+    let visibility = DeckVisibility::try_from(default_if_empty(form.visibility.trim(), "private"))
+        .map_err(|()| "Choose a valid deck visibility.")?
+        .as_str()
+        .to_owned();
+    let status = DeckStatus::try_from(default_if_empty(form.status.trim(), "active"))
+        .map_err(|()| "Choose a valid deck status.")?
+        .as_str()
+        .to_owned();
+    let tutor_density = TutorDensity::try_from(default_if_empty(form.tutor_density.trim(), "none"))
+        .map_err(|()| "Choose a valid tutor density.")?
+        .as_str()
+        .to_owned();
+    let game_changers_count = parse_optional_i32(&form.game_changers_count)
+        .unwrap_or(Some(0))
+        .ok_or("Game Changers count must be a number.")?;
+    if game_changers_count < 0 {
+        return Err("Game Changers count cannot be negative.");
+    }
+
+    let playgroup_id = optional_trimmed(&form.playgroup_id)
+        .map(str::parse)
+        .transpose()
+        .map_err(|_| "Choose a valid playgroup for playgroup-visible decks.")?;
+    if playgroup_id.is_some_and(|id| !playgroups.iter().any(|playgroup| playgroup.id == id)) {
+        return Err("Choose a playgroup you belong to.");
+    }
+    if visibility == DeckVisibility::Playgroup.as_str() && playgroup_id.is_none() {
+        return Err("Playgroup-visible decks need a playgroup.");
+    }
+
+    Ok(ParsedDeckForm {
+        playgroup_id,
+        name: name.to_owned(),
+        commander: commander.to_owned(),
+        color_identity: normalize_color_identity(&form.color_identity),
+        claimed_bracket: form.claimed_bracket.trim().to_owned(),
+        archetype: form.archetype.trim().to_owned(),
+        tags: normalize_tags(&form.tags),
+        visibility,
+        status,
+        game_changers_count,
+        has_infinite_combo: form.has_infinite_combo,
+        has_fast_mana: form.has_fast_mana,
+        tutor_density,
+        has_extra_turns: form.has_extra_turns,
+        has_mass_land_denial: form.has_mass_land_denial,
+        salt_notes: form.salt_notes.trim().to_owned(),
+        notes: form.notes.trim().to_owned(),
+    })
+}
+
 fn optional_trimmed(value: &str) -> Option<&str> {
     let value = value.trim();
     (!value.is_empty()).then_some(value)
+}
+
+fn default_if_empty<'a>(value: &'a str, fallback: &'a str) -> &'a str {
+    if value.is_empty() { fallback } else { value }
 }
 
 fn parse_optional_i32(value: &str) -> Option<Option<i32>> {
@@ -1604,6 +1974,18 @@ mod tests {
             .trim_start_matches("/events/")
             .parse()
             .expect("event uuid")
+    }
+
+    fn redirected_deck_id(response: &axum::response::Response) -> uuid::Uuid {
+        response
+            .headers()
+            .get(LOCATION)
+            .expect("deck redirect")
+            .to_str()
+            .expect("location str")
+            .trim_start_matches("/decks/")
+            .parse()
+            .expect("deck uuid")
     }
 
     #[tokio::test]
@@ -2315,5 +2697,144 @@ mod tests {
         assert!(calendar_body.contains("SUMMARY:Calendar Pods"));
         assert!(calendar_body.contains("LOCATION:Private House"));
         assert!(!calendar_body.contains("456 Hidden Ave"));
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn deck_registry_search_and_event_declarations_are_scoped(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool.clone()));
+        let owner = sign_up(&app, "deck-route-owner@example.test", "Owner").await;
+
+        let create_playgroup = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Deck+Route+Crew&description=Decks&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create playgroup");
+        assert_eq!(create_playgroup.status(), StatusCode::SEE_OTHER);
+
+        let playgroup = PlaygroupRepository::new(&pool)
+            .get_by_slug_for_user(
+                "deck-route-crew",
+                IdentityRepository::new(&pool)
+                    .find_user_by_email("deck-route-owner@example.test")
+                    .await
+                    .expect("owner user")
+                    .expect("owner user")
+                    .id,
+            )
+            .await
+            .expect("playgroup")
+            .expect("playgroup");
+
+        let create_deck = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/decks")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "name=Atraxa+Counters&commander=Atraxa%2C+Praetors%27+Voice&color_identity=WUBG&claimed_bracket=3&archetype=Counters&tags=counters%2Cmidrange&visibility=private&playgroup_id={}&status=active&game_changers_count=1&has_fast_mana=true&tutor_density=medium&salt_notes=Fast+mana&notes=Main+deck&csrf_token={}",
+                        playgroup.id,
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create deck");
+        assert_eq!(create_deck.status(), StatusCode::SEE_OTHER);
+        let deck_id = redirected_deck_id(&create_deck);
+
+        let search = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/decks?q=midrange")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("deck search");
+        assert_eq!(search.status(), StatusCode::OK);
+        let search_body = body_string(search).await;
+        assert!(search_body.contains("Atraxa Counters"));
+
+        let outsider = sign_up(&app, "deck-route-outsider@example.test", "Outsider").await;
+        let outsider_detail = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/decks/{deck_id}"))
+                    .header("cookie", outsider.cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("outsider deck detail");
+        assert_eq!(outsider_detail.status(), StatusCode::NOT_FOUND);
+
+        let create_event = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/playgroups/deck-route-crew/events")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "title=Deck+Night&description=Declare+decks&start_time=2026-06-03T19:00&end_time=&visibility=members&location_name=&address_line1=&address_line2=&city=&state_province=&postal_code=&country=&location_notes=&address_visibility=hidden&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("create event");
+        assert_eq!(create_event.status(), StatusCode::SEE_OTHER);
+        let event_id = redirected_event_id(&create_event);
+
+        let declare = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/events/{event_id}/decks"))
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::from(format!(
+                        "deck_id={deck_id}&preference=1&testing_notes=Testing+counter+package&csrf_token={}",
+                        owner.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("declare deck");
+        assert_eq!(declare.status(), StatusCode::SEE_OTHER);
+
+        let event = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/events/{event_id}"))
+                    .header("cookie", owner.cookie_header)
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("event detail");
+        assert_eq!(event.status(), StatusCode::OK);
+        let event_body = body_string(event).await;
+        assert!(event_body.contains("Atraxa Counters"));
+        assert!(event_body.contains("Testing counter package"));
     }
 }

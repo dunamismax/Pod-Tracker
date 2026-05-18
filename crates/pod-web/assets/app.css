@@ -533,6 +533,10 @@ button:focus-visible {
   align-items: start;
 }
 
+.split-layout.wide-left {
+  grid-template-columns: minmax(0, 1.2fr) minmax(340px, 0.8fr);
+}
+
 .list {
   display: grid;
   gap: 10px;
@@ -609,7 +613,8 @@ button:focus-visible {
 }
 
 .form-panel label,
-.stack label {
+.stack label,
+.search-form label {
   display: grid;
   gap: 7px;
   color: var(--muted);
@@ -620,7 +625,8 @@ button:focus-visible {
 .form-panel input,
 .form-panel select,
 .form-panel textarea,
-.stack input {
+.stack input,
+.search-form input {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line-strong);
@@ -634,7 +640,8 @@ button:focus-visible {
 .form-panel input:focus,
 .form-panel select:focus,
 .form-panel textarea:focus,
-.stack input:focus {
+.stack input:focus,
+.search-form input:focus {
   outline: 3px solid rgba(22, 107, 88, 0.16);
   outline-offset: 0;
   border-color: var(--accent);
@@ -650,6 +657,33 @@ button:focus-visible {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.check-grid label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.check-grid input {
+  width: 18px;
+  min-height: 18px;
+}
+
+.search-form {
+  display: grid;
+  max-width: 680px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 22px;
 }
 
 .status-list {
@@ -679,6 +713,34 @@ button:focus-visible {
 
 .health-list dd {
   color: var(--accent-strong);
+}
+
+.compact-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+}
+
+.compact-list div {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.65fr) minmax(0, 1fr);
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.compact-list dt {
+  color: var(--soft);
+  font-size: 0.76rem;
+  font-weight: 880;
+  text-transform: uppercase;
+}
+
+.compact-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 760;
 }
 
 .location-block {
@@ -728,6 +790,7 @@ button:focus-visible {
   .hero,
   .dashboard-header,
   .split-layout,
+  .split-layout.wide-left,
   .ops-strip {
     grid-template-columns: 1fr;
   }
@@ -786,6 +849,8 @@ button:focus-visible {
   .hero-metrics,
   .console-matrix,
   .field-grid,
+  .check-grid,
+  .search-form,
   .status-list div {
     grid-template-columns: 1fr;
   }
