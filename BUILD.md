@@ -413,7 +413,7 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 9 - Scryfall Import And Card Search
 
-- [ ] Add Scryfall bulk import job.
+- [x] Add Scryfall bulk import job.
 - [x] Store raw Scryfall JSONB payloads.
 - [x] Normalize cards, faces, printings, legalities, prices, and search
       documents.
@@ -704,3 +704,10 @@ Trust current primary docs over this file.
   `pg_trgm` card search with color identity, commander legality, mana
   value, price, type, and Game Changer filters; wired `/cards`, SQL
   Observatory card-search entries, and focused PostgreSQL-backed tests.
+- 2026-05-18 - Completed the Phase 9 Scryfall bulk import job: added the
+  `scryfall_bulk_import` background job type, default-cards payload
+  parsing, Scryfall bulk metadata fetching with required headers,
+  streamed download-to-tempfile handling, streaming JSON-array import
+  through the existing card repository, import status/error tracking,
+  enqueue coverage, and fixture-backed worker tests that prove imported
+  cards remain searchable.

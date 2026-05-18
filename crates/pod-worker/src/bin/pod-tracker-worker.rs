@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use anyhow::Context;
 use pod_core::config::AppConfig;
-use pod_db::{BackgroundJobRecord, OpsRepository};
+use pod_db::{BackgroundJobRecord, OpsRepository, ScryfallRepository};
+use pod_worker::{
+    SCRYFALL_BULK_IMPORT_JOB_TYPE, ScryfallBulkClient, process_scryfall_bulk_import_job,
+};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 use uuid::Uuid;
@@ -25,6 +28,7 @@ async fn main() -> anyhow::Result<()> {
 
     let worker_id = worker_id();
     let email_client = Smtp2GoClient::new(config.smtp2go_api_key.clone(), config.smtp_sender);
+    let scryfall_client = ScryfallBulkClient::new();
     let mut ticker = time::interval(Duration::from_secs(5));
     loop {
         tokio::select! {
@@ -39,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
                     tracing::warn!(err = %err, "worker database check failed");
                 }
                 if let Some(pool) = db.as_ref()
-                    && let Err(err) = process_due_jobs(&OpsRepository::new(pool), &email_client, &worker_id).await
+                    && let Err(err) = process_due_jobs(pool, &OpsRepository::new(pool), &email_client, &scryfall_client, &worker_id).await
                 {
                     tracing::error!(err = %err, "worker job processing failed");
                 }
@@ -49,8 +53,10 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn process_due_jobs(
+    pool: &sqlx::PgPool,
     ops: &OpsRepository<'_>,
     email_client: &Smtp2GoClient,
+    scryfall_client: &ScryfallBulkClient,
     worker_id: &str,
 ) -> anyhow::Result<()> {
     loop {
@@ -63,7 +69,8 @@ async fn process_due_jobs(
         };
 
         tracing::info!(job_id = %job.id, job_type = %job.job_type, "worker_job_claimed");
-        let result = process_job(ops, email_client, &job).await;
+        let scryfall_repo = ScryfallRepository::new(pool);
+        let result = process_job(ops, &scryfall_repo, email_client, scryfall_client, &job).await;
         match result {
             Ok(()) => {
                 ops.complete_background_job(job.id)
@@ -83,11 +90,25 @@ async fn process_due_jobs(
 
 async fn process_job(
     ops: &OpsRepository<'_>,
+    scryfall_repo: &ScryfallRepository<'_>,
     email_client: &Smtp2GoClient,
+    scryfall_client: &ScryfallBulkClient,
     job: &BackgroundJobRecord,
 ) -> anyhow::Result<()> {
     match job.job_type.as_str() {
         "send_email" => process_send_email_job(ops, email_client, job).await,
+        SCRYFALL_BULK_IMPORT_JOB_TYPE => {
+            let import = process_scryfall_bulk_import_job(scryfall_repo, scryfall_client, job)
+                .await
+                .context("process Scryfall bulk import")?;
+            tracing::info!(
+                import_id = %import.id,
+                bulk_type = %import.bulk_type,
+                cards_imported = import.cards_imported,
+                "scryfall_bulk_import_completed"
+            );
+            Ok(())
+        }
         other => anyhow::bail!("unknown job type: {other}"),
     }
 }

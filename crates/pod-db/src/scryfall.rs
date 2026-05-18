@@ -101,6 +101,12 @@ impl<'a> ScryfallRepository<'a> {
                 content_type = excluded.content_type,
                 content_encoding = excluded.content_encoding,
                 size_bytes = excluded.size_bytes,
+                status = 'pending',
+                cards_seen = 0,
+                cards_imported = 0,
+                error_message = null,
+                started_at = null,
+                finished_at = null,
                 raw_metadata = excluded.raw_metadata,
                 updated_at = now()
             returning id, bulk_type, source_uri, download_uri, source_updated_at,

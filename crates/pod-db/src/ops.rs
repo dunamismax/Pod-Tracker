@@ -203,6 +203,21 @@ impl<'a> OpsRepository<'a> {
         Ok((delivery, job))
     }
 
+    pub async fn enqueue_scryfall_bulk_import(
+        &self,
+        bulk_type: &str,
+        run_at: OffsetDateTime,
+    ) -> Result<BackgroundJobRecord, DbError> {
+        let payload = json!({ "bulk_type": bulk_type });
+        self.insert_background_job(BackgroundJobInput {
+            queue: "default",
+            job_type: "scryfall_bulk_import",
+            payload: &payload,
+            run_at,
+        })
+        .await
+    }
+
     pub async fn acquire_next_background_job(
         &self,
         worker_id: &str,
@@ -345,5 +360,18 @@ mod tests {
                 .expect("claim none")
                 .is_none()
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn queues_scryfall_bulk_import_jobs(pool: sqlx::PgPool) {
+        let repo = OpsRepository::new(&pool);
+        let job = repo
+            .enqueue_scryfall_bulk_import("default_cards", time::OffsetDateTime::now_utc())
+            .await
+            .expect("queue import");
+
+        assert_eq!(job.queue, "default");
+        assert_eq!(job.job_type, "scryfall_bulk_import");
+        assert_eq!(job.payload["bulk_type"], "default_cards");
     }
 }
