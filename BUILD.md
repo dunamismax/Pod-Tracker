@@ -51,6 +51,11 @@ needed to understand, stabilize, or safely replace existing behavior.
 - **tower**, **tower-http**, and **tracing** for middleware,
   instrumentation, compression, static assets, request IDs, and
   production logs.
+- **tracing-subscriber** first for local and production logs; add
+  OpenTelemetry only after request/job spans are stable and there is a real
+  collector or exporter target.
+- **figment** or **config** only if environment, file, tenant, and job
+  settings outgrow the current explicit configuration model.
 - **PostgreSQL `LISTEN` / `NOTIFY`** for lightweight realtime fanout.
 - **SSE** for browser event streams.
 - **PostgreSQL-backed job tables** using `FOR UPDATE SKIP LOCKED` for
@@ -487,6 +492,11 @@ state where documented verification passes on a clean checkout.
       address reveal, and result changes.
 - [ ] Add structured error pages.
 - [ ] Add log redaction checks.
+- [ ] Add stable request, job, and database spans before considering
+      OpenTelemetry export.
+- [ ] Revisit config loading with `figment` or `config` if deployment,
+      worker, email, and tenant settings become too broad for explicit env
+      parsing.
 - [ ] Add CSRF tests.
 - [x] Add security header checks.
 - [x] Add privacy model in `docs/privacy.md`.
