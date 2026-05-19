@@ -29,6 +29,7 @@ pub use decks::{
     CreateDeckInput, DeckBracketSnapshotRecord, DeckCardRecord, DeckRecord, DeckRepository,
     DeckVersionRecord, DecklistExportRecord, DecklistImportInput, DecklistImportSummary,
     EventDeckDeclarationInput, EventDeckDeclarationRecord, EventDeckDeclarationWithDeck,
+    SimilarDeckRecommendation,
 };
 pub use events::{
     CalendarEventRecord, CreateEventInput, CreateEventReminderInput, EventHostRecord,

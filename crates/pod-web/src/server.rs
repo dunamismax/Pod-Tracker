@@ -992,6 +992,13 @@ async fn deck_detail(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
+    let recommendations = match deck_repo.similar_deck_recommendations(id, user.id, 4).await {
+        Ok(recommendations) => recommendations,
+        Err(err) => {
+            tracing::error!(err = %err, "list similar deck recommendations");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
     let csrf = ensure_csrf_cookie(&headers, &state.config);
     html_with_cookies(
@@ -1000,6 +1007,7 @@ async fn deck_detail(
             &deck,
             &csrf.token,
             snapshot.as_ref(),
+            &recommendations,
             None,
             deck.owner_user_id == user.id && snapshot.is_some(),
         ),
@@ -1051,6 +1059,7 @@ async fn import_decklist(
                 &deck,
                 &csrf.token,
                 snapshot.as_ref(),
+                &[],
                 Some("Paste a plain-text decklist before importing."),
                 snapshot.is_some(),
             ),
@@ -1073,6 +1082,7 @@ async fn import_decklist(
                 &deck,
                 &csrf.token,
                 None,
+                &[],
                 Some("No decklist cards were found to import."),
                 false,
             ),
@@ -5072,6 +5082,7 @@ mod tests {
         assert_eq!(imported_detail.status(), StatusCode::OK);
         let imported_detail_body = body_string(imported_detail).await;
         assert!(imported_detail_body.contains("Bracket check"));
+        assert!(imported_detail_body.contains("Similar decks"));
         assert!(imported_detail_body.contains("1 Game Changer"));
         assert!(imported_detail_body.contains("1 decklist line(s) did not match"));
         assert!(imported_detail_body.contains("Plain text"));

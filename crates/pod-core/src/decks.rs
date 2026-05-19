@@ -124,10 +124,71 @@ pub fn normalize_color_identity(value: &str) -> String {
     colors.into_iter().collect()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SimilarDeckScoreInput<'a> {
+    pub current_commander: &'a str,
+    pub candidate_commander: &'a str,
+    pub current_color_identity: &'a str,
+    pub candidate_color_identity: &'a str,
+    pub current_claimed_bracket: &'a str,
+    pub candidate_claimed_bracket: &'a str,
+    pub current_archetype: &'a str,
+    pub candidate_archetype: &'a str,
+    pub shared_cards_count: i64,
+    pub shared_tags_count: usize,
+}
+
+pub fn color_overlap_count(left: &str, right: &str) -> usize {
+    let left = normalize_color_identity(left);
+    let right = normalize_color_identity(right);
+    left.chars().filter(|color| right.contains(*color)).count()
+}
+
+pub fn similar_deck_score(input: SimilarDeckScoreInput<'_>) -> i32 {
+    let mut score = 0;
+    score += input.shared_cards_count.clamp(0, 20) as i32 * 3;
+    score += (input.shared_tags_count.min(4) as i32) * 5;
+    score += (color_overlap_count(input.current_color_identity, input.candidate_color_identity)
+        as i32)
+        * 4;
+
+    if input
+        .current_commander
+        .eq_ignore_ascii_case(input.candidate_commander)
+    {
+        score += 30;
+    }
+    if input
+        .current_archetype
+        .eq_ignore_ascii_case(input.candidate_archetype)
+    {
+        score += 18;
+    }
+
+    match bracket_distance(
+        input.current_claimed_bracket,
+        input.candidate_claimed_bracket,
+    ) {
+        Some(0) => score += 10,
+        Some(1) => score += 6,
+        Some(2) => score += 2,
+        _ => {}
+    }
+
+    score
+}
+
+pub fn bracket_distance(left: &str, right: &str) -> Option<i32> {
+    let left = left.trim().parse::<i32>().ok()?;
+    let right = right.trim().parse::<i32>().ok()?;
+    Some((left - right).abs())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        DeckStatus, DeckVisibility, TutorDensity, normalize_color_identity, normalize_tags,
+        DeckStatus, DeckVisibility, SimilarDeckScoreInput, TutorDensity, color_overlap_count,
+        normalize_color_identity, normalize_tags, similar_deck_score,
     };
 
     #[test]
@@ -148,5 +209,36 @@ mod tests {
             vec!["combo".to_owned(), "tokens".to_owned()]
         );
         assert_eq!(normalize_color_identity("gwuux"), "WUG");
+    }
+
+    #[test]
+    fn scores_similar_decks_from_metadata_and_overlap() {
+        let close = similar_deck_score(SimilarDeckScoreInput {
+            current_commander: "Atraxa, Praetors' Voice",
+            candidate_commander: "Atraxa, Praetors' Voice",
+            current_color_identity: "WUBG",
+            candidate_color_identity: "WUG",
+            current_claimed_bracket: "3",
+            candidate_claimed_bracket: "3",
+            current_archetype: "Counters",
+            candidate_archetype: "Counters",
+            shared_cards_count: 12,
+            shared_tags_count: 2,
+        });
+        let distant = similar_deck_score(SimilarDeckScoreInput {
+            current_commander: "Atraxa, Praetors' Voice",
+            candidate_commander: "Krenko, Mob Boss",
+            current_color_identity: "WUBG",
+            candidate_color_identity: "R",
+            current_claimed_bracket: "3",
+            candidate_claimed_bracket: "1",
+            current_archetype: "Counters",
+            candidate_archetype: "Tokens",
+            shared_cards_count: 1,
+            shared_tags_count: 0,
+        });
+
+        assert_eq!(color_overlap_count("WUBG", "WUG"), 3);
+        assert!(close > distant);
     }
 }

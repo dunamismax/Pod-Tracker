@@ -3,8 +3,8 @@ use pod_db::{
     CardSearchResult, CollectionCardRecord, CollectionRecord, DeckBracketSnapshotRecord,
     DeckMissingCardRecord, DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord,
     EventWithRole, GameWithPlayers, HouseRuleRecord, MetaDashboard, MetaDistributionMetric,
-    PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats, WishlistCardRecord,
-    WishlistMissingCardRecord, WishlistRecord,
+    PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats, SimilarDeckRecommendation,
+    WishlistCardRecord, WishlistMissingCardRecord, WishlistRecord,
 };
 use time::{OffsetDateTime, UtcOffset};
 
@@ -608,6 +608,7 @@ pub fn render_deck_detail(
     deck: &DeckRecord,
     csrf_token: &str,
     snapshot: Option<&DeckBracketSnapshotRecord>,
+    recommendations: &[SimilarDeckRecommendation],
     import_error: Option<&str>,
     can_export: bool,
 ) -> String {
@@ -615,6 +616,7 @@ pub fn render_deck_detail(
     let tags = deck.tags.join(", ");
     let csrf_token = csrf_token.to_owned();
     let snapshot = snapshot.cloned();
+    let recommendations = recommendations.to_vec();
     let import_error = import_error.map(str::to_owned);
 
     view! {
@@ -664,6 +666,37 @@ pub fn render_deck_detail(
                         </dl>
                         {(!deck.salt_notes.is_empty()).then(|| view! { <p class="body-copy">{deck.salt_notes}</p> })}
                     </div>
+                </section>
+                <section class="workspace-panel section-gap">
+                    <div class="section-heading">
+                        <h2>"Similar decks"</h2>
+                        <span>{recommendations.len()} " recommendations"</span>
+                    </div>
+                    {if recommendations.is_empty() {
+                        view! { <p class="empty-state">"No similar visible decks yet."</p> }.into_any()
+                    } else {
+                        view! {
+                            <div class="list">
+                                {recommendations.into_iter().map(|recommendation| {
+                                    let deck = recommendation.deck;
+                                    view! {
+                                        <article class="list-item">
+                                            <div>
+                                                <h3><a href=format!("/decks/{}", deck.id)>{deck.name}</a></h3>
+                                                <p>{deck.commander}</p>
+                                                <dl class="inline-metrics">
+                                                    <div><dt>"Score"</dt><dd>{recommendation.score}</dd></div>
+                                                    <div><dt>"Shared cards"</dt><dd>{recommendation.shared_cards_count}</dd></div>
+                                                    <div><dt>"Bracket"</dt><dd>{deck.claimed_bracket}</dd></div>
+                                                </dl>
+                                                <p class="meta-line">{recommendation.reasons.join(" · ")}</p>
+                                            </div>
+                                        </article>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        }.into_any()
+                    }}
                 </section>
                 <section class="split-layout wide-left section-gap">
                     <form method="post" action=format!("/decks/{}/import", deck.id) class="form-panel">

@@ -4,7 +4,10 @@ use uuid::Uuid;
 use sqlx::PgPool;
 
 use crate::{DbError, meta::enqueue_meta_dashboard_refresh};
-use pod_core::decklists::{DecklistEntry, parse_plain_text_decklist};
+use pod_core::{
+    decklists::{DecklistEntry, parse_plain_text_decklist},
+    decks::{SimilarDeckScoreInput, bracket_distance, color_overlap_count, similar_deck_score},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeckRecord {
@@ -122,6 +125,15 @@ pub struct DecklistExportRecord {
     pub cards: Vec<DeckCardRecord>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SimilarDeckRecommendation {
+    pub deck: DeckRecord,
+    pub score: i32,
+    pub shared_cards_count: i64,
+    pub shared_tags: Vec<String>,
+    pub reasons: Vec<String>,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct CreateDeckInput<'a> {
     pub owner_user_id: Uuid,
@@ -167,6 +179,33 @@ struct CardNameResolution {
     match_status: &'static str,
     match_method: &'static str,
     name_similarity: Option<f32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SimilarDeckCandidateRow {
+    id: Uuid,
+    owner_user_id: Uuid,
+    playgroup_id: Option<Uuid>,
+    name: String,
+    commander: String,
+    color_identity: String,
+    claimed_bracket: String,
+    archetype: String,
+    tags: Vec<String>,
+    visibility: String,
+    status: String,
+    game_changers_count: i32,
+    has_infinite_combo: bool,
+    has_fast_mana: bool,
+    tutor_density: String,
+    has_extra_turns: bool,
+    has_mass_land_denial: bool,
+    salt_notes: String,
+    notes: String,
+    created_at: OffsetDateTime,
+    updated_at: OffsetDateTime,
+    shared_cards_count: i64,
+    shared_tags: Vec<String>,
 }
 
 pub struct DeckRepository<'a> {
@@ -330,6 +369,128 @@ impl<'a> DeckRepository<'a> {
         .await?;
 
         Ok(deck)
+    }
+
+    pub async fn similar_deck_recommendations(
+        &self,
+        deck_id: Uuid,
+        user_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<SimilarDeckRecommendation>, DbError> {
+        let Some(source) = self.get_for_user(deck_id, user_id).await? else {
+            return Ok(Vec::new());
+        };
+        let fetch_limit = limit.max(1).saturating_mul(8);
+        let candidates = sqlx::query_as!(
+            SimilarDeckCandidateRow,
+            r#"
+            with source as (
+              select d.id, d.tags
+              from core.decks d
+              left join core.playgroup_memberships source_membership
+                on source_membership.playgroup_id = d.playgroup_id
+               and source_membership.user_id = $2
+              where d.id = $1
+                and (
+                  d.owner_user_id = $2
+                  or d.visibility = 'public'
+                  or (
+                    d.visibility = 'playgroup'
+                    and source_membership.user_id is not null
+                  )
+                )
+            ),
+            source_version as (
+              select v.id
+              from mtg.deck_versions v
+              join source s on s.id = v.deck_id
+              order by v.version_number desc
+              limit 1
+            ),
+            source_cards as (
+              select dc.oracle_id
+              from mtg.deck_cards dc
+              join source_version sv on sv.id = dc.deck_version_id
+              where dc.match_status = 'matched'
+                and dc.oracle_id is not null
+              group by dc.oracle_id
+            ),
+            visible_candidates as (
+              select distinct d.id, d.owner_user_id, d.playgroup_id, d.name, d.commander,
+                d.color_identity, d.claimed_bracket, d.archetype, d.tags, d.visibility,
+                d.status, d.game_changers_count, d.has_infinite_combo, d.has_fast_mana,
+                d.tutor_density, d.has_extra_turns, d.has_mass_land_denial,
+                d.salt_notes, d.notes, d.created_at, d.updated_at
+              from core.decks d
+              join source s on true
+              left join core.playgroup_memberships m
+                on m.playgroup_id = d.playgroup_id
+               and m.user_id = $2
+              where d.id <> s.id
+                and d.status = 'active'
+                and (
+                  d.owner_user_id = $2
+                  or d.visibility = 'public'
+                  or (d.visibility = 'playgroup' and m.user_id is not null)
+                )
+            ),
+            candidate_versions as (
+              select distinct on (v.deck_id) v.deck_id, v.id
+              from mtg.deck_versions v
+              join visible_candidates c on c.id = v.deck_id
+              order by v.deck_id, v.version_number desc
+            ),
+            card_overlap as (
+              select cv.deck_id, count(distinct dc.oracle_id)::bigint as shared_cards_count
+              from candidate_versions cv
+              join mtg.deck_cards dc on dc.deck_version_id = cv.id
+              join source_cards sc on sc.oracle_id = dc.oracle_id
+              where dc.match_status = 'matched'
+                and dc.oracle_id is not null
+              group by cv.deck_id
+            )
+            select c.id, c.owner_user_id, c.playgroup_id, c.name, c.commander,
+              c.color_identity, c.claimed_bracket, c.archetype, c.tags, c.visibility,
+              c.status, c.game_changers_count, c.has_infinite_combo, c.has_fast_mana,
+              c.tutor_density, c.has_extra_turns, c.has_mass_land_denial,
+              c.salt_notes, c.notes, c.created_at, c.updated_at,
+              coalesce(o.shared_cards_count, 0)::bigint as "shared_cards_count!",
+              coalesce(
+                array(
+                  select candidate_tag
+                  from unnest(c.tags) as candidate_tag
+                  join source s on candidate_tag = any(s.tags)
+                  order by candidate_tag
+                ),
+                '{}'
+              ) as "shared_tags!"
+            from visible_candidates c
+            left join card_overlap o on o.deck_id = c.id
+            order by coalesce(o.shared_cards_count, 0) desc, c.updated_at desc, c.name asc
+            limit $3
+            "#,
+            deck_id,
+            user_id,
+            fetch_limit,
+        )
+        .fetch_all(self.pool)
+        .await?;
+
+        let mut recommendations = candidates
+            .into_iter()
+            .map(|candidate| build_similar_deck_recommendation(&source, candidate))
+            .collect::<Vec<_>>();
+        recommendations.sort_by(|left, right| {
+            right
+                .score
+                .cmp(&left.score)
+                .then_with(|| right.shared_cards_count.cmp(&left.shared_cards_count))
+                .then_with(|| right.deck.updated_at.cmp(&left.deck.updated_at))
+                .then_with(|| left.deck.name.cmp(&right.deck.name))
+        });
+        recommendations.truncate(limit.max(0) as usize);
+
+        Ok(recommendations)
     }
 
     pub async fn declare_event_deck(
@@ -697,6 +858,102 @@ impl<'a> DeckRepository<'a> {
 
         Ok(deck)
     }
+}
+
+fn build_similar_deck_recommendation(
+    source: &DeckRecord,
+    candidate: SimilarDeckCandidateRow,
+) -> SimilarDeckRecommendation {
+    let deck = candidate.deck_record();
+    let score = similar_deck_score(SimilarDeckScoreInput {
+        current_commander: &source.commander,
+        candidate_commander: &deck.commander,
+        current_color_identity: &source.color_identity,
+        candidate_color_identity: &deck.color_identity,
+        current_claimed_bracket: &source.claimed_bracket,
+        candidate_claimed_bracket: &deck.claimed_bracket,
+        current_archetype: &source.archetype,
+        candidate_archetype: &deck.archetype,
+        shared_cards_count: candidate.shared_cards_count,
+        shared_tags_count: candidate.shared_tags.len(),
+    });
+    let reasons = similar_deck_reasons(
+        source,
+        &deck,
+        candidate.shared_cards_count,
+        &candidate.shared_tags,
+    );
+
+    SimilarDeckRecommendation {
+        deck,
+        score,
+        shared_cards_count: candidate.shared_cards_count,
+        shared_tags: candidate.shared_tags,
+        reasons,
+    }
+}
+
+impl SimilarDeckCandidateRow {
+    fn deck_record(&self) -> DeckRecord {
+        DeckRecord {
+            id: self.id,
+            owner_user_id: self.owner_user_id,
+            playgroup_id: self.playgroup_id,
+            name: self.name.clone(),
+            commander: self.commander.clone(),
+            color_identity: self.color_identity.clone(),
+            claimed_bracket: self.claimed_bracket.clone(),
+            archetype: self.archetype.clone(),
+            tags: self.tags.clone(),
+            visibility: self.visibility.clone(),
+            status: self.status.clone(),
+            game_changers_count: self.game_changers_count,
+            has_infinite_combo: self.has_infinite_combo,
+            has_fast_mana: self.has_fast_mana,
+            tutor_density: self.tutor_density.clone(),
+            has_extra_turns: self.has_extra_turns,
+            has_mass_land_denial: self.has_mass_land_denial,
+            salt_notes: self.salt_notes.clone(),
+            notes: self.notes.clone(),
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+        }
+    }
+}
+
+fn similar_deck_reasons(
+    source: &DeckRecord,
+    candidate: &DeckRecord,
+    shared_cards_count: i64,
+    shared_tags: &[String],
+) -> Vec<String> {
+    let mut reasons = Vec::new();
+    if shared_cards_count > 0 {
+        reasons.push(format!("{shared_cards_count} shared imported cards"));
+    }
+    if source.commander.eq_ignore_ascii_case(&candidate.commander) {
+        reasons.push("Same commander".to_owned());
+    }
+    if source.archetype.eq_ignore_ascii_case(&candidate.archetype) {
+        reasons.push(format!("Same archetype: {}", candidate.archetype));
+    }
+    match bracket_distance(&source.claimed_bracket, &candidate.claimed_bracket) {
+        Some(0) => reasons.push(format!("Same bracket: {}", candidate.claimed_bracket)),
+        Some(1) => reasons.push(format!("Nearby bracket: {}", candidate.claimed_bracket)),
+        _ => {}
+    }
+    let color_overlap = color_overlap_count(&source.color_identity, &candidate.color_identity);
+    if color_overlap > 0 {
+        reasons.push(format!(
+            "{color_overlap} shared colors: {}",
+            candidate.color_identity
+        ));
+    }
+    if !shared_tags.is_empty() {
+        reasons.push(format!("Shared tags: {}", shared_tags.join(", ")));
+    }
+
+    reasons
 }
 
 async fn insert_deck_card(
@@ -1338,6 +1595,240 @@ Deck
         assert_eq!(export.cards[0].section, "commander");
         assert_eq!(export.cards[5].card_name, "Fire // Ice");
         assert_eq!(export.cards[5].match_status, "ambiguous");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn recommends_similar_decks_with_visible_scope_and_import_overlap(pool: sqlx::PgPool) {
+        let identity = IdentityRepository::new(&pool);
+        let owner = identity
+            .create_user(
+                "deck-rec-owner@example.test",
+                "Deck Recommendation Owner",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("owner");
+        let member = identity
+            .create_user(
+                "deck-rec-member@example.test",
+                "Deck Recommendation Member",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("member");
+        let outsider = identity
+            .create_user(
+                "deck-rec-outsider@example.test",
+                "Deck Recommendation Outsider",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("outsider");
+        let playgroup = PlaygroupRepository::new(&pool)
+            .create_playgroup(owner.id, "Recommendation Group", "recommendation-group", "")
+            .await
+            .expect("playgroup");
+        PlaygroupRepository::new(&pool)
+            .add_membership(playgroup.id, member.id, PlaygroupRole::Member, None)
+            .await
+            .expect("member membership");
+
+        let scryfall = ScryfallRepository::new(&pool);
+        let metadata = json!({
+            "type": "default_cards",
+            "updated_at": "2026-05-19T09:09:27.689+00:00",
+            "uri": "https://api.scryfall.com/bulk-data/recommendations",
+            "download_uri": "https://data.scryfall.io/default-cards/recommendations.json"
+        });
+        let import = scryfall
+            .create_import(ScryfallImportInput {
+                bulk_type: "default_cards",
+                source_uri: metadata["uri"].as_str().expect("uri"),
+                download_uri: metadata["download_uri"].as_str().expect("download_uri"),
+                source_updated_at: time::OffsetDateTime::now_utc(),
+                content_type: "application/json",
+                content_encoding: Some("gzip"),
+                size_bytes: Some(128),
+                raw_metadata: &metadata,
+            })
+            .await
+            .expect("create import");
+        for card in [
+            card_json(
+                "00000000-0000-7000-8000-000000000301",
+                "10000000-0000-7000-8000-000000000301",
+                "Atraxa, Praetors' Voice",
+                &["W", "U", "B", "G"],
+                "Legendary Creature - Phyrexian Angel Horror",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7000-8000-000000000302",
+                "10000000-0000-7000-8000-000000000302",
+                "Sol Ring",
+                &[],
+                "Artifact",
+                false,
+            ),
+            card_json(
+                "00000000-0000-7000-8000-000000000303",
+                "10000000-0000-7000-8000-000000000303",
+                "Counterspell",
+                &["U"],
+                "Instant",
+                false,
+            ),
+        ] {
+            scryfall
+                .upsert_card_from_scryfall_json(import.id, &card)
+                .await
+                .expect("upsert card");
+        }
+
+        let repo = DeckRepository::new(&pool);
+        let source_tags = vec!["counters".to_owned(), "midrange".to_owned()];
+        let similar_tags = vec!["counters".to_owned(), "value".to_owned()];
+        let distant_tags = vec!["tokens".to_owned()];
+        let source = repo
+            .create_deck(CreateDeckInput {
+                owner_user_id: owner.id,
+                playgroup_id: Some(playgroup.id),
+                name: "Atraxa Counters",
+                commander: "Atraxa, Praetors' Voice",
+                color_identity: "WUBG",
+                claimed_bracket: "3",
+                archetype: "Counters",
+                tags: &source_tags,
+                visibility: "private",
+                status: "active",
+                game_changers_count: 0,
+                has_infinite_combo: false,
+                has_fast_mana: false,
+                tutor_density: "low",
+                has_extra_turns: false,
+                has_mass_land_denial: false,
+                salt_notes: "",
+                notes: "",
+            })
+            .await
+            .expect("source deck");
+        let similar = repo
+            .create_deck(CreateDeckInput {
+                owner_user_id: member.id,
+                playgroup_id: Some(playgroup.id),
+                name: "Atraxa Value",
+                commander: "Atraxa, Praetors' Voice",
+                color_identity: "WUG",
+                claimed_bracket: "3",
+                archetype: "Counters",
+                tags: &similar_tags,
+                visibility: "playgroup",
+                status: "active",
+                game_changers_count: 0,
+                has_infinite_combo: false,
+                has_fast_mana: false,
+                tutor_density: "low",
+                has_extra_turns: false,
+                has_mass_land_denial: false,
+                salt_notes: "",
+                notes: "",
+            })
+            .await
+            .expect("similar deck");
+        let distant = repo
+            .create_deck(CreateDeckInput {
+                owner_user_id: member.id,
+                playgroup_id: Some(playgroup.id),
+                name: "Krenko Tokens",
+                commander: "Krenko, Mob Boss",
+                color_identity: "R",
+                claimed_bracket: "1",
+                archetype: "Tokens",
+                tags: &distant_tags,
+                visibility: "playgroup",
+                status: "active",
+                game_changers_count: 0,
+                has_infinite_combo: false,
+                has_fast_mana: false,
+                tutor_density: "none",
+                has_extra_turns: false,
+                has_mass_land_denial: false,
+                salt_notes: "",
+                notes: "",
+            })
+            .await
+            .expect("distant deck");
+        let hidden = repo
+            .create_deck(CreateDeckInput {
+                owner_user_id: outsider.id,
+                playgroup_id: None,
+                name: "Hidden Atraxa",
+                commander: "Atraxa, Praetors' Voice",
+                color_identity: "WUBG",
+                claimed_bracket: "3",
+                archetype: "Counters",
+                tags: &source_tags,
+                visibility: "private",
+                status: "active",
+                game_changers_count: 0,
+                has_infinite_combo: false,
+                has_fast_mana: false,
+                tutor_density: "low",
+                has_extra_turns: false,
+                has_mass_land_denial: false,
+                salt_notes: "",
+                notes: "",
+            })
+            .await
+            .expect("hidden deck");
+
+        let source_text =
+            "Commander\n1 Atraxa, Praetors' Voice\n\nDeck\n1 Sol Ring\n1 Counterspell";
+        repo.import_plain_text_decklist(super::DecklistImportInput {
+            deck_id: source.id,
+            owner_user_id: owner.id,
+            source_text,
+        })
+        .await
+        .expect("import source")
+        .expect("source summary");
+        repo.import_plain_text_decklist(super::DecklistImportInput {
+            deck_id: similar.id,
+            owner_user_id: member.id,
+            source_text,
+        })
+        .await
+        .expect("import similar")
+        .expect("similar summary");
+        repo.import_plain_text_decklist(super::DecklistImportInput {
+            deck_id: hidden.id,
+            owner_user_id: outsider.id,
+            source_text,
+        })
+        .await
+        .expect("import hidden")
+        .expect("hidden summary");
+
+        let recommendations = repo
+            .similar_deck_recommendations(source.id, owner.id, 5)
+            .await
+            .expect("recommendations");
+        assert_eq!(recommendations[0].deck.id, similar.id);
+        assert!(recommendations[0].score > 0);
+        assert!(recommendations[0].shared_cards_count >= 3);
+        assert!(
+            recommendations[0]
+                .shared_tags
+                .contains(&"counters".to_owned())
+        );
+        assert!(
+            recommendations[0]
+                .reasons
+                .iter()
+                .any(|reason| reason.contains("shared imported cards"))
+        );
+        assert!(recommendations.iter().any(|rec| rec.deck.id == distant.id));
+        assert!(!recommendations.iter().any(|rec| rec.deck.id == hidden.id));
     }
 
     fn card_json(

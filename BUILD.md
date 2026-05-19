@@ -506,12 +506,12 @@ state where documented verification passes on a clean checkout.
 ### Phase 16 - Advanced Intelligence
 
 - [x] Improve pod scoring with matchup freshness and deck variety.
-- [ ] Add similar deck recommendations.
+- [x] Add similar deck recommendations.
 - [ ] Add collection-aware deck suggestions.
 - [ ] Add optional pgvector semantic card/deck search.
 - [ ] Add natural-language meta query research after SQL Observatory is
       useful.
-- [ ] Document which recommendations are SQL, heuristic, semantic, or
+- [x] Document which recommendations are SQL, heuristic, semantic, or
       AI-backed.
 
 ### Phase 17 - Localization And Card Languages
@@ -779,3 +779,8 @@ Trust current primary docs over this file.
   script, verifies the restored SQLx migration table and
   readiness-critical schema, and documents the non-production drill path
   in `docs/operations.md`.
+- 2026-05-19 - Added Phase 16 similar deck recommendations as
+  SQL-scoped heuristic matching: deck detail pages now show visible
+  recommendations scored by latest imported card overlap plus commander,
+  archetype, bracket, color identity, and tag similarity; SQL
+  Observatory documents that this path is not semantic or AI-backed.

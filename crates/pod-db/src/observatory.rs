@@ -210,6 +210,82 @@ where dc.deck_version_id = $1
         sample_data: "Scrubbed fixture: a 100-card import with one matched Game Changer writes game_changers_count=1 to the latest bracket snapshot.",
     },
     ObservatoryEntry {
+        slug: "similar-deck-recommendations",
+        title: "Similar deck recommendations",
+        badge: "SQL + heuristic",
+        source: "DeckRepository::similar_deck_recommendations",
+        sql: r#"with source as (
+  select d.id, d.tags
+  from core.decks d
+  left join core.playgroup_memberships source_membership
+    on source_membership.playgroup_id = d.playgroup_id
+   and source_membership.user_id = $2
+  where d.id = $1
+    and (
+      d.owner_user_id = $2
+      or d.visibility = 'public'
+      or (d.visibility = 'playgroup' and source_membership.user_id is not null)
+    )
+),
+source_version as (
+  select v.id
+  from mtg.deck_versions v
+  join source s on s.id = v.deck_id
+  order by v.version_number desc
+  limit 1
+),
+source_cards as (
+  select dc.oracle_id
+  from mtg.deck_cards dc
+  join source_version sv on sv.id = dc.deck_version_id
+  where dc.match_status = 'matched'
+    and dc.oracle_id is not null
+  group by dc.oracle_id
+),
+visible_candidates as (
+  select distinct d.id, d.name, d.commander, d.color_identity,
+    d.claimed_bracket, d.archetype, d.tags, d.updated_at
+  from core.decks d
+  join source s on true
+  left join core.playgroup_memberships m
+    on m.playgroup_id = d.playgroup_id
+   and m.user_id = $2
+  where d.id <> s.id
+    and d.status = 'active'
+    and (
+      d.owner_user_id = $2
+      or d.visibility = 'public'
+      or (d.visibility = 'playgroup' and m.user_id is not null)
+    )
+),
+candidate_versions as (
+  select distinct on (v.deck_id) v.deck_id, v.id
+  from mtg.deck_versions v
+  join visible_candidates c on c.id = v.deck_id
+  order by v.deck_id, v.version_number desc
+),
+card_overlap as (
+  select cv.deck_id, count(distinct dc.oracle_id)::bigint as shared_cards_count
+  from candidate_versions cv
+  join mtg.deck_cards dc on dc.deck_version_id = cv.id
+  join source_cards sc on sc.oracle_id = dc.oracle_id
+  where dc.match_status = 'matched'
+    and dc.oracle_id is not null
+  group by cv.deck_id
+)
+select c.id, c.name, c.commander, c.color_identity, c.claimed_bracket,
+  c.archetype, c.tags, coalesce(o.shared_cards_count, 0) as shared_cards_count
+from visible_candidates c
+left join card_overlap o on o.deck_id = c.id
+order by coalesce(o.shared_cards_count, 0) desc, c.updated_at desc, c.name asc
+limit $3;"#,
+        inputs: "source deck_id, current user_id, and recommendation limit. SQL scopes the source and candidates to decks visible to that user.",
+        indexes: "decks primary key, decks_owner_user_id_idx, decks_playgroup_id_idx, deck_versions_deck_id_idx, deck_cards_version_idx, deck_cards_oracle_id_idx, playgroup membership indexes.",
+        plan_shape: "Read the latest imported source list, calculate shared matched-card overlap against visible active candidates, then Rust heuristics add commander, archetype, bracket, color, and tag similarity.",
+        output: "Visible deck recommendations with aggregate scores and public-safe reason labels. This is SQL-scoped heuristic matching, not semantic or AI-backed matching.",
+        sample_data: "Scrubbed fixture: Atraxa Counters recommends Atraxa Value because it shares imported cards, archetype, bracket, colors, and a tag.",
+    },
+    ObservatoryEntry {
         slug: "reminders",
         title: "Reminders and job claiming",
         badge: "ops SQL",
@@ -356,6 +432,7 @@ mod tests {
             "bracket-compatibility",
             "fuzzy-card-search",
             "game-changers-count",
+            "similar-deck-recommendations",
             "reminders",
             "matchup-history",
             "scryfall-jsonb",
