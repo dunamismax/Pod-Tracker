@@ -31,12 +31,13 @@ use pod_core::games::{GameResultType, normalize_game_tags};
 use pod_core::health::{HealthResponse, ReadinessFailure};
 use pod_core::playgroups::{PlaygroupRole, slugify};
 use pod_db::{
-    AddCollectionCardInput, AddWishlistCardInput, CardSearchFilters, CollectionRepository,
-    CreateCollectionInput, CreateDeckInput, CreateEventInput, CreateWishlistInput, DbError,
-    DeckRepository, DecklistImportInput, EventDeckDeclarationInput, EventDeckDeclarationWithDeck,
-    EventLocationInput, EventRepository, EventRsvpRecord, EventWithRole, GameRepository,
-    GameWithPlayers, IdentityRepository, LogGameInput, MetaRepository, PlaygroupRepository,
-    PodRepository, PodWithSeats, RsvpInput, ScryfallRepository, UpdateEventInput, UserRecord,
+    AddCollectionCardInput, AddWishlistCardInput, AuditRepository, CardSearchFilters,
+    CollectionRepository, CreateCollectionInput, CreateDeckInput, CreateEventInput,
+    CreateWishlistInput, DbError, DeckRepository, DecklistImportInput, EventDeckDeclarationInput,
+    EventDeckDeclarationWithDeck, EventLocationInput, EventRepository, EventRsvpRecord,
+    EventWithRole, GameRepository, GameWithPlayers, IdentityRepository, LogGameInput,
+    MetaRepository, PlaygroupRepository, PodRepository, PodWithSeats, RsvpInput,
+    ScryfallRepository, UpdateEventInput, UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -1880,7 +1881,7 @@ async fn event_detail(
         }
     };
 
-    let mut context = match event_page_context(&repo, &event, Some(user.id), false).await {
+    let mut context = match event_page_context(pool, &repo, &event, Some(user.id), false).await {
         Ok(context) => context,
         Err(err) => {
             tracing::error!(err = %err, "load event context");
@@ -2469,7 +2470,7 @@ async fn public_event_detail(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
-    let context = match public_event_page_context(&repo, event.id).await {
+    let context = match public_event_page_context(pool, &repo, event.id, "public_event").await {
         Ok(context) => context,
         Err(err) => {
             tracing::error!(err = %err, "load public event context");
@@ -2497,7 +2498,7 @@ async fn guest_rsvp_form(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
-    let context = match public_event_page_context(&repo, event.id).await {
+    let context = match public_event_page_context(pool, &repo, event.id, "guest_rsvp_form").await {
         Ok(context) => context,
         Err(err) => {
             tracing::error!(err = %err, "load guest rsvp context");
@@ -2535,13 +2536,14 @@ async fn save_guest_rsvp(
     };
     let guest_name = form.guest_name.trim();
     if guest_name.is_empty() {
-        let context = match public_event_page_context(&repo, event.id).await {
-            Ok(context) => context,
-            Err(err) => {
-                tracing::error!(err = %err, "reload guest rsvp context");
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-        };
+        let context =
+            match public_event_page_context(pool, &repo, event.id, "guest_rsvp_error").await {
+                Ok(context) => context,
+                Err(err) => {
+                    tracing::error!(err = %err, "reload guest rsvp context");
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                }
+            };
         let csrf = ensure_csrf_cookie(&headers, &state.config);
         return html_with_cookies(
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -3067,6 +3069,7 @@ fn is_unique_violation(err: &DbError) -> bool {
 }
 
 async fn event_page_context(
+    pool: &PgPool,
     repo: &EventRepository<'_>,
     event: &EventWithRole,
     user_id: Option<uuid::Uuid>,
@@ -3094,6 +3097,24 @@ async fn event_page_context(
         viewer_rsvp,
         guest_scope,
     );
+    if show_address
+        && location
+            .as_ref()
+            .is_some_and(|location| location.address_line1.is_some())
+    {
+        AuditRepository::new(pool)
+            .record_address_reveal(
+                event.id,
+                user_id,
+                if guest_scope {
+                    "guest"
+                } else {
+                    "authenticated"
+                },
+                "event_detail",
+            )
+            .await?;
+    }
 
     Ok(EventPageContext {
         location,
@@ -3109,8 +3130,10 @@ async fn event_page_context(
 }
 
 async fn public_event_page_context(
+    pool: &PgPool,
     repo: &EventRepository<'_>,
     event_id: uuid::Uuid,
+    source: &str,
 ) -> Result<EventPageContext, DbError> {
     let location = repo.get_location_for_event(event_id).await?;
     let hosts = repo.list_hosts(event_id).await?;
@@ -3119,6 +3142,15 @@ async fn public_event_page_context(
         .filter_map(|host| AddressVisibility::try_from(host.address_visibility.as_str()).ok())
         .collect::<Vec<_>>();
     let show_address = can_show_event_address(&address_visibilities, false, None, None, true);
+    if show_address
+        && location
+            .as_ref()
+            .is_some_and(|location| location.address_line1.is_some())
+    {
+        AuditRepository::new(pool)
+            .record_address_reveal(event_id, None, "public_or_guest", source)
+            .await?;
+    }
 
     Ok(EventPageContext {
         location,

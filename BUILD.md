@@ -488,7 +488,7 @@ state where documented verification passes on a clean checkout.
 
 - [x] Add rate limits for signup, login, RSVP, invites, deck import,
       search, and admin actions.
-- [ ] Add audit events for auth, membership, invite, event, RSVP, pod,
+- [x] Add audit events for auth, membership, invite, event, RSVP, pod,
       address reveal, and result changes.
 - [x] Add structured error pages.
 - [x] Add log redaction checks.
@@ -753,3 +753,9 @@ Trust current primary docs over this file.
   pages for empty client/server error responses; stable request span route
   family labels that avoid raw tokens; and log redaction checks for
   session, CSRF, invite-token, email, and PostgreSQL URL password values.
+- 2026-05-19 - Added Phase 15 audit events: append-only sanitized
+  `audit.audit_events` history for auth, membership, invite, event, RSVP,
+  pod, and result changes, plus explicit address-reveal audit writes when
+  event pages disclose host addresses; added PostgreSQL-backed tests that
+  prove sensitive emails, tokens, addresses, and notes stay out of audit
+  metadata.
