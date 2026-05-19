@@ -462,11 +462,11 @@ state where documented verification passes on a clean checkout.
 ### Phase 13 - SQL Observatory
 
 - [x] Build `/observatory`.
-- [ ] Show real SQL for pod generation, avoid-repeat pairing, bracket
+- [x] Show real SQL for pod generation, avoid-repeat pairing, bracket
       compatibility, fuzzy card search, Game Changers count, reminders,
       matchup history, and Scryfall JSONB exploration.
-- [ ] Explain inputs, indexes, query plan shape, and output.
-- [ ] Add safe sample data or scrubbed fixtures.
+- [x] Explain inputs, indexes, query plan shape, and output.
+- [x] Add safe sample data or scrubbed fixtures.
 - [x] Never expose private addresses, emails, phone numbers, invite
       tokens, or production logs.
 
@@ -740,3 +740,10 @@ Trust current primary docs over this file.
   local Scryfall matching, visibility-scoped wishlist reads, collection
   coverage calculations for wanted cards, and focused PostgreSQL-backed
   repository and route tests.
+- 2026-05-19 - Completed Rust Phase 13 SQL Observatory coverage:
+  centralized safe Observatory entries for pod generation, avoid-repeat
+  pairing, bracket compatibility, fuzzy card search, Game Changers count,
+  reminders and job claiming, matchup history, and Scryfall JSONB
+  exploration while preserving the meta dashboard materialized-view
+  entry; added input/index/plan/output notes, scrubbed sample context,
+  safety tests, and SSR route assertions.

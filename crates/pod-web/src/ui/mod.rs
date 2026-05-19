@@ -2014,80 +2014,7 @@ pub fn render_placeholder(title: &'static str) -> String {
 }
 
 pub fn render_observatory() -> String {
-    let pod_sql = r#"with confirmed as (
-  select r.id as rsvp_id, r.user_id, r.guest_name, ed.deck_id
-  from core.event_rsvps r
-  left join lateral (
-    select deck_id
-    from core.event_deck_declarations
-    where event_id = r.event_id and user_id = r.user_id
-    order by preference asc, created_at asc
-    limit 1
-  ) ed on true
-  where r.event_id = $1 and r.status = 'yes'
-)
-select rsvp_id, user_id, guest_name, deck_id
-from confirmed
-order by rsvp_id;"#;
-    let scoring_sql = r#"select count(*)::int
-from core.pod_seats a
-join core.pod_seats b on b.pod_id = a.pod_id and b.user_id = $3
-join core.pods prior_pods on prior_pods.id = a.pod_id
-join core.events prior_events on prior_events.id = prior_pods.event_id
-join core.events current_events on current_events.id = $1
-where a.user_id = $2
-  and prior_pods.event_id <> $1
-  and prior_pods.state in ('locked', 'active', 'completed')
-  and prior_events.playgroup_id = current_events.playgroup_id;"#;
-    let card_search_sql = r#"select scryfall_id, name, type_line, commander_legal, mana_value, usd
-from search.card_documents
-where (
-    document @@ websearch_to_tsquery('english', $1)
-    or name % $1
-    or normalized_name % regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
-  )
-  and ($2::text[] is null or color_identity <@ $2)
-  and ($3::boolean is null or commander_legal = $3)
-  and ($4::double precision is null or mana_value <= $4)
-  and ($5::text is null or type_line ilike '%' || $5 || '%')
-order by
-  ts_rank_cd(document, websearch_to_tsquery('english', $1)) desc,
-  similarity(name, $1) desc,
-  name asc
-limit 50;"#;
-    let jsonb_sql = r#"select p.scryfall_id, p.raw_payload #>> '{prices,usd}' as usd,
-       p.raw_payload #>> '{legalities,commander}' as commander_status
-from mtg.card_printings p
-where p.raw_payload @> '{"layout":"normal"}'::jsonb
-  and p.raw_payload ? 'prices'
-limit 25;"#;
-    let game_changer_sql = r#"select v.deck_id,
-       s.deck_version_id,
-       s.game_changers_count,
-       s.commander_names,
-       s.color_identity,
-       s.warning_codes
-from mtg.deck_bracket_snapshots s
-join mtg.deck_versions v on v.id = s.deck_version_id
-where v.deck_id = $1
-order by v.version_number desc
-limit 1;"#;
-    let meta_sql = r#"refresh materialized view meta.attendance_summary;
-refresh materialized view meta.deck_win_rates;
-refresh materialized view meta.player_win_rates;
-refresh materialized view meta.commander_popularity;
-refresh materialized view meta.bracket_distribution;
-refresh materialized view meta.color_identity_distribution;
-refresh materialized view meta.archetype_distribution;
-refresh materialized view meta.matchup_summary;
-refresh materialized view meta.stale_decks;
-
-select a.playgroup_name, a.events_total, a.confirmed_rsvps,
-       c.commander, c.games_seen, s.deck_name, s.stale_reason
-from meta.attendance_summary a
-left join meta.commander_popularity c on c.playgroup_id = a.playgroup_id
-left join meta.stale_decks s on s.playgroup_id = a.playgroup_id
-where a.playgroup_id = $1;"#;
+    let entries = pod_db::observatory_entries();
 
     view! {
         <AppShell title="SQL Observatory" account_label="Account" account_href="/settings">
@@ -2096,95 +2023,31 @@ where a.playgroup_id = $1;"#;
                     <p class="eyebrow">"PostgreSQL"</p>
                     <h1>"SQL Observatory"</h1>
                     <p class="body-copy">
-                        "Safe query shapes for the Rust pod generator. Inputs are event-scoped IDs; output avoids addresses, emails, invite tokens, and private notes."
+                        "Safe query shapes from the Rust repositories. Inputs are scoped IDs or public card filters; outputs avoid host addresses, contact fields, invite tokens, and private notes."
                     </p>
                 </section>
-                <section class="split-layout wide-left section-gap">
-                    <article class="panel">
-                        <div class="section-heading">
-                            <h2>"Confirmed attendees"</h2>
-                            <span class="badge">"candidate SQL"</span>
-                        </div>
-                        <pre class="sql-block"><code>{pod_sql}</code></pre>
-                    </article>
-                    <article class="panel">
-                        <h2>"Plan Shape"</h2>
-                        <dl class="compact-list">
-                            <div><dt>"Inputs"</dt><dd>"event_id, user pair, deck pair"</dd></div>
-                            <div><dt>"Indexes"</dt><dd>"event RSVPs, pod seats, pods by event"</dd></div>
-                            <div><dt>"Output"</dt><dd>"candidate seats and repeat penalties"</dd></div>
-                        </dl>
-                    </article>
-                </section>
-                <section class="section-gap">
-                    <article class="panel">
-                        <div class="section-heading">
-                            <h2>"Repeat pair penalty"</h2>
-                            <span class="badge">"scoring SQL"</span>
-                        </div>
-                        <pre class="sql-block"><code>{scoring_sql}</code></pre>
-                    </article>
-                </section>
-                <section class="split-layout wide-left section-gap">
-                    <article class="panel">
-                        <div class="section-heading">
-                            <h2>"Card search"</h2>
-                            <span class="badge">"full-text + trigram"</span>
-                        </div>
-                        <pre class="sql-block"><code>{card_search_sql}</code></pre>
-                    </article>
-                    <article class="panel">
-                        <h2>"Plan Shape"</h2>
-                        <dl class="compact-list">
-                            <div><dt>"Inputs"</dt><dd>"query, color identity, commander legality, mana value"</dd></div>
-                            <div><dt>"Indexes"</dt><dd>"GIN tsvector, trigram name, trigram normalized name"</dd></div>
-                            <div><dt>"Output"</dt><dd>"local card rows with rank, price, and legality filters"</dd></div>
-                        </dl>
-                    </article>
-                </section>
-                <section class="section-gap">
-                    <article class="panel">
-                        <div class="section-heading">
-                            <h2>"Scryfall JSONB"</h2>
-                            <span class="badge">"raw payload"</span>
-                        </div>
-                        <pre class="sql-block"><code>{jsonb_sql}</code></pre>
-                    </article>
-                </section>
-                <section class="split-layout wide-left section-gap">
-                    <article class="panel">
-                        <div class="section-heading">
-                            <h2>"Game Changers count"</h2>
-                            <span class="badge">"deck snapshot"</span>
-                        </div>
-                        <pre class="sql-block"><code>{game_changer_sql}</code></pre>
-                    </article>
-                    <article class="panel">
-                        <h2>"Plan Shape"</h2>
-                        <dl class="compact-list">
-                            <div><dt>"Inputs"</dt><dd>"deck_id"</dd></div>
-                            <div><dt>"Indexes"</dt><dd>"deck versions by deck, snapshot version key"</dd></div>
-                            <div><dt>"Output"</dt><dd>"latest imported bracket snapshot and warning codes"</dd></div>
-                        </dl>
-                    </article>
-                </section>
-                <section class="split-layout wide-left section-gap">
-                    <article class="panel">
-                        <div class="section-heading">
-                            <h2>"Meta dashboard"</h2>
-                            <span class="badge">"materialized views"</span>
-                        </div>
-                        <pre class="sql-block"><code>{meta_sql}</code></pre>
-                    </article>
-                    <article class="panel">
-                        <h2>"Plan Shape"</h2>
-                        <dl class="compact-list">
-                            <div><dt>"Inputs"</dt><dd>"playgroup_id from membership scope"</dd></div>
-                            <div><dt>"Indexes"</dt><dd>"materialized-view indexes by playgroup and metric key"</dd></div>
-                            <div><dt>"Output"</dt><dd>"attendance, variety, freshness, stale-deck, and optional win-rate metrics"</dd></div>
-                        </dl>
-                    </article>
-                </section>
+                {entries.iter().copied().map(|entry| view! {
+                    <section id=entry.slug class="split-layout wide-left section-gap">
+                        <article class="panel">
+                            <div class="section-heading">
+                                <h2>{entry.title}</h2>
+                                <span class="badge">{entry.badge}</span>
+                            </div>
+                            <pre class="sql-block"><code>{entry.sql}</code></pre>
+                        </article>
+                        <article class="panel">
+                            <h2>"Plan Shape"</h2>
+                            <dl class="compact-list">
+                                <div><dt>"Source"</dt><dd><code>{entry.source}</code></dd></div>
+                                <div><dt>"Inputs"</dt><dd>{entry.inputs}</dd></div>
+                                <div><dt>"Indexes"</dt><dd>{entry.indexes}</dd></div>
+                                <div><dt>"Plan"</dt><dd>{entry.plan_shape}</dd></div>
+                                <div><dt>"Output"</dt><dd>{entry.output}</dd></div>
+                                <div><dt>"Sample"</dt><dd>{entry.sample_data}</dd></div>
+                            </dl>
+                        </article>
+                    </section>
+                }).collect_view()}
             </main>
         </AppShell>
     }

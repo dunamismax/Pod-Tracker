@@ -3646,6 +3646,11 @@ mod tests {
         assert!(body.contains("core.pod_seats"));
         assert!(body.contains("search.card_documents"));
         assert!(body.contains("mtg.card_printings"));
+        assert!(body.contains("Bracket compatibility"));
+        assert!(body.contains("Reminders and job claiming"));
+        assert!(body.contains("Matchup history"));
+        assert!(body.contains("Meta dashboard materialized views"));
+        assert!(body.contains("Scrubbed fixture"));
         assert!(!body.contains("address_line1"));
         assert!(!body.contains("invite_token"));
         assert!(!body.contains("to_address"));
