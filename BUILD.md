@@ -505,7 +505,7 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 16 - Advanced Intelligence
 
-- [ ] Improve pod scoring with matchup freshness and deck variety.
+- [x] Improve pod scoring with matchup freshness and deck variety.
 - [ ] Add similar deck recommendations.
 - [ ] Add collection-aware deck suggestions.
 - [ ] Add optional pgvector semantic card/deck search.
@@ -765,3 +765,10 @@ Trust current primary docs over this file.
   reads to public-safe tokens and address-scoped location fields; added
   PostgreSQL-backed scoped-query tests for tenant, guest, public token,
   and host-address boundaries.
+- 2026-05-19 - Completed the first Rust Phase 16 pod intelligence slice:
+  pod generation now uses recency-weighted player/deck matchup freshness
+  and deck variety scoring, applies a bounded score-improving optimizer
+  over the initial round-robin pods, records the new scoring inputs in
+  `scoring_details`, updates SQL Observatory coverage, and includes
+  PostgreSQL-backed tests proving recent repeated pods are split when a
+  better scored arrangement exists.

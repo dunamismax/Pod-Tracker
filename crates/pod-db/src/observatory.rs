@@ -28,6 +28,9 @@ const ENTRIES: &[ObservatoryEntry] = &[
   dec.id as deck_declaration_id,
   dec.deck_id,
   d.claimed_bracket,
+  d.commander,
+  d.color_identity,
+  d.archetype,
   r.arrival_time,
   r.leaving_time
 from core.event_rsvps r
@@ -52,42 +55,66 @@ order by coalesce(r.arrival_time, r.created_at), r.created_at;"#,
         inputs: "event_id for the event being seated; target pod size is applied in Rust after this candidate set.",
         indexes: "event_rsvps_event_id_idx, event_deck_declarations_event_id_idx, pod_seats_event_rsvp_key, decks primary key.",
         plan_shape: "Index-scope RSVPs by event, lateral-pick each player's preferred deck declaration, anti-join already-seated RSVPs, then sort by availability.",
-        output: "Candidate attendee rows with optional user, guest name, deck declaration, deck id, bracket, arrival time, and leaving time.",
+        output: "Candidate attendee rows with optional user, guest name, deck declaration, deck id, bracket, commander, color identity, archetype, arrival time, and leaving time.",
         sample_data: "Scrubbed fixture: event_id=00000000-0000-7000-8000-000000000013; players Ada, Ben, Cy, Dee; guest label Guest A; no addresses or contact fields.",
     },
     ObservatoryEntry {
         slug: "avoid-repeat-pairing",
-        title: "Avoid-repeat pairing",
+        title: "Avoid-repeat and freshness pairing",
         badge: "scoring SQL",
         source: "PodRepository::repeat_player_pair_penalty and repeat_deck_matchup_penalty",
         sql: r#"-- prior player pairings in the same playgroup
-select count(*)::int
-from core.pod_seats a
-join core.pod_seats b on b.pod_id = a.pod_id and b.user_id = $3
-join core.pods prior_pods on prior_pods.id = a.pod_id
-join core.events prior_events on prior_events.id = prior_pods.event_id
-join core.events current_events on current_events.id = $1
-where a.user_id = $2
-  and prior_pods.event_id <> $1
-  and prior_pods.state in ('locked', 'active', 'completed')
-  and prior_events.playgroup_id = current_events.playgroup_id;
+with current_event as (
+  select playgroup_id, start_time
+  from core.events
+  where id = $1
+),
+prior_pairings as (
+  select prior_events.start_time
+  from core.pod_seats a
+  join core.pod_seats b on b.pod_id = a.pod_id and b.user_id = $3
+  join core.pods prior_pods on prior_pods.id = a.pod_id
+  join core.events prior_events on prior_events.id = prior_pods.event_id
+  join current_event current_events on true
+  where a.user_id = $2
+    and prior_pods.event_id <> $1
+    and prior_pods.state in ('locked', 'active', 'completed')
+    and prior_events.playgroup_id = current_events.playgroup_id
+    and prior_events.start_time < current_events.start_time
+)
+select count(*)::int as repeat_count,
+  extract(day from ((select start_time from current_event) - max(start_time)))::int
+    as days_since_last
+from prior_pairings;
 
 -- prior deck matchups in the same playgroup
-select count(*)::int
-from core.pod_seats a
-join core.pod_seats b on b.pod_id = a.pod_id and b.deck_id = $3
-join core.pods prior_pods on prior_pods.id = a.pod_id
-join core.events prior_events on prior_events.id = prior_pods.event_id
-join core.events current_events on current_events.id = $1
-where a.deck_id = $2
-  and prior_pods.event_id <> $1
-  and prior_pods.state in ('locked', 'active', 'completed')
-  and prior_events.playgroup_id = current_events.playgroup_id;"#,
+with current_event as (
+  select playgroup_id, start_time
+  from core.events
+  where id = $1
+),
+prior_matchups as (
+  select prior_events.start_time
+  from core.pod_seats a
+  join core.pod_seats b on b.pod_id = a.pod_id and b.deck_id = $3
+  join core.pods prior_pods on prior_pods.id = a.pod_id
+  join core.events prior_events on prior_events.id = prior_pods.event_id
+  join current_event current_events on true
+  where a.deck_id = $2
+    and prior_pods.event_id <> $1
+    and prior_pods.state in ('locked', 'active', 'completed')
+    and prior_events.playgroup_id = current_events.playgroup_id
+    and prior_events.start_time < current_events.start_time
+)
+select count(*)::int as repeat_count,
+  extract(day from ((select start_time from current_event) - max(start_time)))::int
+    as days_since_last
+from prior_matchups;"#,
         inputs: "current event_id plus each candidate user pair or deck pair being scored.",
         indexes: "pod_seats_user_id_idx, pod_seats_deck_id_idx, pods_event_id_idx, pods_state_idx, events primary key.",
-        plan_shape: "Probe prior pod seats by user or deck, join to historical pods and events, and constrain history to the current playgroup.",
-        output: "Counts converted into repeat penalties: player repeats cost 4 points each; deck repeats cost 3 points each.",
-        sample_data: "Scrubbed fixture: Ada and Ben played together once last month; Atraxa and Yuriko faced each other twice; names are demo labels only.",
+        plan_shape: "Probe prior pod seats by user or deck, join to historical pods and events, constrain history to the current playgroup, and keep the latest prior event date for recency weighting.",
+        output: "Repeat counts plus days since the latest matchup. Counts produce repeat penalties; recent pairs add freshness penalties before the pod optimizer accepts a swap.",
+        sample_data: "Scrubbed fixture: Ada and Ben played together 10 days ago; Atraxa and Yuriko faced each other twice; names are demo labels only.",
     },
     ObservatoryEntry {
         slug: "bracket-compatibility",

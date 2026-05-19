@@ -70,9 +70,47 @@ pub fn guest_placement_score(guest_count: usize, pod_size: usize) -> i32 {
     }
 }
 
+pub fn deck_variety_score(
+    declared_decks: usize,
+    distinct_commanders: usize,
+    distinct_archetypes: usize,
+    distinct_color_identities: usize,
+) -> i32 {
+    if declared_decks < 2 {
+        return 0;
+    }
+
+    let commander_score = if distinct_commanders == declared_decks {
+        4
+    } else {
+        0
+    };
+    let archetype_score = distinct_archetypes.saturating_sub(1).min(4) as i32 * 2;
+    let color_score = distinct_color_identities.saturating_sub(1).min(2) as i32 * 2;
+
+    commander_score + archetype_score + color_score
+}
+
+pub fn matchup_freshness_penalty(days_since_last_matchup: Option<i64>, base_penalty: i32) -> i32 {
+    let Some(days_since_last_matchup) = days_since_last_matchup else {
+        return 0;
+    };
+
+    if days_since_last_matchup <= 30 {
+        base_penalty * 2
+    } else if days_since_last_matchup <= 90 {
+        base_penalty
+    } else {
+        0
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{PodState, bracket_compatibility_score, guest_placement_score, pod_size_fit_score};
+    use super::{
+        PodState, bracket_compatibility_score, deck_variety_score, guest_placement_score,
+        matchup_freshness_penalty, pod_size_fit_score,
+    };
 
     #[test]
     fn validates_pod_states() {
@@ -89,5 +127,16 @@ mod tests {
         assert_eq!(bracket_compatibility_score(&[1, 4]), 4);
         assert_eq!(guest_placement_score(1, 4), 8);
         assert_eq!(guest_placement_score(4, 4), 10);
+    }
+
+    #[test]
+    fn scores_deck_variety_and_matchup_freshness() {
+        assert_eq!(deck_variety_score(1, 1, 1, 1), 0);
+        assert_eq!(deck_variety_score(4, 4, 4, 3), 14);
+        assert_eq!(deck_variety_score(4, 2, 1, 1), 0);
+        assert_eq!(matchup_freshness_penalty(None, 4), 0);
+        assert_eq!(matchup_freshness_penalty(Some(14), 4), 8);
+        assert_eq!(matchup_freshness_penalty(Some(75), 4), 4);
+        assert_eq!(matchup_freshness_penalty(Some(120), 4), 0);
     }
 }
