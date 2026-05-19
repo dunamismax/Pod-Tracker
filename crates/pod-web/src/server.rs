@@ -1,7 +1,11 @@
-use axum::body::Body;
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration as StdDuration, Instant};
+
+use axum::body::{Body, to_bytes};
 use axum::extract::{Query, State};
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE, COOKIE, SET_COOKIE, USER_AGENT};
-use axum::http::{HeaderMap, HeaderName, HeaderValue, Request, StatusCode};
+use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
@@ -51,16 +55,22 @@ const SESSION_DURATION: Duration = Duration::days(30);
 pub struct AppState {
     pub config: AppConfig,
     pub db: Option<PgPool>,
+    rate_limiter: Arc<RateLimiter>,
 }
 
 impl AppState {
     pub fn new(config: AppConfig, db: Option<PgPool>) -> Self {
-        Self { config, db }
+        Self {
+            config,
+            db,
+            rate_limiter: Arc::new(RateLimiter::default()),
+        }
     }
 }
 
 pub fn build_router(state: AppState) -> Router {
     let request_id_header = HeaderName::from_static("x-request-id");
+    let rate_limit_state = state.clone();
 
     Router::new()
         .route("/", get(home))
@@ -117,13 +127,300 @@ pub fn build_router(state: AppState) -> Router {
         .route("/observatory", get(observatory))
         .route("/healthz", get(healthz))
         .route("/readyz", get(readyz))
+        .fallback(not_found)
         .nest_service("/static", ServeDir::new(state.config.static_dir.clone()))
         .with_state(state)
         .layer(CompressionLayer::new())
         .layer(PropagateRequestIdLayer::new(request_id_header.clone()))
         .layer(SetRequestIdLayer::new(request_id_header, MakeRequestUuid))
-        .layer(TraceLayer::new_for_http())
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
+                tracing::info_span!(
+                    "http.request",
+                    http.method = %request.method(),
+                    http.route_family = route_family_label(request.method(), request.uri().path())
+                )
+            }),
+        )
+        .layer(middleware::from_fn(structured_error_pages))
+        .layer(middleware::from_fn_with_state(
+            rate_limit_state,
+            enforce_rate_limit,
+        ))
         .layer(middleware::from_fn(add_security_headers))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum RateLimitFamily {
+    Signup,
+    Login,
+    Rsvp,
+    Invite,
+    DeckImport,
+    Search,
+    Admin,
+}
+
+impl RateLimitFamily {
+    fn policy(self) -> RateLimitPolicy {
+        match self {
+            Self::Signup => RateLimitPolicy {
+                max_requests: 5,
+                window: StdDuration::from_secs(15 * 60),
+            },
+            Self::Login => RateLimitPolicy {
+                max_requests: 10,
+                window: StdDuration::from_secs(15 * 60),
+            },
+            Self::Rsvp => RateLimitPolicy {
+                max_requests: 20,
+                window: StdDuration::from_secs(10 * 60),
+            },
+            Self::Invite => RateLimitPolicy {
+                max_requests: 60,
+                window: StdDuration::from_secs(10 * 60),
+            },
+            Self::DeckImport => RateLimitPolicy {
+                max_requests: 8,
+                window: StdDuration::from_secs(15 * 60),
+            },
+            Self::Search => RateLimitPolicy {
+                max_requests: 120,
+                window: StdDuration::from_secs(60),
+            },
+            Self::Admin => RateLimitPolicy {
+                max_requests: 30,
+                window: StdDuration::from_secs(60),
+            },
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Signup => "signup",
+            Self::Login => "login",
+            Self::Rsvp => "rsvp",
+            Self::Invite => "invite",
+            Self::DeckImport => "deck_import",
+            Self::Search => "search",
+            Self::Admin => "admin",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RateLimitPolicy {
+    max_requests: usize,
+    window: StdDuration,
+}
+
+#[derive(Debug, Default)]
+struct RateLimiter {
+    attempts: Mutex<HashMap<(RateLimitFamily, String), VecDeque<Instant>>>,
+}
+
+impl RateLimiter {
+    fn check(&self, family: RateLimitFamily, key: String) -> bool {
+        let policy = family.policy();
+        let now = Instant::now();
+        let mut attempts = self.attempts.lock().expect("rate limiter lock");
+        let bucket = attempts.entry((family, key)).or_default();
+
+        while bucket
+            .front()
+            .is_some_and(|attempt| now.duration_since(*attempt) >= policy.window)
+        {
+            bucket.pop_front();
+        }
+
+        if bucket.len() >= policy.max_requests {
+            return false;
+        }
+
+        bucket.push_back(now);
+        true
+    }
+}
+
+async fn enforce_rate_limit(
+    State(state): State<AppState>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    if let Some(family) = rate_limit_family(request.method(), request.uri().path()) {
+        let key = client_rate_key(request.headers());
+        if !state.rate_limiter.check(family, key.clone()) {
+            tracing::warn!(
+                rate_limit.family = family.as_str(),
+                rate_limit.key = %key,
+                "rate limit exceeded"
+            );
+            return error_response(
+                StatusCode::TOO_MANY_REQUESTS,
+                "Too many requests",
+                "This action is temporarily limited. Wait a little before trying again.",
+            );
+        }
+    }
+
+    next.run(request).await
+}
+
+async fn structured_error_pages(request: Request<Body>, next: Next) -> Response {
+    let response = next.run(request).await;
+    let status = response.status();
+    if !status.is_client_error() && !status.is_server_error() {
+        return response;
+    }
+    if response.headers().contains_key(CONTENT_TYPE) {
+        return response;
+    }
+
+    let (mut parts, body) = response.into_parts();
+    let bytes = match to_bytes(body, 4096).await {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            tracing::warn!(err = %err, "read error response body");
+            Default::default()
+        }
+    };
+    if !bytes.is_empty() {
+        return Response::from_parts(parts, Body::from(bytes));
+    }
+
+    let (title, message) = error_copy(status);
+    parts.headers.insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    Response::from_parts(
+        parts,
+        Body::from(ui::render_error_page(status.as_u16(), title, message)),
+    )
+}
+
+async fn not_found() -> Response {
+    error_response(
+        StatusCode::NOT_FOUND,
+        "Page not found",
+        "The requested page is not available.",
+    )
+}
+
+fn rate_limit_family(method: &Method, path: &str) -> Option<RateLimitFamily> {
+    match (method, path) {
+        (&Method::POST, "/signup") => Some(RateLimitFamily::Signup),
+        (&Method::POST, "/login") => Some(RateLimitFamily::Login),
+        (&Method::GET, "/cards") | (&Method::GET, "/decks") => Some(RateLimitFamily::Search),
+        _ if method == Method::POST && path.starts_with("/rsvp/") => Some(RateLimitFamily::Rsvp),
+        _ if method == Method::GET && (path.starts_with("/rsvp/") || path.starts_with("/e/")) => {
+            Some(RateLimitFamily::Invite)
+        }
+        _ if method == Method::POST && path.starts_with("/decks/") && path.ends_with("/import") => {
+            Some(RateLimitFamily::DeckImport)
+        }
+        _ if method == Method::POST && is_admin_action_path(path) => Some(RateLimitFamily::Admin),
+        _ => None,
+    }
+}
+
+fn route_family_label(method: &Method, path: &str) -> &'static str {
+    rate_limit_family(method, path)
+        .map(RateLimitFamily::as_str)
+        .unwrap_or_else(|| {
+            if path == "/" {
+                "home"
+            } else if path.starts_with("/static/") {
+                "static"
+            } else if path == "/healthz" || path == "/readyz" || path == "/status" {
+                "ops"
+            } else if path.starts_with("/events/") {
+                "events"
+            } else if path.starts_with("/playgroups") {
+                "playgroups"
+            } else if path.starts_with("/decks/") {
+                "decks"
+            } else if path.starts_with("/collections") {
+                "collections"
+            } else if path.starts_with("/wishlists") {
+                "wishlists"
+            } else {
+                "public"
+            }
+        })
+}
+
+fn is_admin_action_path(path: &str) -> bool {
+    if path == "/playgroups" {
+        return true;
+    }
+
+    let segments = path
+        .trim_matches('/')
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>();
+
+    matches!(
+        segments.as_slice(),
+        ["playgroups", _, "events"]
+            | ["events", _, "edit"]
+            | ["events", _, "pods", "generate"]
+            | ["events", _, "pods", "publish"]
+            | ["events", _, "games"]
+            | ["pods", _, "lock"]
+            | ["pods", _, "seats", _, "move"]
+    )
+}
+
+fn client_rate_key(headers: &HeaderMap) -> String {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(',').next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|value| value.to_str().ok())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        })
+        .unwrap_or("local")
+        .to_owned()
+}
+
+fn error_copy(status: StatusCode) -> (&'static str, &'static str) {
+    match status {
+        StatusCode::BAD_REQUEST => ("Bad request", "The submitted request could not be used."),
+        StatusCode::FORBIDDEN => ("Forbidden", "This account cannot perform that action."),
+        StatusCode::NOT_FOUND => ("Page not found", "The requested page is not available."),
+        StatusCode::TOO_MANY_REQUESTS => (
+            "Too many requests",
+            "This action is temporarily limited. Wait a little before trying again.",
+        ),
+        StatusCode::SERVICE_UNAVAILABLE => (
+            "Service unavailable",
+            "A required local dependency is not available right now.",
+        ),
+        _ if status.is_server_error() => (
+            "Server error",
+            "The application could not complete this request.",
+        ),
+        _ => (
+            "Request failed",
+            "The application could not complete this request.",
+        ),
+    }
+}
+
+fn error_response(status: StatusCode, title: &'static str, message: &'static str) -> Response {
+    (
+        status,
+        Html(ui::render_error_page(status.as_u16(), title, message)),
+    )
+        .into_response()
 }
 
 async fn add_security_headers(request: Request<Body>, next: Next) -> Response {
@@ -3396,7 +3693,7 @@ mod tests {
     use serde_json::json;
     use tower::ServiceExt;
 
-    use super::{AppState, build_router, session_cookie};
+    use super::{AppState, RateLimitFamily, build_router, rate_limit_family, session_cookie};
 
     fn test_state() -> AppState {
         AppState::new(
@@ -3804,6 +4101,111 @@ mod tests {
         assert_eq!(
             headers.get("permissions-policy").expect("header"),
             "camera=(), microphone=(), geolocation=()"
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_routes_render_structured_error_pages() {
+        let app = build_router(test_state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/missing-page")
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("response");
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.headers().get(CONTENT_TYPE).expect("content type"),
+            "text/html; charset=utf-8"
+        );
+        let body = body_string(response).await;
+        assert!(body.contains("Page not found"));
+        assert!(body.contains("The requested page is not available."));
+    }
+
+    #[tokio::test]
+    async fn rate_limits_login_attempts_by_route_family() {
+        let app = build_router(test_state());
+
+        for attempt in 0..10 {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/login")
+                        .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                        .header("x-forwarded-for", "198.51.100.10")
+                        .body(Body::from(format!(
+                            "email=player{attempt}%40example.test&password=nope&csrf_token="
+                        )))
+                        .expect("request"),
+                )
+                .await
+                .expect("login attempt");
+            assert_ne!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        }
+
+        let limited = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/login")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("x-forwarded-for", "198.51.100.10")
+                    .body(Body::from(
+                        "email=blocked%40example.test&password=nope&csrf_token=",
+                    ))
+                    .expect("request"),
+            )
+            .await
+            .expect("limited login");
+
+        assert_eq!(limited.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body = body_string(limited).await;
+        assert!(body.contains("Too many requests"));
+    }
+
+    #[test]
+    fn rate_limit_classification_covers_hardening_route_families_without_tokens() {
+        assert_eq!(
+            rate_limit_family(&http::Method::POST, "/signup"),
+            Some(RateLimitFamily::Signup)
+        );
+        assert_eq!(
+            rate_limit_family(&http::Method::POST, "/login"),
+            Some(RateLimitFamily::Login)
+        );
+        assert_eq!(
+            rate_limit_family(&http::Method::POST, "/rsvp/private-token"),
+            Some(RateLimitFamily::Rsvp)
+        );
+        assert_eq!(
+            rate_limit_family(&http::Method::GET, "/e/private-token"),
+            Some(RateLimitFamily::Invite)
+        );
+        assert_eq!(
+            rate_limit_family(
+                &http::Method::POST,
+                "/decks/00000000-0000-7000-8000-000000000001/import"
+            ),
+            Some(RateLimitFamily::DeckImport)
+        );
+        assert_eq!(
+            rate_limit_family(&http::Method::GET, "/cards"),
+            Some(RateLimitFamily::Search)
+        );
+        assert_eq!(
+            rate_limit_family(
+                &http::Method::POST,
+                "/events/00000000-0000-7000-8000-000000000001/pods/generate"
+            ),
+            Some(RateLimitFamily::Admin)
         );
     }
 

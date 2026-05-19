@@ -8,7 +8,7 @@ verification.
 Treat unchecked boxes as plan. Move stable material into `docs/`,
 `README.md`, or runbooks as the implementation matures.
 
-Last reviewed: 2026-05-18.
+Last reviewed: 2026-05-19.
 
 ---
 
@@ -486,12 +486,12 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 15 - Hardening
 
-- [ ] Add rate limits for signup, login, RSVP, invites, deck import,
+- [x] Add rate limits for signup, login, RSVP, invites, deck import,
       search, and admin actions.
 - [ ] Add audit events for auth, membership, invite, event, RSVP, pod,
       address reveal, and result changes.
-- [ ] Add structured error pages.
-- [ ] Add log redaction checks.
+- [x] Add structured error pages.
+- [x] Add log redaction checks.
 - [ ] Add stable request, job, and database spans before considering
       OpenTelemetry export.
 - [ ] Revisit config loading with `figment` or `config` if deployment,
@@ -747,3 +747,9 @@ Trust current primary docs over this file.
   exploration while preserving the meta dashboard materialized-view
   entry; added input/index/plan/output notes, scrubbed sample context,
   safety tests, and SSR route assertions.
+- 2026-05-19 - Added the first Rust Phase 15 hardening slice: route-family
+  rate limits for signup, login, RSVP, invite-token reads, decklist
+  import, card/deck search, and admin actions; structured HTML error
+  pages for empty client/server error responses; stable request span route
+  family labels that avoid raw tokens; and log redaction checks for
+  session, CSRF, invite-token, email, and PostgreSQL URL password values.

@@ -136,6 +136,29 @@ pub fn render_status(database_configured: bool, smtp_configured: bool) -> String
     .to_html()
 }
 
+pub fn render_error_page(status_code: u16, title: &str, message: &str) -> String {
+    let status_code = status_code.to_string();
+    let title = title.to_owned();
+    let message = message.to_owned();
+
+    view! {
+        <AppShell title="Pod Tracker Error">
+            <main id="main" class="shell">
+                <section class="page-header compact">
+                    <p class="eyebrow">{status_code}</p>
+                    <h1>{title}</h1>
+                    <p class="body-copy">{message}</p>
+                    <nav class="actions" aria-label="Error recovery">
+                        <a class="button primary" href="/home">"Home"</a>
+                        <a class="button ghost" href="/status">"Status"</a>
+                    </nav>
+                </section>
+            </main>
+        </AppShell>
+    }
+    .to_html()
+}
+
 pub fn render_signup(
     csrf_token: &str,
     error: Option<&str>,
