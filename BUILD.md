@@ -481,7 +481,7 @@ state where documented verification passes on a clean checkout.
 - [x] Keep restore script and restore drill documentation current.
 - [x] Keep operations runbook in `docs/operations.md`.
 - [x] Add Caddy config validation.
-- [ ] Add backup and restore drill from a real snapshot before public
+- [x] Add backup and restore drill from a real snapshot before public
       claims.
 
 ### Phase 15 - Hardening
@@ -772,3 +772,10 @@ Trust current primary docs over this file.
   `scoring_details`, updates SQL Observatory coverage, and includes
   PostgreSQL-backed tests proving recent repeated pods are split when a
   better scored arrangement exists.
+- 2026-05-19 - Completed the Phase 14 local backup/restore drill: added
+  `just backup-restore-drill`, which creates disposable local
+  PostgreSQL databases, migrates and snapshots the source through the
+  checked-in backup script, restores through the checked-in restore
+  script, verifies the restored SQLx migration table and
+  readiness-critical schema, and documents the non-production drill path
+  in `docs/operations.md`.

@@ -132,7 +132,27 @@ path. Copy backups off the VM through the normal server backup channel.
 
 ## Restore Drill
 
-Use a non-production database for drills:
+Use a real local/non-production snapshot for drills. The checked-in drill
+creates two disposable local PostgreSQL databases, migrates the source
+database, inserts a non-sensitive marker row, takes a custom-format
+`pg_dump` snapshot through `deploy/scripts/backup.sh`, restores that
+snapshot through `deploy/scripts/restore.sh`, applies any pending
+checked-in migrations against the restored database, and verifies the
+SQLx migration table, readiness-critical schema, and restored marker row:
+
+```sh
+just backup-restore-drill
+```
+
+The drill refuses database names that do not start with
+`pod_tracker_drill_` and deletes its temporary databases and dump file
+when it exits. To inspect artifacts after a failed or manual drill:
+
+```sh
+POD_TRACKER_DRILL_KEEP_ARTIFACTS=1 just backup-restore-drill
+```
+
+For a manual non-production restore:
 
 ```sh
 createdb pod_tracker_restore_drill

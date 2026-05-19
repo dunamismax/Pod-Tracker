@@ -29,7 +29,10 @@ if [[ -z "$restore_url" ]]; then
   exit 1
 fi
 
-read -r -p "Restore ${backup_file} into configured database? Type RESTORE to continue: " confirmation
+confirmation="${POD_TRACKER_RESTORE_CONFIRM:-}"
+if [[ -z "$confirmation" ]]; then
+  read -r -p "Restore ${backup_file} into configured database? Type RESTORE to continue: " confirmation
+fi
 if [[ "$confirmation" != "RESTORE" ]]; then
   printf 'restore cancelled\n' >&2
   exit 1

@@ -91,3 +91,6 @@ sqlx-migrate-smoke:
   done
   psql -d "$db" -Atc "select extname from pg_extension where extname in ('pgcrypto','pg_trgm','pg_stat_statements','btree_gin') order by extname"
   DATABASE_URL="postgres://$(whoami)@localhost:5432/$db?sslmode=disable" cargo check -p pod-db --all-targets --all-features
+
+backup-restore-drill:
+  deploy/scripts/backup-restore-drill.sh
