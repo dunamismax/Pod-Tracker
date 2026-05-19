@@ -170,6 +170,11 @@ impl<'a> EventRepository<'a> {
         Self { pool }
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "create_event")
+    )]
     pub async fn create_event(&self, input: CreateEventInput<'_>) -> Result<EventRecord, DbError> {
         let mut tx = self.pool.begin().await?;
         let location_id = if let Some(location) = input.location {
@@ -246,6 +251,11 @@ impl<'a> EventRepository<'a> {
         Ok(event)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "update_event")
+    )]
     pub async fn update_event(&self, input: UpdateEventInput<'_>) -> Result<EventRecord, DbError> {
         let event = sqlx::query_as!(
             EventRecord,
@@ -274,6 +284,11 @@ impl<'a> EventRepository<'a> {
         Ok(event)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "list_for_user")
+    )]
     pub async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<EventWithRole>, DbError> {
         let events = sqlx::query_as!(
             EventWithRole,
@@ -295,6 +310,11 @@ impl<'a> EventRepository<'a> {
         Ok(events)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "list_for_playgroup")
+    )]
     pub async fn list_for_playgroup(
         &self,
         playgroup_id: Uuid,
@@ -316,6 +336,11 @@ impl<'a> EventRepository<'a> {
         Ok(events)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "get_for_user")
+    )]
     pub async fn get_for_user(
         &self,
         event_id: Uuid,
@@ -342,6 +367,11 @@ impl<'a> EventRepository<'a> {
         Ok(event)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "get_by_token")
+    )]
     pub async fn get_by_token(&self, token: &str) -> Result<Option<EventRecord>, DbError> {
         let event = sqlx::query_as!(
             EventRecord,
@@ -360,6 +390,37 @@ impl<'a> EventRepository<'a> {
         Ok(event)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "get_public_safe_by_token")
+    )]
+    pub async fn get_public_safe_by_token(
+        &self,
+        token: &str,
+    ) -> Result<Option<EventRecord>, DbError> {
+        let event = sqlx::query_as!(
+            EventRecord,
+            r#"
+            select id, playgroup_id, title, description, start_time, end_time,
+              location_id, visibility, invite_token, created_by, created_at, updated_at
+            from core.events
+            where invite_token = $1
+              and visibility = 'public_safe'
+            "#,
+            token,
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(event)
+    }
+
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "get_location_for_event")
+    )]
     pub async fn get_location_for_event(
         &self,
         event_id: Uuid,
@@ -382,6 +443,46 @@ impl<'a> EventRepository<'a> {
         Ok(location)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "get_location_for_event_scoped")
+    )]
+    pub async fn get_location_for_event_scoped(
+        &self,
+        event_id: Uuid,
+        include_private_address: bool,
+    ) -> Result<Option<EventLocationRecord>, DbError> {
+        let location = sqlx::query_as!(
+            EventLocationRecord,
+            r#"
+            select l.id, l.playgroup_id, l.name,
+              case when $2 then l.address_line1 else null end as address_line1,
+              case when $2 then l.address_line2 else null end as address_line2,
+              case when $2 then l.city else null end as city,
+              case when $2 then l.state_province else null end as state_province,
+              case when $2 then l.postal_code else null end as postal_code,
+              case when $2 then l.country else null end as country,
+              case when $2 then l.notes else '' end as "notes!",
+              l.created_by, l.created_at, l.updated_at
+            from core.event_locations l
+            join core.events e on e.location_id = l.id
+            where e.id = $1
+            "#,
+            event_id,
+            include_private_address,
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(location)
+    }
+
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "list_hosts")
+    )]
     pub async fn list_hosts(&self, event_id: Uuid) -> Result<Vec<EventHostRecord>, DbError> {
         let hosts = sqlx::query_as!(
             EventHostRecord,
@@ -398,6 +499,11 @@ impl<'a> EventRepository<'a> {
         Ok(hosts)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "list_rsvps")
+    )]
     pub async fn list_rsvps(&self, event_id: Uuid) -> Result<Vec<EventRsvpRecord>, DbError> {
         let rsvps = sqlx::query_as!(
             EventRsvpRecord,
@@ -416,6 +522,11 @@ impl<'a> EventRepository<'a> {
         Ok(rsvps)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "get_user_rsvp")
+    )]
     pub async fn get_user_rsvp(
         &self,
         event_id: Uuid,
@@ -439,6 +550,11 @@ impl<'a> EventRepository<'a> {
         Ok(rsvp)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "upsert_user_rsvp")
+    )]
     pub async fn upsert_user_rsvp(&self, input: RsvpInput<'_>) -> Result<EventRsvpRecord, DbError> {
         if let Some(user_id) = input.user_id
             && let Some(existing) = self.get_user_rsvp(input.event_id, user_id).await?
@@ -449,6 +565,11 @@ impl<'a> EventRepository<'a> {
         self.create_rsvp(input).await
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "create_rsvp")
+    )]
     pub async fn create_rsvp(&self, input: RsvpInput<'_>) -> Result<EventRsvpRecord, DbError> {
         let rsvp = sqlx::query_as!(
             EventRsvpRecord,
@@ -479,6 +600,11 @@ impl<'a> EventRepository<'a> {
         Ok(rsvp)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "update_rsvp")
+    )]
     pub async fn update_rsvp(
         &self,
         rsvp_id: Uuid,
@@ -515,6 +641,11 @@ impl<'a> EventRepository<'a> {
         Ok(rsvp)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "list_calendar_events")
+    )]
     pub async fn list_calendar_events(
         &self,
         user_id: Uuid,
@@ -538,6 +669,11 @@ impl<'a> EventRepository<'a> {
         Ok(events)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "events", db.operation = "create_event_reminder")
+    )]
     pub async fn create_event_reminder(
         &self,
         input: CreateEventReminderInput<'_>,
@@ -704,5 +840,175 @@ mod tests {
             .expect("create reminder");
         assert_eq!(reminder.event_id, event.id);
         assert_eq!(reminder.status, "pending");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn scoped_event_queries_enforce_tenant_token_guest_and_address_boundaries(
+        pool: sqlx::PgPool,
+    ) {
+        let identity = IdentityRepository::new(&pool);
+        let owner = identity
+            .create_user(
+                "scope-owner@example.test",
+                "Scope Owner",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("create owner");
+        let member = identity
+            .create_user(
+                "scope-member@example.test",
+                "Scope Member",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("create member");
+        let outsider = identity
+            .create_user(
+                "scope-outsider@example.test",
+                "Scope Outsider",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("create outsider");
+        let playgroups = PlaygroupRepository::new(&pool);
+        let playgroup = playgroups
+            .create_playgroup(owner.id, "Scope Group", "scope-group", "")
+            .await
+            .expect("create playgroup");
+        playgroups
+            .add_membership(playgroup.id, member.id, PlaygroupRole::Member, None)
+            .await
+            .expect("add member");
+
+        let repo = EventRepository::new(&pool);
+        let start_time =
+            time::OffsetDateTime::from_unix_timestamp(1_801_000_000).expect("valid timestamp");
+        let public_event = repo
+            .create_event(CreateEventInput {
+                playgroup_id: playgroup.id,
+                title: "Public Scope Night",
+                description: "Public-safe event.",
+                start_time,
+                end_time: None,
+                location: Some(EventLocationInput {
+                    name: "Scope Table",
+                    address_line1: Some("789 Private Lane"),
+                    address_line2: Some("Unit 4"),
+                    city: Some("Durham"),
+                    state_province: Some("NC"),
+                    postal_code: Some("27707"),
+                    country: Some("US"),
+                    notes: "Private gate code.",
+                }),
+                visibility: "public_safe",
+                invite_token: "scope-public-token",
+                address_visibility: "rsvps",
+                created_by: owner.id,
+            })
+            .await
+            .expect("create public event");
+        let invite_only_event = repo
+            .create_event(CreateEventInput {
+                playgroup_id: playgroup.id,
+                title: "Invite Scope Night",
+                description: "Invite-only event.",
+                start_time: start_time + time::Duration::days(1),
+                end_time: None,
+                location: None,
+                visibility: "invite_only",
+                invite_token: "scope-invite-token",
+                address_visibility: "hidden",
+                created_by: owner.id,
+            })
+            .await
+            .expect("create invite event");
+        repo.create_event(CreateEventInput {
+            playgroup_id: playgroup.id,
+            title: "Members Scope Night",
+            description: "Members-only event.",
+            start_time: start_time + time::Duration::days(2),
+            end_time: None,
+            location: None,
+            visibility: "members",
+            invite_token: "scope-members-token",
+            address_visibility: "hidden",
+            created_by: owner.id,
+        })
+        .await
+        .expect("create members event");
+
+        assert!(
+            repo.get_for_user(public_event.id, member.id)
+                .await
+                .expect("member event")
+                .is_some()
+        );
+        assert!(
+            repo.get_for_user(public_event.id, outsider.id)
+                .await
+                .expect("outsider event")
+                .is_none()
+        );
+        assert_eq!(
+            repo.list_for_user(outsider.id)
+                .await
+                .expect("outsider events")
+                .len(),
+            0
+        );
+
+        assert_eq!(
+            repo.get_by_token("scope-invite-token")
+                .await
+                .expect("invite token")
+                .expect("invite event")
+                .id,
+            invite_only_event.id
+        );
+        assert!(
+            repo.get_by_token("scope-members-token")
+                .await
+                .expect("members token")
+                .is_none()
+        );
+        assert_eq!(
+            repo.get_public_safe_by_token("scope-public-token")
+                .await
+                .expect("public token")
+                .expect("public event")
+                .id,
+            public_event.id
+        );
+        assert!(
+            repo.get_public_safe_by_token("scope-invite-token")
+                .await
+                .expect("invite public token")
+                .is_none()
+        );
+
+        let hidden_location = repo
+            .get_location_for_event_scoped(public_event.id, false)
+            .await
+            .expect("hidden location")
+            .expect("hidden location");
+        assert_eq!(hidden_location.name, "Scope Table");
+        assert!(hidden_location.address_line1.is_none());
+        assert!(hidden_location.address_line2.is_none());
+        assert!(hidden_location.city.is_none());
+        assert!(hidden_location.postal_code.is_none());
+        assert!(hidden_location.country.is_none());
+        assert!(hidden_location.notes.is_empty());
+
+        let revealed_location = repo
+            .get_location_for_event_scoped(public_event.id, true)
+            .await
+            .expect("revealed location")
+            .expect("revealed location");
+        assert_eq!(
+            revealed_location.address_line1.as_deref(),
+            Some("789 Private Lane")
+        );
+        assert_eq!(revealed_location.notes, "Private gate code.");
     }
 }

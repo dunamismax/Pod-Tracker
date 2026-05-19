@@ -9,6 +9,7 @@ use pod_worker::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::time;
+use tracing::{Instrument, Span};
 use uuid::Uuid;
 
 #[tokio::main]
@@ -69,32 +70,54 @@ async fn process_due_jobs(
             return Ok(());
         };
 
-        tracing::info!(job_id = %job.id, job_type = %job.job_type, "worker_job_claimed");
-        let scryfall_repo = ScryfallRepository::new(pool);
-        let meta_repo = MetaRepository::new(pool);
-        let result = process_job(
-            ops,
-            &scryfall_repo,
-            &meta_repo,
-            email_client,
-            scryfall_client,
-            &job,
-        )
-        .await;
-        match result {
-            Ok(()) => {
-                ops.complete_background_job(job.id)
-                    .await
-                    .context("complete background job")?;
-                tracing::info!(job_id = %job.id, "worker_job_completed");
+        async {
+            tracing::info!(job_id = %job.id, job_type = %job.job_type, "worker_job_claimed");
+            let scryfall_repo = ScryfallRepository::new(pool);
+            let meta_repo = MetaRepository::new(pool);
+            let result = process_job(
+                ops,
+                &scryfall_repo,
+                &meta_repo,
+                email_client,
+                scryfall_client,
+                &job,
+            )
+            .await;
+            match result {
+                Ok(()) => {
+                    ops.complete_background_job(job.id)
+                        .await
+                        .context("complete background job")?;
+                    tracing::info!(job_id = %job.id, "worker_job_completed");
+                }
+                Err(err) => {
+                    ops.fail_background_job(job.id, &err.to_string())
+                        .await
+                        .context("fail background job")?;
+                    tracing::warn!(job_id = %job.id, err = %err, "worker_job_failed");
+                }
             }
-            Err(err) => {
-                ops.fail_background_job(job.id, &err.to_string())
-                    .await
-                    .context("fail background job")?;
-                tracing::warn!(job_id = %job.id, err = %err, "worker_job_failed");
-            }
+            Ok::<(), anyhow::Error>(())
         }
+        .instrument(worker_job_span(&job))
+        .await?;
+    }
+}
+
+fn worker_job_span(job: &BackgroundJobRecord) -> Span {
+    tracing::info_span!(
+        "worker.job",
+        job.queue = %job.queue,
+        job.family = worker_job_family(&job.job_type)
+    )
+}
+
+fn worker_job_family(job_type: &str) -> &'static str {
+    match job_type {
+        "send_email" => "send_email",
+        SCRYFALL_BULK_IMPORT_JOB_TYPE => "scryfall_bulk_import",
+        META_DASHBOARD_REFRESH_JOB_TYPE => "meta_dashboard_refresh",
+        _ => "unknown",
     }
 }
 
@@ -283,5 +306,25 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::worker_job_family;
+    use pod_worker::{META_DASHBOARD_REFRESH_JOB_TYPE, SCRYFALL_BULK_IMPORT_JOB_TYPE};
+
+    #[test]
+    fn worker_job_family_labels_are_stable_and_low_cardinality() {
+        assert_eq!(worker_job_family("send_email"), "send_email");
+        assert_eq!(
+            worker_job_family(SCRYFALL_BULK_IMPORT_JOB_TYPE),
+            "scryfall_bulk_import"
+        );
+        assert_eq!(
+            worker_job_family(META_DASHBOARD_REFRESH_JOB_TYPE),
+            "meta_dashboard_refresh"
+        );
+        assert_eq!(worker_job_family("user-controlled-job-type"), "unknown");
     }
 }

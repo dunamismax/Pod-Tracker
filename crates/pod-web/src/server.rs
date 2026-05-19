@@ -2462,8 +2462,8 @@ async fn public_event_detail(
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     };
     let repo = EventRepository::new(pool);
-    let event = match repo.get_by_token(token.trim()).await {
-        Ok(Some(event)) if event.visibility == EventVisibility::PublicSafe.as_str() => event,
+    let event = match repo.get_public_safe_by_token(token.trim()).await {
+        Ok(Some(event)) => event,
         Ok(_) => return StatusCode::NOT_FOUND.into_response(),
         Err(err) => {
             tracing::error!(err = %err, "get public event");
@@ -3075,7 +3075,6 @@ async fn event_page_context(
     user_id: Option<uuid::Uuid>,
     guest_scope: bool,
 ) -> Result<EventPageContext, DbError> {
-    let location = repo.get_location_for_event(event.id).await?;
     let hosts = repo.list_hosts(event.id).await?;
     let rsvps = repo.list_rsvps(event.id).await?;
     let user_rsvp =
@@ -3097,6 +3096,9 @@ async fn event_page_context(
         viewer_rsvp,
         guest_scope,
     );
+    let location = repo
+        .get_location_for_event_scoped(event.id, show_address)
+        .await?;
     if show_address
         && location
             .as_ref()
@@ -3135,13 +3137,15 @@ async fn public_event_page_context(
     event_id: uuid::Uuid,
     source: &str,
 ) -> Result<EventPageContext, DbError> {
-    let location = repo.get_location_for_event(event_id).await?;
     let hosts = repo.list_hosts(event_id).await?;
     let address_visibilities = hosts
         .iter()
         .filter_map(|host| AddressVisibility::try_from(host.address_visibility.as_str()).ok())
         .collect::<Vec<_>>();
     let show_address = can_show_event_address(&address_visibilities, false, None, None, true);
+    let location = repo
+        .get_location_for_event_scoped(event_id, show_address)
+        .await?;
     if show_address
         && location
             .as_ref()
@@ -3725,7 +3729,10 @@ mod tests {
     use serde_json::json;
     use tower::ServiceExt;
 
-    use super::{AppState, RateLimitFamily, build_router, rate_limit_family, session_cookie};
+    use super::{
+        AppState, RateLimitFamily, build_router, rate_limit_family, route_family_label,
+        session_cookie,
+    };
 
     fn test_state() -> AppState {
         AppState::new(
@@ -4241,6 +4248,32 @@ mod tests {
         );
     }
 
+    #[test]
+    fn request_span_route_family_labels_are_stable_without_tokens() {
+        assert_eq!(
+            route_family_label(&http::Method::GET, "/e/private-token"),
+            "invite"
+        );
+        assert_eq!(
+            route_family_label(&http::Method::POST, "/rsvp/private-token"),
+            "rsvp"
+        );
+        assert_eq!(
+            route_family_label(
+                &http::Method::POST,
+                "/events/00000000-0000-7000-8000-000000000001/pods/generate"
+            ),
+            "admin"
+        );
+        assert_eq!(
+            route_family_label(
+                &http::Method::GET,
+                "/decks/00000000-0000-7000-8000-000000000001"
+            ),
+            "decks"
+        );
+    }
+
     #[tokio::test]
     async fn signup_form_sets_csrf_cookie_and_hidden_token() {
         let app = build_router(test_state());
@@ -4572,7 +4605,7 @@ mod tests {
                     .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
                     .header("cookie", owner.cookie_header.clone())
                     .body(Body::from(format!(
-                        "title=Friday+Pods&description=Bring+decks&start_time=2026-06-01T19:00&end_time=&visibility=public_safe&location_name=Kitchen+Table&address_line1=123+Private+St&address_line2=&city=Durham&state_province=NC&postal_code=27701&country=US&location_notes=&address_visibility=rsvps&csrf_token={}",
+                        "title=Friday+Pods&description=Bring+decks&start_time=2026-06-01T19:00&end_time=&visibility=public_safe&location_name=Kitchen+Table&address_line1=123+Private+St&address_line2=&city=Durham&state_province=NC&postal_code=27701&country=US&location_notes=Private+gate+code&address_visibility=rsvps&csrf_token={}",
                         owner.csrf_token
                     )))
                     .expect("request"),
@@ -4651,6 +4684,7 @@ mod tests {
         let public_body = body_string(public_event).await;
         assert!(public_body.contains("Kitchen Table"));
         assert!(!public_body.contains("123 Private St"));
+        assert!(!public_body.contains("Private gate code"));
 
         let member = sign_up(&app, "event-member@example.test", "Member").await;
         let member_user = IdentityRepository::new(&pool)
@@ -4682,6 +4716,7 @@ mod tests {
         assert_eq!(member_before_rsvp.status(), StatusCode::OK);
         let member_before_body = body_string(member_before_rsvp).await;
         assert!(!member_before_body.contains("123 Private St"));
+        assert!(!member_before_body.contains("Private gate code"));
 
         let save_rsvp = app
             .clone()
@@ -4714,6 +4749,7 @@ mod tests {
         assert_eq!(member_after_rsvp.status(), StatusCode::OK);
         let member_after_body = body_string(member_after_rsvp).await;
         assert!(member_after_body.contains("123 Private St"));
+        assert!(member_after_body.contains("Private gate code"));
         let member_rsvp = EventRepository::new(&pool)
             .get_user_rsvp(event_id, member_user.id)
             .await

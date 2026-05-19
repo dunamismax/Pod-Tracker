@@ -60,6 +60,11 @@ impl<'a> OpsRepository<'a> {
         Self { pool }
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "insert_email_delivery")
+    )]
     pub async fn insert_email_delivery(
         &self,
         input: EmailDeliveryInput<'_>,
@@ -85,6 +90,11 @@ impl<'a> OpsRepository<'a> {
         Ok(delivery)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "get_email_delivery")
+    )]
     pub async fn get_email_delivery(
         &self,
         id: Uuid,
@@ -105,6 +115,11 @@ impl<'a> OpsRepository<'a> {
         Ok(delivery)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "update_email_delivery_status")
+    )]
     pub async fn update_email_delivery_status(
         &self,
         id: Uuid,
@@ -133,6 +148,11 @@ impl<'a> OpsRepository<'a> {
         Ok(delivery)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "insert_background_job")
+    )]
     pub async fn insert_background_job(
         &self,
         input: BackgroundJobInput<'_>,
@@ -158,6 +178,11 @@ impl<'a> OpsRepository<'a> {
         Ok(job)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "enqueue_email_delivery")
+    )]
     pub async fn enqueue_email_delivery(
         &self,
         input: EmailDeliveryInput<'_>,
@@ -203,6 +228,11 @@ impl<'a> OpsRepository<'a> {
         Ok((delivery, job))
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "enqueue_scryfall_bulk_import")
+    )]
     pub async fn enqueue_scryfall_bulk_import(
         &self,
         bulk_type: &str,
@@ -218,6 +248,11 @@ impl<'a> OpsRepository<'a> {
         .await
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "enqueue_meta_dashboard_refresh")
+    )]
     pub async fn enqueue_meta_dashboard_refresh(
         &self,
         run_at: OffsetDateTime,
@@ -232,6 +267,11 @@ impl<'a> OpsRepository<'a> {
         .await
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "acquire_next_background_job")
+    )]
     pub async fn acquire_next_background_job(
         &self,
         worker_id: &str,
@@ -268,6 +308,11 @@ impl<'a> OpsRepository<'a> {
         Ok(job)
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "complete_background_job")
+    )]
     pub async fn complete_background_job(&self, id: Uuid) -> Result<(), DbError> {
         sqlx::query!(
             r#"
@@ -282,6 +327,11 @@ impl<'a> OpsRepository<'a> {
         Ok(())
     }
 
+    #[tracing::instrument(
+        name = "db.operation",
+        skip_all,
+        fields(db.system = "postgresql", db.repository = "ops", db.operation = "fail_background_job")
+    )]
     pub async fn fail_background_job(&self, id: Uuid, last_error: &str) -> Result<(), DbError> {
         sqlx::query!(
             r#"

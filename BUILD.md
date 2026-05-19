@@ -492,7 +492,7 @@ state where documented verification passes on a clean checkout.
       address reveal, and result changes.
 - [x] Add structured error pages.
 - [x] Add log redaction checks.
-- [ ] Add stable request, job, and database spans before considering
+- [x] Add stable request, job, and database spans before considering
       OpenTelemetry export.
 - [ ] Revisit config loading with `figment` or `config` if deployment,
       worker, email, and tenant settings become too broad for explicit env
@@ -500,7 +500,7 @@ state where documented verification passes on a clean checkout.
 - [x] Add CSRF tests.
 - [x] Add security header checks.
 - [x] Add privacy model in `docs/privacy.md`.
-- [ ] Add RLS or equivalent scoped-query tests for tenant, guest, public
+- [x] Add RLS or equivalent scoped-query tests for tenant, guest, public
       token, and host-address boundaries.
 
 ### Phase 16 - Advanced Intelligence
@@ -759,3 +759,9 @@ Trust current primary docs over this file.
   event pages disclose host addresses; added PostgreSQL-backed tests that
   prove sensitive emails, tokens, addresses, and notes stay out of audit
   metadata.
+- 2026-05-19 - Completed the remaining local Phase 15 hardening slice:
+  added stable low-cardinality worker job spans and explicit database
+  operation spans for event and ops repositories; tightened public event
+  reads to public-safe tokens and address-scoped location fields; added
+  PostgreSQL-backed scoped-query tests for tenant, guest, public token,
+  and host-address boundaries.
