@@ -21,9 +21,9 @@ pub mod scryfall;
 
 pub use audit::{AuditEventRecord, AuditRepository};
 pub use collections::{
-    AddCollectionCardInput, AddWishlistCardInput, CollectionCardRecord, CollectionRecord,
-    CollectionRepository, CreateCollectionInput, CreateWishlistInput, DeckMissingCardRecord,
-    WishlistCardRecord, WishlistMissingCardRecord, WishlistRecord,
+    AddCollectionCardInput, AddWishlistCardInput, CollectionCardRecord, CollectionDeckSuggestion,
+    CollectionRecord, CollectionRepository, CreateCollectionInput, CreateWishlistInput,
+    DeckMissingCardRecord, WishlistCardRecord, WishlistMissingCardRecord, WishlistRecord,
 };
 pub use decks::{
     CreateDeckInput, DeckBracketSnapshotRecord, DeckCardRecord, DeckRecord, DeckRepository,

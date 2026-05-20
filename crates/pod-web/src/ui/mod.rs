@@ -1,10 +1,10 @@
 use leptos::prelude::*;
 use pod_db::{
-    CardSearchResult, CollectionCardRecord, CollectionRecord, DeckBracketSnapshotRecord,
-    DeckMissingCardRecord, DeckRecord, EventDeckDeclarationWithDeck, EventRecord, EventRsvpRecord,
-    EventWithRole, GameWithPlayers, HouseRuleRecord, MetaDashboard, MetaDistributionMetric,
-    PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats, SimilarDeckRecommendation,
-    WishlistCardRecord, WishlistMissingCardRecord, WishlistRecord,
+    CardSearchResult, CollectionCardRecord, CollectionDeckSuggestion, CollectionRecord,
+    DeckBracketSnapshotRecord, DeckMissingCardRecord, DeckRecord, EventDeckDeclarationWithDeck,
+    EventRecord, EventRsvpRecord, EventWithRole, GameWithPlayers, HouseRuleRecord, MetaDashboard,
+    MetaDistributionMetric, PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
+    SimilarDeckRecommendation, WishlistCardRecord, WishlistMissingCardRecord, WishlistRecord,
 };
 use time::{OffsetDateTime, UtcOffset};
 
@@ -940,6 +940,7 @@ pub fn render_collection_detail(
     collection: &CollectionRecord,
     cards: &[CollectionCardRecord],
     decks: &[DeckRecord],
+    suggestions: &[CollectionDeckSuggestion],
     csrf_token: &str,
     error: Option<&str>,
     can_edit: bool,
@@ -947,6 +948,7 @@ pub fn render_collection_detail(
     let collection = collection.clone();
     let cards = cards.to_vec();
     let decks = decks.to_vec();
+    let suggestions = suggestions.to_vec();
     let csrf_token = csrf_token.to_owned();
     let error = error.map(str::to_owned);
     let has_cards = !cards.is_empty();
@@ -1025,6 +1027,37 @@ pub fn render_collection_detail(
                             <button class="button primary" type="submit">"Add card"</button>
                         </form>
                     })}
+                </section>
+                <section class="workspace-panel section-gap">
+                    <div class="section-heading">
+                        <h2>"Buildable decks"</h2>
+                        <span>{suggestions.len()} " suggestions"</span>
+                    </div>
+                    {if suggestions.is_empty() {
+                        view! { <p class="empty-state">"Import decklists to rank visible decks by collection coverage."</p> }.into_any()
+                    } else {
+                        view! {
+                            <div class="list">
+                                {suggestions.into_iter().map(|suggestion| {
+                                    let deck = suggestion.deck;
+                                    view! {
+                                        <article class="list-item">
+                                            <div>
+                                                <h2><a href=format!("/decks/{}", deck.id)>{deck.name.clone()}</a></h2>
+                                                <p>{deck.commander}</p>
+                                                <dl class="inline-metrics">
+                                                    <div><dt>"Owned"</dt><dd>{suggestion.coverage_percent} "%"</dd></div>
+                                                    <div><dt>"Missing"</dt><dd>{suggestion.missing_cards_count}</dd></div>
+                                                    <div><dt>"Score"</dt><dd>{suggestion.score}</dd></div>
+                                                </dl>
+                                                <p class="meta-line">{suggestion.reasons.join(" · ")}</p>
+                                            </div>
+                                        </article>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        }.into_any()
+                    }}
                 </section>
                 <section class="workspace-panel section-gap">
                     <div class="section-heading">

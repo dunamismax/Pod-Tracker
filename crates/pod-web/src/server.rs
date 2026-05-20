@@ -3216,6 +3216,16 @@ async fn render_collection_detail_response(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
+    let suggestions = match repo
+        .deck_suggestions_for_collection(collection_id, user_id, 5)
+        .await
+    {
+        Ok(suggestions) => suggestions,
+        Err(err) => {
+            tracing::error!(err = %err, "list collection deck suggestions");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
     let csrf = ensure_csrf_cookie(headers, &state.config);
     html_with_cookies(
@@ -3224,6 +3234,7 @@ async fn render_collection_detail_response(
             &collection,
             &cards,
             &decks,
+            &suggestions,
             &csrf.token,
             error,
             collection.owner_user_id == user_id,
@@ -5683,6 +5694,23 @@ mod tests {
             .await
             .expect("import")
             .expect("summary");
+
+        let detail_with_suggestions = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/collections/{collection_id}"))
+                    .header("cookie", owner.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("collection detail with suggestions");
+        assert_eq!(detail_with_suggestions.status(), StatusCode::OK);
+        let detail_with_suggestions_body = body_string(detail_with_suggestions).await;
+        assert!(detail_with_suggestions_body.contains("Buildable decks"));
+        assert!(detail_with_suggestions_body.contains("Collection Route Deck"));
+        assert!(detail_with_suggestions_body.contains("25% owned"));
 
         let missing = app
             .clone()

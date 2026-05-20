@@ -286,6 +286,88 @@ limit $3;"#,
         sample_data: "Scrubbed fixture: Atraxa Counters recommends Atraxa Value because it shares imported cards, archetype, bracket, colors, and a tag.",
     },
     ObservatoryEntry {
+        slug: "collection-aware-deck-suggestions",
+        title: "Collection-aware deck suggestions",
+        badge: "SQL + heuristic",
+        source: "CollectionRepository::deck_suggestions_for_collection",
+        sql: r#"with visible_collection as (
+  select c.id
+  from core.collections c
+  left join core.playgroup_memberships collection_membership
+    on collection_membership.playgroup_id = c.playgroup_id
+   and collection_membership.user_id = $2
+  where c.id = $1
+    and (
+      c.owner_user_id = $2
+      or c.visibility = 'public'
+      or (c.visibility = 'playgroup' and collection_membership.user_id is not null)
+    )
+),
+owned_cards as (
+  select cc.oracle_id, sum(cc.quantity)::bigint as owned_quantity
+  from core.collection_cards cc
+  join visible_collection c on c.id = cc.collection_id
+  group by cc.oracle_id
+),
+visible_decks as (
+  select distinct d.id, d.name, d.commander, d.updated_at
+  from core.decks d
+  join visible_collection source_collection on true
+  left join core.playgroup_memberships deck_membership
+    on deck_membership.playgroup_id = d.playgroup_id
+   and deck_membership.user_id = $2
+  where d.status = 'active'
+    and (
+      d.owner_user_id = $2
+      or d.visibility = 'public'
+      or (d.visibility = 'playgroup' and deck_membership.user_id is not null)
+    )
+),
+latest_versions as (
+  select distinct on (v.deck_id) v.deck_id, v.id
+  from mtg.deck_versions v
+  join visible_decks d on d.id = v.deck_id
+  order by v.deck_id, v.version_number desc
+),
+required_cards as (
+  select v.deck_id, dc.oracle_id, bool_or(dc.is_commander) as is_commander,
+    sum(dc.quantity)::bigint as required_quantity
+  from mtg.deck_cards dc
+  join latest_versions v on v.id = dc.deck_version_id
+  where dc.match_status = 'matched'
+    and dc.oracle_id is not null
+  group by v.deck_id, dc.oracle_id
+),
+coverage as (
+  select r.deck_id,
+    sum(r.required_quantity)::bigint as required_cards_count,
+    sum(least(r.required_quantity, coalesce(o.owned_quantity, 0)))::bigint
+      as owned_cards_count,
+    sum(greatest(r.required_quantity - coalesce(o.owned_quantity, 0), 0))::bigint
+      as missing_cards_count,
+    bool_or(r.is_commander and coalesce(o.owned_quantity, 0) >= r.required_quantity)
+      as commander_covered
+  from required_cards r
+  left join owned_cards o on o.oracle_id = r.oracle_id
+  group by r.deck_id
+)
+select d.id, d.name, d.commander,
+  round((c.owned_cards_count::numeric / c.required_cards_count::numeric) * 100)::int
+    as coverage_percent,
+  c.missing_cards_count,
+  c.commander_covered
+from coverage c
+join visible_decks d on d.id = c.deck_id
+where c.required_cards_count > 0
+order by coverage_percent desc, c.missing_cards_count asc, d.updated_at desc, d.name asc
+limit $3;"#,
+        inputs: "collection_id, current user_id, and suggestion limit. SQL scopes both the collection and candidate decks to records visible to that user.",
+        indexes: "collections primary key, collection_cards_collection_id_idx, decks visibility and playgroup indexes, deck_versions_deck_id_idx, deck_cards_version_idx, deck_cards_oracle_id_idx, playgroup membership indexes.",
+        plan_shape: "Aggregate owned oracle quantities from one visible collection, compare them to each visible active deck's latest matched import, then rank by coverage, missing quantity, and commander coverage.",
+        output: "Visible deck suggestions with owned percentage, missing-card count, score, and public-safe reason labels. This is SQL-scoped heuristic matching, not semantic or AI-backed matching.",
+        sample_data: "Scrubbed fixture: a binder with two Sol Rings suggests an imported artifact deck as complete and ranks it above decks with missing cards.",
+    },
+    ObservatoryEntry {
         slug: "reminders",
         title: "Reminders and job claiming",
         badge: "ops SQL",
@@ -433,6 +515,7 @@ mod tests {
             "fuzzy-card-search",
             "game-changers-count",
             "similar-deck-recommendations",
+            "collection-aware-deck-suggestions",
             "reminders",
             "matchup-history",
             "scryfall-jsonb",

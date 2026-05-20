@@ -37,6 +37,12 @@ equivalent authorization. They can show event planning context, but must
 not reveal private host details unless the event and address visibility
 rules explicitly allow it.
 
+Deck, collection, wishlist, and recommendation surfaces must preserve the
+same viewer scopes. Heuristic recommendations may use decklists and
+collection quantities only after the source collection and candidate decks
+are visible to the requesting user, and should return aggregate coverage
+or reason labels rather than private notes or card storage locations.
+
 ## Address Visibility
 
 Host address visibility is event-specific. Supported address visibility

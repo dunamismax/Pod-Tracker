@@ -8,7 +8,7 @@ verification.
 Treat unchecked boxes as plan. Move stable material into `docs/`,
 `README.md`, or runbooks as the implementation matures.
 
-Last reviewed: 2026-05-19.
+Last reviewed: 2026-05-20.
 
 ---
 
@@ -507,7 +507,7 @@ state where documented verification passes on a clean checkout.
 
 - [x] Improve pod scoring with matchup freshness and deck variety.
 - [x] Add similar deck recommendations.
-- [ ] Add collection-aware deck suggestions.
+- [x] Add collection-aware deck suggestions.
 - [ ] Add optional pgvector semantic card/deck search.
 - [ ] Add natural-language meta query research after SQL Observatory is
       useful.
@@ -784,3 +784,9 @@ Trust current primary docs over this file.
   recommendations scored by latest imported card overlap plus commander,
   archetype, bracket, color identity, and tag similarity; SQL
   Observatory documents that this path is not semantic or AI-backed.
+- 2026-05-20 - Added Phase 16 collection-aware deck suggestions as
+  SQL-scoped heuristic matching: collection detail pages now rank visible
+  active decks by latest imported decklist coverage against a visible
+  collection, show owned percentage and missing-card reasons, preserve
+  deck and collection visibility scopes, and document the path in the SQL
+  Observatory and privacy model.

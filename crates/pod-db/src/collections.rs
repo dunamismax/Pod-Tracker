@@ -79,6 +79,18 @@ pub struct DeckMissingCardRecord {
     pub missing_quantity: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollectionDeckSuggestion {
+    pub deck: crate::DeckRecord,
+    pub required_cards_count: i64,
+    pub owned_cards_count: i64,
+    pub missing_cards_count: i64,
+    pub coverage_percent: i32,
+    pub score: i64,
+    pub commander_covered: bool,
+    pub reasons: Vec<String>,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct CreateCollectionInput<'a> {
     pub owner_user_id: Uuid,
@@ -126,6 +138,37 @@ struct CardResolution {
     scryfall_id: Option<Uuid>,
     name: String,
     name_similarity: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CollectionDeckSuggestionRow {
+    id: Uuid,
+    owner_user_id: Uuid,
+    playgroup_id: Option<Uuid>,
+    name: String,
+    commander: String,
+    color_identity: String,
+    claimed_bracket: String,
+    archetype: String,
+    tags: Vec<String>,
+    visibility: String,
+    status: String,
+    game_changers_count: i32,
+    has_infinite_combo: bool,
+    has_fast_mana: bool,
+    tutor_density: String,
+    has_extra_turns: bool,
+    has_mass_land_denial: bool,
+    salt_notes: String,
+    notes: String,
+    created_at: OffsetDateTime,
+    updated_at: OffsetDateTime,
+    required_cards_count: i64,
+    owned_cards_count: i64,
+    missing_cards_count: i64,
+    coverage_percent: i32,
+    score: i64,
+    commander_covered: bool,
 }
 
 pub struct CollectionRepository<'a> {
@@ -446,6 +489,156 @@ impl<'a> CollectionRepository<'a> {
         .await?;
 
         Ok(missing)
+    }
+
+    pub async fn deck_suggestions_for_collection(
+        &self,
+        collection_id: Uuid,
+        user_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<CollectionDeckSuggestion>, DbError> {
+        if limit <= 0 {
+            return Ok(Vec::new());
+        }
+
+        let rows = sqlx::query_as!(
+            CollectionDeckSuggestionRow,
+            r#"
+            with visible_collection as (
+              select c.id
+              from core.collections c
+              left join core.playgroup_memberships collection_membership
+                on collection_membership.playgroup_id = c.playgroup_id
+               and collection_membership.user_id = $2
+              where c.id = $1
+                and (
+                  c.owner_user_id = $2
+                  or c.visibility = 'public'
+                  or (
+                    c.visibility = 'playgroup'
+                    and collection_membership.user_id is not null
+                  )
+                )
+            ),
+            owned_cards as (
+              select cc.oracle_id, sum(cc.quantity)::bigint as owned_quantity
+              from core.collection_cards cc
+              join visible_collection c on c.id = cc.collection_id
+              group by cc.oracle_id
+            ),
+            visible_decks as (
+              select distinct d.id, d.owner_user_id, d.playgroup_id, d.name,
+                d.commander, d.color_identity, d.claimed_bracket, d.archetype,
+                d.tags, d.visibility, d.status, d.game_changers_count,
+                d.has_infinite_combo, d.has_fast_mana, d.tutor_density,
+                d.has_extra_turns, d.has_mass_land_denial, d.salt_notes,
+                d.notes, d.created_at, d.updated_at
+              from core.decks d
+              join visible_collection source_collection on true
+              left join core.playgroup_memberships deck_membership
+                on deck_membership.playgroup_id = d.playgroup_id
+               and deck_membership.user_id = $2
+              where d.status = 'active'
+                and (
+                  d.owner_user_id = $2
+                  or d.visibility = 'public'
+                  or (
+                    d.visibility = 'playgroup'
+                    and deck_membership.user_id is not null
+                  )
+                )
+            ),
+            latest_versions as (
+              select distinct on (v.deck_id) v.deck_id, v.id
+              from mtg.deck_versions v
+              join visible_decks d on d.id = v.deck_id
+              order by v.deck_id, v.version_number desc
+            ),
+            required_cards as (
+              select
+                v.deck_id,
+                dc.oracle_id,
+                bool_or(dc.is_commander) as is_commander,
+                sum(dc.quantity)::bigint as required_quantity
+              from mtg.deck_cards dc
+              join latest_versions v on v.id = dc.deck_version_id
+              where dc.match_status = 'matched'
+                and dc.oracle_id is not null
+              group by v.deck_id, dc.oracle_id
+            ),
+            coverage as (
+              select
+                r.deck_id,
+                sum(r.required_quantity)::bigint as required_cards_count,
+                sum(least(r.required_quantity, coalesce(o.owned_quantity, 0)))::bigint
+                  as owned_cards_count,
+                sum(greatest(r.required_quantity - coalesce(o.owned_quantity, 0), 0))::bigint
+                  as missing_cards_count,
+                bool_or(
+                  r.is_commander
+                  and coalesce(o.owned_quantity, 0) >= r.required_quantity
+                ) as commander_covered
+              from required_cards r
+              left join owned_cards o on o.oracle_id = r.oracle_id
+              group by r.deck_id
+            ),
+            scored as (
+              select
+                c.deck_id,
+                c.required_cards_count,
+                c.owned_cards_count,
+                c.missing_cards_count,
+                case
+                  when c.required_cards_count > 0
+                  then round(
+                    (c.owned_cards_count::numeric / c.required_cards_count::numeric) * 100
+                  )::int
+                  else 0
+                end as coverage_percent,
+                (
+                  case
+                    when c.required_cards_count > 0
+                    then round(
+                      (c.owned_cards_count::numeric / c.required_cards_count::numeric) * 100
+                    )::bigint * 10
+                    else 0
+                  end
+                  + c.owned_cards_count
+                  - (c.missing_cards_count * 2)
+                  + case when c.commander_covered then 25 else 0 end
+                )::bigint as score,
+                c.commander_covered
+              from coverage c
+              where c.required_cards_count > 0
+            )
+            select d.id, d.owner_user_id, d.playgroup_id, d.name, d.commander,
+              d.color_identity, d.claimed_bracket, d.archetype, d.tags, d.visibility,
+              d.status, d.game_changers_count, d.has_infinite_combo, d.has_fast_mana,
+              d.tutor_density, d.has_extra_turns, d.has_mass_land_denial,
+              d.salt_notes, d.notes, d.created_at, d.updated_at,
+              s.required_cards_count as "required_cards_count!",
+              s.owned_cards_count as "owned_cards_count!",
+              s.missing_cards_count as "missing_cards_count!",
+              s.coverage_percent as "coverage_percent!",
+              s.score as "score!",
+              s.commander_covered as "commander_covered!"
+            from scored s
+            join visible_decks d on d.id = s.deck_id
+            order by s.score desc, s.coverage_percent desc, s.missing_cards_count asc,
+              d.updated_at desc, d.name asc
+            limit $3
+            "#,
+            collection_id,
+            user_id,
+            limit,
+        )
+        .fetch_all(self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(build_collection_deck_suggestion)
+            .collect())
     }
 
     pub async fn create_wishlist(
@@ -807,6 +1000,65 @@ async fn resolve_card(
     Ok(fuzzy.filter(|candidate| candidate.name_similarity >= 0.35))
 }
 
+fn build_collection_deck_suggestion(row: CollectionDeckSuggestionRow) -> CollectionDeckSuggestion {
+    let reasons = collection_deck_suggestion_reasons(
+        row.coverage_percent,
+        row.missing_cards_count,
+        row.commander_covered,
+    );
+    CollectionDeckSuggestion {
+        deck: crate::DeckRecord {
+            id: row.id,
+            owner_user_id: row.owner_user_id,
+            playgroup_id: row.playgroup_id,
+            name: row.name,
+            commander: row.commander,
+            color_identity: row.color_identity,
+            claimed_bracket: row.claimed_bracket,
+            archetype: row.archetype,
+            tags: row.tags,
+            visibility: row.visibility,
+            status: row.status,
+            game_changers_count: row.game_changers_count,
+            has_infinite_combo: row.has_infinite_combo,
+            has_fast_mana: row.has_fast_mana,
+            tutor_density: row.tutor_density,
+            has_extra_turns: row.has_extra_turns,
+            has_mass_land_denial: row.has_mass_land_denial,
+            salt_notes: row.salt_notes,
+            notes: row.notes,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        },
+        required_cards_count: row.required_cards_count,
+        owned_cards_count: row.owned_cards_count,
+        missing_cards_count: row.missing_cards_count,
+        coverage_percent: row.coverage_percent,
+        score: row.score,
+        commander_covered: row.commander_covered,
+        reasons,
+    }
+}
+
+fn collection_deck_suggestion_reasons(
+    coverage_percent: i32,
+    missing_cards_count: i64,
+    commander_covered: bool,
+) -> Vec<String> {
+    let mut reasons = vec![format!("{coverage_percent}% owned")];
+    if missing_cards_count == 0 {
+        reasons.push("complete from collection".to_owned());
+    } else if missing_cards_count == 1 {
+        reasons.push("1 missing card".to_owned());
+    } else {
+        reasons.push(format!("{missing_cards_count} missing cards"));
+    }
+    if commander_covered {
+        reasons.push("commander covered".to_owned());
+    }
+    reasons
+}
+
 #[cfg(test)]
 mod tests {
     use pod_core::playgroups::PlaygroupRole;
@@ -1008,6 +1260,101 @@ mod tests {
         let proxy_list = pod_core::collections::export_proxy_print_list(&entries);
         assert!(proxy_list.contains("Commander\n1 Atraxa, Praetors' Voice"));
         assert!(proxy_list.contains("Deck\n1 Counterspell\n1 Sol Ring"));
+
+        let buildable_deck = DeckRepository::new(&pool)
+            .create_deck(CreateDeckInput {
+                owner_user_id: member.id,
+                playgroup_id: Some(playgroup.id),
+                name: "Ring Box",
+                commander: "Sol Ring",
+                color_identity: "",
+                claimed_bracket: "1",
+                archetype: "Artifact",
+                tags: &tags,
+                visibility: "playgroup",
+                status: "active",
+                game_changers_count: 0,
+                has_infinite_combo: false,
+                has_fast_mana: false,
+                tutor_density: "none",
+                has_extra_turns: false,
+                has_mass_land_denial: false,
+                salt_notes: "",
+                notes: "",
+            })
+            .await
+            .expect("buildable deck");
+        DeckRepository::new(&pool)
+            .import_plain_text_decklist(DecklistImportInput {
+                deck_id: buildable_deck.id,
+                owner_user_id: member.id,
+                source_text: "Deck\n2 Sol Ring\n",
+            })
+            .await
+            .expect("import buildable decklist")
+            .expect("buildable decklist summary");
+        let hidden_deck = DeckRepository::new(&pool)
+            .create_deck(CreateDeckInput {
+                owner_user_id: outsider.id,
+                playgroup_id: None,
+                name: "Hidden Ring Box",
+                commander: "Sol Ring",
+                color_identity: "",
+                claimed_bracket: "1",
+                archetype: "Artifact",
+                tags: &tags,
+                visibility: "private",
+                status: "active",
+                game_changers_count: 0,
+                has_infinite_combo: false,
+                has_fast_mana: false,
+                tutor_density: "none",
+                has_extra_turns: false,
+                has_mass_land_denial: false,
+                salt_notes: "",
+                notes: "",
+            })
+            .await
+            .expect("hidden deck");
+        DeckRepository::new(&pool)
+            .import_plain_text_decklist(DecklistImportInput {
+                deck_id: hidden_deck.id,
+                owner_user_id: outsider.id,
+                source_text: "Deck\n2 Sol Ring\n",
+            })
+            .await
+            .expect("import hidden decklist")
+            .expect("hidden decklist summary");
+
+        let suggestions = collection_repo
+            .deck_suggestions_for_collection(collection.id, member.id, 5)
+            .await
+            .expect("collection deck suggestions");
+        assert_eq!(suggestions[0].deck.id, buildable_deck.id);
+        assert_eq!(suggestions[0].coverage_percent, 100);
+        assert_eq!(suggestions[0].missing_cards_count, 0);
+        assert!(
+            suggestions[0]
+                .reasons
+                .contains(&"complete from collection".to_owned())
+        );
+        assert!(
+            suggestions
+                .iter()
+                .any(|suggestion| suggestion.deck.id == deck.id)
+        );
+        assert!(
+            !suggestions
+                .iter()
+                .any(|suggestion| suggestion.deck.id == hidden_deck.id)
+        );
+        assert!(
+            collection_repo
+                .deck_suggestions_for_collection(collection.id, outsider.id, 5)
+                .await
+                .expect("outsider collection deck suggestions")
+                .is_empty()
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
