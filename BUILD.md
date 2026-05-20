@@ -521,13 +521,13 @@ state where documented verification passes on a clean checkout.
 - [x] Store user locale, timezone, and date/time display preferences.
 - [x] Keep event scheduling and calendar export correct across locale and
       timezone settings.
-- [ ] Preserve Scryfall language fields for printings and names.
-- [ ] Add multilingual card search where Scryfall data supports it.
-- [ ] Add language-aware display for card names, printings, and decklist
+- [x] Preserve Scryfall language fields for printings and names.
+- [x] Add multilingual card search where Scryfall data supports it.
+- [x] Add language-aware display for card names, printings, and decklist
       imports without breaking English canonical matching.
 - [ ] Extract UI copy into a Rust-owned localization workflow once the
       core UI settles.
-- [ ] Add tests for locale formatting, calendar output, multilingual card
+- [x] Add tests for locale formatting, calendar output, multilingual card
       search, and decklist import matching.
 
 ---
@@ -796,3 +796,10 @@ Trust current primary docs over this file.
   authenticated event and RSVP form times in the viewer's timezone, kept
   calendar exports UTC-canonical, and added focused preference,
   formatting, and calendar tests.
+- 2026-05-20 - Completed the Phase 17 card-language groundwork: Scryfall
+  printings and faces now preserve `lang`, printed names, printed type
+  lines, and printed text; card search indexes canonical English and
+  printed-language documents; card results display localized printing text
+  when present; and decklist imports can match localized printed names back
+  to canonical English Oracle cards without breaking existing exact,
+  normalized, and fuzzy matching.

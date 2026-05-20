@@ -148,25 +148,41 @@ order by d.claimed_bracket nulls last, r.created_at;"#,
         title: "Fuzzy card search",
         badge: "full-text + trigram",
         source: "ScryfallRepository::search_cards",
-        sql: r#"select scryfall_id, oracle_id, name, type_line, oracle_text,
+        sql: r#"select scryfall_id, oracle_id, name, lang, printed_name,
+  coalesce(printed_name, name) as display_name,
+  type_line, printed_type_line,
+  coalesce(printed_type_line, type_line) as display_type_line,
+  oracle_text, printed_text,
+  coalesce(printed_text, oracle_text) as display_text,
   color_identity, commander_legal, mana_value, usd, game_changer,
   case
     when $1::text is null then 0::real
-    else ts_rank_cd(document, websearch_to_tsquery('english', $1))::real
+    else greatest(
+      ts_rank_cd(document, websearch_to_tsquery('english', $1)),
+      ts_rank_cd(printed_document, websearch_to_tsquery('simple', $1))
+    )::real
   end as text_rank,
   case
     when $1::text is null then 0::real
     else greatest(
       similarity(name, $1),
-      similarity(normalized_name, regexp_replace(lower($1), '[^a-z0-9]+', '', 'g'))
+      similarity(normalized_name, regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')),
+      similarity(coalesce(printed_name, ''), $1),
+      similarity(
+        coalesce(normalized_printed_name, ''),
+        regexp_replace(lower($1), '[^[:alnum:]]+', '', 'g')
+      )
     )::real
   end as name_similarity
 from search.card_documents
 where (
     $1::text is null
     or document @@ websearch_to_tsquery('english', $1)
+    or printed_document @@ websearch_to_tsquery('simple', $1)
     or name % $1
     or normalized_name % regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
+    or printed_name % $1
+    or normalized_printed_name % regexp_replace(lower($1), '[^[:alnum:]]+', '', 'g')
   )
   and ($2::text[] is null or color_identity <@ $2)
   and ($3::boolean is null or commander_legal = $3)
@@ -174,14 +190,18 @@ where (
   and ($5::double precision is null or mana_value <= $5)
   and ($6::double precision is null or usd <= $6)
   and ($7::boolean is null or game_changer = $7)
-  and ($8::text is null or type_line ilike '%' || $8 || '%')
-order by 11 desc, 12 desc, name asc
+  and (
+    $8::text is null
+    or type_line ilike '%' || $8 || '%'
+    or printed_type_line ilike '%' || $8 || '%'
+  )
+order by text_rank desc, name_similarity desc, coalesce(printed_name, name) asc, name asc
 limit $9;"#,
         inputs: "query text, optional color identity, commander legality, mana value range, price ceiling, Game Changer flag, type filter, and limit.",
-        indexes: "card_documents_document_gin_idx, card_documents_name_trgm_idx, card_documents_normalized_name_trgm_idx, card_documents_color_identity_gin_idx.",
-        plan_shape: "Combine full-text and trigram candidate retrieval, apply metadata filters, then rank by text relevance, name similarity, and stable name order.",
-        output: "Local Scryfall card rows with legality, mana value, price, Game Changer flag, text rank, and name similarity.",
-        sample_data: "Scrubbed fixture: query='atraxa preator'; colors={W,U,B,G}; commander_legal=true; max_usd=50; returns local imported card rows.",
+        indexes: "card_documents_document_gin_idx, card_documents_printed_document_gin_idx, card_documents_name_trgm_idx, card_documents_printed_name_trgm_idx, card_documents_normalized_name_trgm_idx, card_documents_normalized_printed_name_trgm_idx, card_documents_color_identity_gin_idx.",
+        plan_shape: "Combine English canonical and printed-language full-text/trigram candidate retrieval, apply metadata filters, then rank by text relevance, name similarity, and stable display name order.",
+        output: "Local Scryfall card rows with canonical and printed names, legality, mana value, price, Game Changer flag, text rank, and name similarity.",
+        sample_data: "Scrubbed fixture: query='foudre blessures'; commander_legal=true; returns the local French printing while preserving the canonical English card name.",
     },
     ObservatoryEntry {
         slug: "game-changers-count",
@@ -480,6 +500,8 @@ order by a.playgroup_name asc;"#,
         badge: "raw payload",
         source: "ScryfallRepository::upsert_card_from_scryfall_json",
         sql: r#"select p.scryfall_id,
+  p.lang,
+  p.printed_name,
   p.raw_payload #>> '{prices,usd}' as usd,
   p.raw_payload #>> '{legalities,commander}' as commander_status,
   p.raw_payload ->> 'layout' as layout,

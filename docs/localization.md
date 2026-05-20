@@ -33,6 +33,19 @@ calendar timezone.
 ## Card Languages
 
 Scryfall raw payloads remain the source of truth for multilingual card
-data. Future language work should preserve Scryfall language fields for
-printings and names, then add multilingual search and display without
-breaking English canonical decklist matching.
+data. The normalized card tables now retain each printing's Scryfall
+`lang`, `printed_name`, `printed_type_line`, and `printed_text` fields
+when present, including face-level printed fields for multiface cards.
+
+Canonical card identity still follows Scryfall `oracle_id` and English
+`name`. Decklist imports first match canonical English names, then can
+match localized printed names back to the same canonical Oracle card. This
+keeps bracket checks, Game Changers counts, collection coverage, and
+exports stable while allowing a player to paste a list from non-English
+physical printings.
+
+Card search combines canonical English search documents with
+printed-language search documents where imported data supports them. A
+`default_cards` import mostly provides English printings; use Scryfall's
+`all_cards` bulk type when the local instance should index every language
+Scryfall publishes.

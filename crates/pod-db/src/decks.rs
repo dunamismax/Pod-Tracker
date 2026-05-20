@@ -1015,6 +1015,25 @@ async fn resolve_card_name(
         return Ok(resolution);
     }
 
+    let printed_exact = sqlx::query_as!(
+        CardNameCandidate,
+        r#"
+        select distinct on (oracle_id)
+          oracle_id,
+          name,
+          1::real as "name_similarity!"
+        from search.card_documents
+        where lower(printed_name) = lower($1)
+        order by oracle_id, name asc
+        "#,
+        name,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    if let Some(resolution) = resolve_candidates(printed_exact, "printed_exact") {
+        return Ok(resolution);
+    }
+
     let normalized = pod_core::decklists::normalize_card_name(name);
     if !normalized.is_empty() {
         let normalized_matches = sqlx::query_as!(
@@ -1035,6 +1054,26 @@ async fn resolve_card_name(
         if let Some(resolution) = resolve_candidates(normalized_matches, "normalized") {
             return Ok(resolution);
         }
+    }
+
+    let printed_normalized = sqlx::query_as!(
+        CardNameCandidate,
+        r#"
+        select distinct on (oracle_id)
+          oracle_id,
+          name,
+          1::real as "name_similarity!"
+        from search.card_documents
+        where normalized_printed_name = regexp_replace(lower($1), '[^[:alnum:]]+', '', 'g')
+          and normalized_printed_name is not null
+        order by oracle_id, name asc
+        "#,
+        name,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
+    if let Some(resolution) = resolve_candidates(printed_normalized, "printed_normalized") {
+        return Ok(resolution);
     }
 
     let fuzzy = sqlx::query_as!(
@@ -1064,9 +1103,43 @@ async fn resolve_card_name(
     )
     .fetch_all(&mut **tx)
     .await?;
+    if let Some(resolution) = resolve_candidates(fuzzy, "fuzzy") {
+        return Ok(resolution);
+    }
+
+    let printed_fuzzy = sqlx::query_as!(
+        CardNameCandidate,
+        r#"
+        with candidates as (
+          select
+            oracle_id,
+            name,
+            greatest(
+              similarity(coalesce(printed_name, ''), $1),
+              similarity(
+                coalesce(normalized_printed_name, ''),
+                regexp_replace(lower($1), '[^[:alnum:]]+', '', 'g')
+              )
+            )::real as name_similarity
+          from search.card_documents
+          where printed_name % $1
+            or normalized_printed_name % regexp_replace(lower($1), '[^[:alnum:]]+', '', 'g')
+        )
+        select distinct on (oracle_id)
+          oracle_id,
+          name,
+          name_similarity as "name_similarity!"
+        from candidates
+        order by oracle_id, name_similarity desc, name asc
+        limit 5
+        "#,
+        name,
+    )
+    .fetch_all(&mut **tx)
+    .await?;
 
     Ok(
-        resolve_candidates(fuzzy, "fuzzy").unwrap_or(CardNameResolution {
+        resolve_candidates(printed_fuzzy, "printed_fuzzy").unwrap_or(CardNameResolution {
             oracle_id: None,
             matched_name: None,
             match_status: "unmatched",
@@ -1418,6 +1491,20 @@ mod tests {
                 "Instant",
                 false,
             ),
+            localized_card_json(
+                card_json(
+                    "00000000-0000-7000-8000-000000000107",
+                    "10000000-0000-7000-8000-000000000107",
+                    "Lightning Bolt",
+                    &["R"],
+                    "Instant",
+                    false,
+                ),
+                "fr",
+                "Foudre",
+                "Ephémère",
+                "La Foudre inflige 3 blessures à n'importe quelle cible.",
+            ),
         ] {
             scryfall
                 .upsert_card_from_scryfall_json(import.id, &card)
@@ -1492,6 +1579,7 @@ Deck
 1 Sol Ring
 1 Storm Kiln Artist
 1 Counterspel
+1 Foudre
 1 Missing Card
 1 Fire // Ice
 "#;
@@ -1557,6 +1645,12 @@ Deck
                 && card.match_status == "matched"
                 && card.match_method == "fuzzy"
         }));
+        assert!(summary.cards.iter().any(|card| {
+            card.card_name == "Foudre"
+                && card.matched_name.as_deref() == Some("Lightning Bolt")
+                && card.match_status == "matched"
+                && card.match_method == "printed_exact"
+        }));
         assert!(
             summary.cards.iter().any(|card| {
                 card.card_name == "Missing Card" && card.match_status == "unmatched"
@@ -1589,12 +1683,12 @@ Deck
             .expect("owner export")
             .expect("export");
         assert_eq!(export.version.id, summary.version.id);
-        assert_eq!(export.cards.len(), 6);
+        assert_eq!(export.cards.len(), 7);
         assert_eq!(export.cards[0].card_name, "Atraxa, Praetors' Voice");
         assert!(export.cards[0].is_commander);
         assert_eq!(export.cards[0].section, "commander");
-        assert_eq!(export.cards[5].card_name, "Fire // Ice");
-        assert_eq!(export.cards[5].match_status, "ambiguous");
+        assert_eq!(export.cards[6].card_name, "Fire // Ice");
+        assert_eq!(export.cards[6].match_status, "ambiguous");
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -1867,5 +1961,19 @@ Deck
                 "usd": "1.00"
             }
         })
+    }
+
+    fn localized_card_json(
+        mut card: serde_json::Value,
+        lang: &str,
+        printed_name: &str,
+        printed_type_line: &str,
+        printed_text: &str,
+    ) -> serde_json::Value {
+        card["lang"] = json!(lang);
+        card["printed_name"] = json!(printed_name);
+        card["printed_type_line"] = json!(printed_type_line);
+        card["printed_text"] = json!(printed_text);
+        card
     }
 }

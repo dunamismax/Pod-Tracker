@@ -63,8 +63,15 @@ pub struct CardSearchResult {
     pub scryfall_id: Uuid,
     pub oracle_id: Uuid,
     pub name: String,
+    pub lang: String,
+    pub printed_name: Option<String>,
+    pub display_name: String,
     pub type_line: String,
+    pub printed_type_line: Option<String>,
+    pub display_type_line: String,
     pub oracle_text: String,
+    pub printed_text: Option<String>,
+    pub display_text: String,
     pub color_identity: Vec<String>,
     pub commander_legal: bool,
     pub mana_value: Option<f64>,
@@ -277,7 +284,8 @@ impl<'a> ScryfallRepository<'a> {
             printing_upsert as (
               insert into mtg.card_printings (
                 scryfall_id, oracle_id, set_code, collector_number, lang, rarity,
-                released_at, artist, prices, import_id, raw_payload
+                printed_name, printed_type_line, printed_text, released_at, artist,
+                prices, import_id, raw_payload
               )
               select
                 (raw->>'id')::uuid,
@@ -286,6 +294,9 @@ impl<'a> ScryfallRepository<'a> {
                 coalesce(nullif(raw->>'collector_number', ''), 'unknown'),
                 lower(coalesce(nullif(raw->>'lang', ''), 'en')),
                 coalesce(raw->>'rarity', ''),
+                nullif(raw->>'printed_name', ''),
+                nullif(raw->>'printed_type_line', ''),
+                nullif(raw->>'printed_text', ''),
                 nullif(raw->>'released_at', '')::date,
                 raw->>'artist',
                 coalesce(raw->'prices', '{}'::jsonb),
@@ -298,6 +309,9 @@ impl<'a> ScryfallRepository<'a> {
                   collector_number = excluded.collector_number,
                   lang = excluded.lang,
                   rarity = excluded.rarity,
+                  printed_name = excluded.printed_name,
+                  printed_type_line = excluded.printed_type_line,
+                  printed_text = excluded.printed_text,
                   released_at = excluded.released_at,
                   artist = excluded.artist,
                   prices = excluded.prices,
@@ -366,6 +380,9 @@ impl<'a> ScryfallRepository<'a> {
                 coalesce(face.value->>'mana_cost', '') as mana_cost,
                 coalesce(face.value->>'type_line', '') as type_line,
                 coalesce(face.value->>'oracle_text', '') as oracle_text,
+                nullif(face.value->>'printed_name', '') as printed_name,
+                nullif(face.value->>'printed_type_line', '') as printed_type_line,
+                nullif(face.value->>'printed_text', '') as printed_text,
                 coalesce(
                   array(select jsonb_array_elements_text(coalesce(face.value->'colors', '[]'::jsonb))),
                   '{}'::text[]
@@ -382,6 +399,9 @@ impl<'a> ScryfallRepository<'a> {
                 coalesce(raw->>'mana_cost', ''),
                 coalesce(raw->>'type_line', ''),
                 coalesce(raw->>'oracle_text', ''),
+                nullif(raw->>'printed_name', ''),
+                nullif(raw->>'printed_type_line', ''),
+                nullif(raw->>'printed_text', ''),
                 coalesce(
                   array(select jsonb_array_elements_text(coalesce(raw->'colors', '[]'::jsonb))),
                   '{}'::text[]
@@ -390,9 +410,11 @@ impl<'a> ScryfallRepository<'a> {
               where jsonb_array_length(coalesce(raw->'card_faces', '[]'::jsonb)) = 0
             )
             insert into mtg.card_faces (
-              scryfall_id, face_index, oracle_id, name, mana_cost, type_line, oracle_text, colors
+              scryfall_id, face_index, oracle_id, name, mana_cost, type_line,
+              oracle_text, printed_name, printed_type_line, printed_text, colors
             )
-            select scryfall_id, face_index, oracle_id, name, mana_cost, type_line, oracle_text, colors
+            select scryfall_id, face_index, oracle_id, name, mana_cost, type_line,
+              oracle_text, printed_name, printed_type_line, printed_text, colors
             from faces
             "#,
             imported.scryfall_id,
@@ -413,12 +435,26 @@ impl<'a> ScryfallRepository<'a> {
                 lateral jsonb_array_elements(coalesce(raw->'card_faces', '[]'::jsonb))
                   with ordinality as face(value, ordinality)
             ),
+            printed_face_text as (
+              select string_agg(coalesce(face.value->>'printed_text', ''), ' ' order by face.ordinality) as printed_text
+              from payload,
+                lateral jsonb_array_elements(coalesce(raw->'card_faces', '[]'::jsonb))
+                  with ordinality as face(value, ordinality)
+            ),
             document_input as (
               select
                 raw->>'name' as name,
                 regexp_replace(lower(coalesce(raw->>'name', '')), '[^a-z0-9]+', '', 'g') as normalized_name,
+                lower(coalesce(nullif(raw->>'lang', ''), 'en')) as lang,
+                nullif(raw->>'printed_name', '') as printed_name,
+                nullif(
+                  regexp_replace(lower(coalesce(raw->>'printed_name', '')), '[^[:alnum:]]+', '', 'g'),
+                  ''
+                ) as normalized_printed_name,
                 coalesce(raw->>'type_line', '') as type_line,
+                nullif(raw->>'printed_type_line', '') as printed_type_line,
                 coalesce(raw->>'oracle_text', face_text.oracle_text, '') as oracle_text,
+                coalesce(nullif(raw->>'printed_text', ''), printed_face_text.printed_text, '') as printed_text,
                 coalesce(
                   array(select jsonb_array_elements_text(coalesce(raw->'color_identity', '[]'::jsonb))),
                   '{}'::text[]
@@ -429,27 +465,38 @@ impl<'a> ScryfallRepository<'a> {
                 nullif(raw #>> '{prices,eur}', '')::double precision as eur,
                 nullif(raw #>> '{prices,tix}', '')::double precision as tix,
                 coalesce((raw->>'game_changer')::boolean, false) as game_changer
-              from payload, face_text
+              from payload, face_text, printed_face_text
             )
             insert into search.card_documents (
-              scryfall_id, oracle_id, name, normalized_name, type_line, oracle_text,
-              color_identity, commander_legal, mana_value, usd, eur, tix,
-              game_changer, document
+              scryfall_id, oracle_id, name, normalized_name, lang, printed_name,
+              normalized_printed_name, type_line, printed_type_line, oracle_text,
+              printed_text, color_identity, commander_legal, mana_value, usd, eur,
+              tix, game_changer, document, printed_document
             )
             select
-              $1, $2, name, normalized_name, type_line, oracle_text,
-              color_identity, commander_legal, mana_value, usd, eur, tix,
+              $1, $2, name, normalized_name, lang, printed_name,
+              normalized_printed_name, type_line, printed_type_line, oracle_text,
+              nullif(printed_text, ''), color_identity, commander_legal, mana_value,
+              usd, eur, tix,
               game_changer,
               setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
               setweight(to_tsvector('english', coalesce(type_line, '')), 'B') ||
-              setweight(to_tsvector('english', coalesce(oracle_text, '')), 'C')
+              setweight(to_tsvector('english', coalesce(oracle_text, '')), 'C'),
+              setweight(to_tsvector('simple', coalesce(printed_name, '')), 'A') ||
+              setweight(to_tsvector('simple', coalesce(printed_type_line, '')), 'B') ||
+              setweight(to_tsvector('simple', coalesce(printed_text, '')), 'C')
             from document_input
             on conflict (scryfall_id) do update
             set oracle_id = excluded.oracle_id,
                 name = excluded.name,
                 normalized_name = excluded.normalized_name,
+                lang = excluded.lang,
+                printed_name = excluded.printed_name,
+                normalized_printed_name = excluded.normalized_printed_name,
                 type_line = excluded.type_line,
+                printed_type_line = excluded.printed_type_line,
                 oracle_text = excluded.oracle_text,
+                printed_text = excluded.printed_text,
                 color_identity = excluded.color_identity,
                 commander_legal = excluded.commander_legal,
                 mana_value = excluded.mana_value,
@@ -458,6 +505,7 @@ impl<'a> ScryfallRepository<'a> {
                 tix = excluded.tix,
                 game_changer = excluded.game_changer,
                 document = excluded.document,
+                printed_document = excluded.printed_document,
                 updated_at = now()
             "#,
             imported.scryfall_id,
@@ -498,25 +546,41 @@ impl<'a> ScryfallRepository<'a> {
         let cards = sqlx::query_as!(
             CardSearchResult,
             r#"
-            select scryfall_id, oracle_id, name, type_line, oracle_text,
+            select scryfall_id, oracle_id, name, lang, printed_name,
+              coalesce(printed_name, name) as "display_name!",
+              type_line, printed_type_line,
+              coalesce(printed_type_line, type_line) as "display_type_line!",
+              oracle_text, printed_text,
+              coalesce(printed_text, oracle_text) as "display_text!",
               color_identity, commander_legal, mana_value, usd, game_changer,
               case
                 when $1::text is null then 0::real
-                else ts_rank_cd(document, websearch_to_tsquery('english', $1))::real
+                else greatest(
+                  ts_rank_cd(document, websearch_to_tsquery('english', $1)),
+                  ts_rank_cd(printed_document, websearch_to_tsquery('simple', $1))
+                )::real
               end as "text_rank!",
               case
                 when $1::text is null then 0::real
                 else greatest(
                   similarity(name, $1),
-                  similarity(normalized_name, regexp_replace(lower($1), '[^a-z0-9]+', '', 'g'))
+                  similarity(normalized_name, regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')),
+                  similarity(coalesce(printed_name, ''), $1),
+                  similarity(
+                    coalesce(normalized_printed_name, ''),
+                    regexp_replace(lower($1), '[^[:alnum:]]+', '', 'g')
+                  )
                 )::real
               end as "name_similarity!"
             from search.card_documents
             where (
                 $1::text is null
                 or document @@ websearch_to_tsquery('english', $1)
+                or printed_document @@ websearch_to_tsquery('simple', $1)
                 or name % $1
                 or normalized_name % regexp_replace(lower($1), '[^a-z0-9]+', '', 'g')
+                or printed_name % $1
+                or normalized_printed_name % regexp_replace(lower($1), '[^[:alnum:]]+', '', 'g')
               )
               and ($2::text[] is null or color_identity <@ $2)
               and ($3::boolean is null or commander_legal = $3)
@@ -524,8 +588,12 @@ impl<'a> ScryfallRepository<'a> {
               and ($5::double precision is null or mana_value <= $5)
               and ($6::double precision is null or usd <= $6)
               and ($7::boolean is null or game_changer = $7)
-              and ($8::text is null or type_line ilike '%' || $8 || '%')
-            order by 11 desc, 12 desc, name asc
+              and (
+                $8::text is null
+                or type_line ilike '%' || $8 || '%'
+                or printed_type_line ilike '%' || $8 || '%'
+              )
+            order by 18 desc, 19 desc, coalesce(printed_name, name) asc, name asc
             limit $9
             "#,
             query,
@@ -721,6 +789,89 @@ mod tests {
         assert!(expensive.is_empty());
     }
 
+    #[sqlx::test(migrations = "./migrations")]
+    async fn preserves_printed_language_fields_and_searches_localized_names(pool: sqlx::PgPool) {
+        let repo = ScryfallRepository::new(&pool);
+        let metadata = json!({
+            "type": "all_cards",
+            "updated_at": "2026-05-18T09:09:27.689+00:00",
+            "uri": "https://api.scryfall.com/bulk-data/all-cards",
+            "download_uri": "https://data.scryfall.io/all-cards/all-cards-20260518090927.json"
+        });
+        let import = repo
+            .create_import(ScryfallImportInput {
+                bulk_type: "all_cards",
+                source_uri: metadata["uri"].as_str().expect("uri"),
+                download_uri: metadata["download_uri"].as_str().expect("download_uri"),
+                source_updated_at: time::OffsetDateTime::parse(
+                    metadata["updated_at"].as_str().expect("updated_at"),
+                    &Rfc3339,
+                )
+                .expect("updated_at"),
+                content_type: "application/json",
+                content_encoding: Some("gzip"),
+                size_bytes: Some(800_000_000),
+                raw_metadata: &metadata,
+            })
+            .await
+            .expect("create import");
+
+        let raw = french_lightning_bolt_card();
+        let imported = repo
+            .upsert_card_from_scryfall_json(import.id, &raw)
+            .await
+            .expect("import localized card");
+
+        let printing = sqlx::query!(
+            r#"
+            select lang, printed_name, printed_type_line, printed_text
+            from mtg.card_printings
+            where scryfall_id = $1
+            "#,
+            imported.scryfall_id,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("printing");
+        assert_eq!(printing.lang, "fr");
+        assert_eq!(printing.printed_name.as_deref(), Some("Foudre"));
+        assert_eq!(printing.printed_type_line.as_deref(), Some("Ephémère"));
+        assert_eq!(
+            printing.printed_text.as_deref(),
+            Some("La Foudre inflige 3 blessures à n'importe quelle cible.")
+        );
+
+        let face = sqlx::query!(
+            r#"
+            select printed_name, printed_type_line, printed_text
+            from mtg.card_faces
+            where scryfall_id = $1 and face_index = 0
+            "#,
+            imported.scryfall_id,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("face");
+        assert_eq!(face.printed_name.as_deref(), Some("Foudre"));
+        assert_eq!(face.printed_type_line.as_deref(), Some("Ephémère"));
+
+        let localized = repo
+            .search_cards(CardSearchFilters {
+                query: Some("Foudre blessures"),
+                commander_legal: Some(true),
+                ..CardSearchFilters::default()
+            })
+            .await
+            .expect("localized search");
+        assert_eq!(localized[0].name, "Lightning Bolt");
+        assert_eq!(localized[0].lang, "fr");
+        assert_eq!(localized[0].printed_name.as_deref(), Some("Foudre"));
+        assert_eq!(localized[0].display_name, "Foudre");
+        assert_eq!(localized[0].display_type_line, "Ephémère");
+        assert!(localized[0].display_text.contains("blessures"));
+        assert!(localized[0].text_rank > 0.0 || localized[0].name_similarity > 0.0);
+    }
+
     fn atraxa_card() -> serde_json::Value {
         json!({
             "id": "00000000-0000-7000-8000-000000000001",
@@ -787,6 +938,43 @@ mod tests {
             "prices": {
                 "usd": "0.25",
                 "eur": "0.12",
+                "tix": "0.03"
+            }
+        })
+    }
+
+    fn french_lightning_bolt_card() -> serde_json::Value {
+        json!({
+            "id": "00000000-0000-7000-8000-000000000003",
+            "oracle_id": "10000000-0000-7000-8000-000000000003",
+            "name": "Lightning Bolt",
+            "printed_name": "Foudre",
+            "printed_type_line": "Ephémère",
+            "printed_text": "La Foudre inflige 3 blessures à n'importe quelle cible.",
+            "lang": "fr",
+            "released_at": "2017-03-17",
+            "layout": "normal",
+            "mana_cost": "{R}",
+            "cmc": 1.0,
+            "type_line": "Instant",
+            "oracle_text": "Lightning Bolt deals 3 damage to any target.",
+            "colors": ["R"],
+            "color_identity": ["R"],
+            "keywords": [],
+            "legalities": {
+                "commander": "legal",
+                "modern": "legal"
+            },
+            "reserved": false,
+            "game_changer": false,
+            "edhrec_rank": 85,
+            "set": "a25",
+            "collector_number": "141",
+            "rarity": "uncommon",
+            "artist": "Christopher Rush",
+            "prices": {
+                "usd": "1.25",
+                "eur": "1.00",
                 "tix": "0.03"
             }
         })

@@ -800,18 +800,24 @@ pub fn render_cards(cards: &[CardSearchResult], search: CardSearchView<'_>) -> S
                                         let price = card.usd
                                             .map(|usd| format!("${usd:.2}"))
                                             .unwrap_or_else(|| "No price".to_owned());
+                                        let canonical_name = (card.display_name != card.name)
+                                            .then(|| card.name.clone());
+                                        let language = (card.lang != "en")
+                                            .then(|| card.lang.to_ascii_uppercase());
                                         view! {
                                             <article class="list-item">
                                                 <div>
-                                                    <h2>{card.name}</h2>
-                                                    <p>{card.type_line}</p>
-                                                    <p>{truncate_text(&card.oracle_text, 180)}</p>
+                                                    <h2>{card.display_name}</h2>
+                                                    {canonical_name.map(|name| view! { <p>{name}</p> })}
+                                                    <p>{card.display_type_line}</p>
+                                                    <p>{truncate_text(&card.display_text, 180)}</p>
                                                 </div>
                                                 <dl class="compact-list inline">
                                                     <div><dt>"CI"</dt><dd>{colors}</dd></div>
                                                     <div><dt>"MV"</dt><dd>{card.mana_value.map(display_number).unwrap_or_else(|| "-".to_owned())}</dd></div>
                                                     <div><dt>"USD"</dt><dd>{price}</dd></div>
                                                     <div><dt>"Commander"</dt><dd>{yes_no(card.commander_legal)}</dd></div>
+                                                    {language.map(|lang| view! { <div><dt>"Lang"</dt><dd>{lang}</dd></div> })}
                                                 </dl>
                                             </article>
                                         }
