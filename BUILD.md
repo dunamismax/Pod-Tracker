@@ -516,10 +516,10 @@ state where documented verification passes on a clean checkout.
 
 ### Phase 17 - Localization And Card Languages
 
-- [ ] Decide supported application locales and document the policy before
+- [x] Decide supported application locales and document the policy before
       translating UI.
-- [ ] Store user locale, timezone, and date/time display preferences.
-- [ ] Keep event scheduling and calendar export correct across locale and
+- [x] Store user locale, timezone, and date/time display preferences.
+- [x] Keep event scheduling and calendar export correct across locale and
       timezone settings.
 - [ ] Preserve Scryfall language fields for printings and names.
 - [ ] Add multilingual card search where Scryfall data supports it.
@@ -790,3 +790,9 @@ Trust current primary docs over this file.
   collection, show owned percentage and missing-card reasons, preserve
   deck and collection visibility scopes, and document the path in the SQL
   Observatory and privacy model.
+- 2026-05-20 - Completed the first Phase 17 localization groundwork:
+  documented the initial `en-US` application-locale policy, added
+  persisted user locale/timezone/date-time display preferences, interpreted
+  authenticated event and RSVP form times in the viewer's timezone, kept
+  calendar exports UTC-canonical, and added focused preference,
+  formatting, and calendar tests.

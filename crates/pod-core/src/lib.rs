@@ -6,5 +6,6 @@ pub mod decks;
 pub mod events;
 pub mod games;
 pub mod health;
+pub mod localization;
 pub mod playgroups;
 pub mod pods;

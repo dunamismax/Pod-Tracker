@@ -41,7 +41,8 @@ pub use games::{
 };
 pub use health::HealthRepository;
 pub use identity::{
-    AccountRecord, AuthIdentityRecord, IdentityRepository, SessionRecord, UserRecord,
+    AccountRecord, AuthIdentityRecord, IdentityRepository, SessionRecord, UserPreferencesRecord,
+    UserRecord,
 };
 pub use meta::{
     META_DASHBOARD_REFRESH_JOB_TYPE, MetaAttendanceSummary, MetaCommanderPopularity, MetaDashboard,

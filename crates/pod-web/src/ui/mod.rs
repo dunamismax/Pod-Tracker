@@ -1,4 +1,8 @@
 use leptos::prelude::*;
+use pod_core::localization::{
+    UserPreferences, datetime_local_value as localized_datetime_local_value,
+    display_datetime as localized_display_datetime,
+};
 use pod_db::{
     CardSearchResult, CollectionCardRecord, CollectionDeckSuggestion, CollectionRecord,
     DeckBracketSnapshotRecord, DeckMissingCardRecord, DeckRecord, EventDeckDeclarationWithDeck,
@@ -6,11 +10,16 @@ use pod_db::{
     MetaDistributionMetric, PlaygroupSettingsRecord, PlaygroupWithRole, PodWithSeats,
     SimilarDeckRecommendation, WishlistCardRecord, WishlistMissingCardRecord, WishlistRecord,
 };
-use time::{OffsetDateTime, UtcOffset};
 
 use crate::server::{
     CollectionForm, DeckForm, EventEditForm, EventForm, EventPageContext, RsvpForm, WishlistForm,
 };
+
+pub struct SettingsChoices<'a> {
+    pub locales: &'a [(&'a str, &'a str)],
+    pub timezones: &'a [(&'a str, &'a str)],
+    pub date_time_formats: &'a [(&'a str, &'a str)],
+}
 
 pub fn render_home() -> String {
     view! {
@@ -401,8 +410,9 @@ pub fn render_playgroup_detail(
     .to_html()
 }
 
-pub fn render_events(events: &[EventWithRole]) -> String {
+pub fn render_events(events: &[EventWithRole], preferences: &UserPreferences) -> String {
     let events = events.to_vec();
+    let preferences = preferences.clone();
     let has_events = !events.is_empty();
 
     view! {
@@ -422,7 +432,7 @@ pub fn render_events(events: &[EventWithRole]) -> String {
                                 <article class="list-item">
                                     <div>
                                         <h2><a href=format!("/events/{}", event.id)>{event.title}</a></h2>
-                                        <p>{event.playgroup_name} " · " {display_datetime(event.start_time)}</p>
+                                        <p>{event.playgroup_name} " · " {display_datetime(event.start_time, &preferences)}</p>
                                     </div>
                                     <span class="badge">{event.visibility}</span>
                                 </article>
@@ -1517,11 +1527,13 @@ pub fn render_event_form(
 
 pub fn render_event_edit(
     event: &EventWithRole,
+    preferences: &UserPreferences,
     csrf_token: &str,
     error: Option<&str>,
     form: Option<&EventEditForm>,
 ) -> String {
     let event = event.clone();
+    let preferences = preferences.clone();
     let csrf_token = csrf_token.to_owned();
     let error = error.map(str::to_owned);
     let title = form
@@ -1534,10 +1546,13 @@ pub fn render_event_edit(
         .to_owned();
     let start_time = form
         .map(|form| form.start_time.clone())
-        .unwrap_or_else(|| datetime_local_value(event.start_time));
-    let end_time = form
-        .map(|form| form.end_time.clone())
-        .unwrap_or_else(|| event.end_time.map(datetime_local_value).unwrap_or_default());
+        .unwrap_or_else(|| datetime_local_value(event.start_time, &preferences));
+    let end_time = form.map(|form| form.end_time.clone()).unwrap_or_else(|| {
+        event
+            .end_time
+            .map(|value| datetime_local_value(value, &preferences))
+            .unwrap_or_default()
+    });
     let visibility = form
         .map(|form| form.visibility.as_str())
         .unwrap_or(&event.visibility)
@@ -1563,10 +1578,12 @@ pub fn render_event_edit(
 pub fn render_event_detail(
     event: &EventWithRole,
     context: &EventPageContext,
+    preferences: &UserPreferences,
     csrf_token: &str,
 ) -> String {
     let event = event.clone();
     let context = context.clone();
+    let preferences = preferences.clone();
     let csrf_token = csrf_token.to_owned();
     let public_url = (event.visibility == "public_safe")
         .then(|| {
@@ -1587,7 +1604,7 @@ pub fn render_event_detail(
                 <section class="page-header">
                     <p class="eyebrow">{event.playgroup_name.clone()}</p>
                     <h1>{event.title.clone()}</h1>
-                    <p class="lede">{display_datetime(event.start_time)}</p>
+                    <p class="lede">{display_datetime(event.start_time, &preferences)}</p>
                     <nav class="actions" aria-label="Event actions">
                         {context.can_edit.then(|| view! { <a class="button primary" href=format!("/events/{}/edit", event.id)>"Edit"</a> })}
                         <a class="button secondary" href=format!("/events/{}/pods", event.id)>"Pods"</a>
@@ -1598,7 +1615,7 @@ pub fn render_event_detail(
                     <LocationBlock location=context.location.clone() show_address=context.show_address/>
                 </section>
                 <section class="split-layout">
-                    <RsvpPanel event_id=event.id csrf_token=csrf_token.clone() user_rsvp=context.user_rsvp.clone()/>
+                    <RsvpPanel event_id=event.id csrf_token=csrf_token.clone() user_rsvp=context.user_rsvp.clone() preferences=preferences.clone()/>
                     <AttendeeList rsvps=context.rsvps/>
                 </section>
                 <section class="split-layout section-gap">
@@ -1612,7 +1629,7 @@ pub fn render_event_detail(
                         pods=context.pods
                         can_edit=context.can_edit
                     />
-                    <GameHistoryList games=context.games/>
+                    <GameHistoryList games=context.games preferences=preferences/>
                 </section>
             </main>
         </AppShell>
@@ -1623,11 +1640,13 @@ pub fn render_event_detail(
 pub fn render_event_pods(
     event: &EventWithRole,
     pods: &[PodWithSeats],
+    preferences: &UserPreferences,
     csrf_token: &str,
     can_edit: bool,
 ) -> String {
     let event = event.clone();
     let pods = pods.to_vec();
+    let preferences = preferences.clone();
     let csrf_token = csrf_token.to_owned();
     let pod_options = pods
         .iter()
@@ -1640,7 +1659,7 @@ pub fn render_event_pods(
                 <section class="page-header">
                     <p class="eyebrow">{event.playgroup_name.clone()}</p>
                     <h1>{event.title.clone()} " pods"</h1>
-                    <p class="lede">{display_datetime(event.start_time)}</p>
+                    <p class="lede">{display_datetime(event.start_time, &preferences)}</p>
                     <nav class="actions" aria-label="Pod actions">
                         <a class="button secondary" href=format!("/events/{}", event.id)>"Event"</a>
                         {can_edit.then(|| view! {
@@ -1742,6 +1761,7 @@ pub fn render_event_pods(
 pub fn render_public_event(event: &EventRecord, context: &EventPageContext) -> String {
     let event = event.clone();
     let context = context.clone();
+    let preferences = UserPreferences::default();
     let invite_url = event
         .invite_token
         .as_ref()
@@ -1753,7 +1773,7 @@ pub fn render_public_event(event: &EventRecord, context: &EventPageContext) -> S
                 <section class="page-header">
                     <p class="eyebrow">"Event"</p>
                     <h1>{event.title.clone()}</h1>
-                    <p class="lede">{display_datetime(event.start_time)}</p>
+                    <p class="lede">{display_datetime(event.start_time, &preferences)}</p>
                     <p class="body-copy">{event.description.clone()}</p>
                     <LocationBlock location=context.location show_address=context.show_address/>
                     <nav class="actions" aria-label="Public event">
@@ -1775,6 +1795,7 @@ pub fn render_guest_rsvp(
 ) -> String {
     let event = event.clone();
     let context = context.clone();
+    let preferences = UserPreferences::default();
     let csrf_token = csrf_token.to_owned();
     let error = error.map(str::to_owned);
     let guest_name = form
@@ -1796,7 +1817,7 @@ pub fn render_guest_rsvp(
                 <form method="post" action=format!("/rsvp/{}", event.invite_token.clone().unwrap_or_default()) class="form-panel">
                     <p class="eyebrow">"Guest RSVP"</p>
                     <h1>{event.title.clone()}</h1>
-                    <p class="lede">{display_datetime(event.start_time)}</p>
+                    <p class="lede">{display_datetime(event.start_time, &preferences)}</p>
                     <LocationBlock location=context.location show_address=context.show_address/>
                     {error.map(|message| view! { <p class="form-error">{message}</p> })}
                     <input type="hidden" name="csrf_token" value=csrf_token/>
@@ -1810,10 +1831,34 @@ pub fn render_guest_rsvp(
     .to_html()
 }
 
-pub fn render_settings(email: &str, display_name: &str, csrf_token: &str) -> String {
+pub fn render_settings(
+    email: &str,
+    display_name: &str,
+    preferences: &UserPreferences,
+    choices: SettingsChoices<'_>,
+    csrf_token: &str,
+    error: Option<&str>,
+) -> String {
     let email = email.to_owned();
     let display_name = display_name.to_owned();
+    let preferences = preferences.clone();
+    let locales = choices
+        .locales
+        .iter()
+        .map(|(value, label)| ((*value).to_owned(), (*label).to_owned()))
+        .collect::<Vec<_>>();
+    let timezones = choices
+        .timezones
+        .iter()
+        .map(|(value, label)| ((*value).to_owned(), (*label).to_owned()))
+        .collect::<Vec<_>>();
+    let date_time_formats = choices
+        .date_time_formats
+        .iter()
+        .map(|(value, label)| ((*value).to_owned(), (*label).to_owned()))
+        .collect::<Vec<_>>();
     let csrf_token = csrf_token.to_owned();
+    let error = error.map(str::to_owned);
 
     view! {
         <AppShell title="Settings" account_label="Account" account_href="/settings">
@@ -1827,6 +1872,36 @@ pub fn render_settings(email: &str, display_name: &str, csrf_token: &str) -> Str
                             <dd>{email}</dd>
                         </div>
                     </dl>
+                    <form method="post" action="/settings" class="form-panel">
+                        <h2>"Display"</h2>
+                        {error.map(|message| view! { <p class="form-error">{message}</p> })}
+                        <input type="hidden" name="csrf_token" value=csrf_token.clone()/>
+                        <label>
+                            "Locale"
+                            <select name="locale">
+                                {locales.into_iter().map(|(value, label)| view! {
+                                    <option value=value.clone() selected=value == preferences.locale.as_str()>{label}</option>
+                                }).collect_view()}
+                            </select>
+                        </label>
+                        <label>
+                            "Timezone"
+                            <select name="timezone">
+                                {timezones.into_iter().map(|(value, label)| view! {
+                                    <option value=value.clone() selected=value == preferences.timezone.as_str()>{label}</option>
+                                }).collect_view()}
+                            </select>
+                        </label>
+                        <label>
+                            "Date and time"
+                            <select name="date_time_format">
+                                {date_time_formats.into_iter().map(|(value, label)| view! {
+                                    <option value=value.clone() selected=value == preferences.date_time_format.as_str()>{label}</option>
+                                }).collect_view()}
+                            </select>
+                        </label>
+                        <button class="button primary" type="submit">"Save settings"</button>
+                    </form>
                     <form method="post" action="/logout" class="inline-form">
                         <input type="hidden" name="csrf_token" value=csrf_token/>
                         <button class="button secondary" type="submit">"Log out"</button>
@@ -1838,8 +1913,9 @@ pub fn render_settings(email: &str, display_name: &str, csrf_token: &str) -> Str
     .to_html()
 }
 
-pub fn render_meta_dashboard(dashboard: &MetaDashboard) -> String {
+pub fn render_meta_dashboard(dashboard: &MetaDashboard, preferences: &UserPreferences) -> String {
     let dashboard = dashboard.clone();
+    let preferences = preferences.clone();
     let has_playgroups = !dashboard.attendance.is_empty();
 
     view! {
@@ -1907,7 +1983,7 @@ pub fn render_meta_dashboard(dashboard: &MetaDashboard) -> String {
                                     <section class="section-gap">
                                         <div class="section-heading">
                                             <h2>{group.playgroup_name.clone()}</h2>
-                                            <span>{group.last_event_at.map(display_datetime).unwrap_or_else(|| "No events".to_owned())}</span>
+                                            <span>{group.last_event_at.map(|value| display_datetime(value, &preferences)).unwrap_or_else(|| "No events".to_owned())}</span>
                                         </div>
                                         <dl class="status-list">
                                             <div><dt>"Events"</dt><dd>{group.events_total}</dd></div>
@@ -1961,7 +2037,7 @@ pub fn render_meta_dashboard(dashboard: &MetaDashboard) -> String {
                                                             {matchup_history.into_iter().map(|metric| view! {
                                                                 <div>
                                                                     <dt>{format!("{}: {}", metric.matchup_type, metric.games_together)}</dt>
-                                                                    <dd>{format!("{} vs {} · {}", metric.left_label, metric.right_label, display_datetime(metric.last_played_at))}</dd>
+                                                                    <dd>{format!("{} vs {} · {}", metric.left_label, metric.right_label, display_datetime(metric.last_played_at, &preferences))}</dd>
                                                                 </div>
                                                             }).collect_view()}
                                                         </dl>
@@ -2424,7 +2500,7 @@ fn GameLogPanel(
 }
 
 #[component]
-fn GameHistoryList(games: Vec<GameWithPlayers>) -> impl IntoView {
+fn GameHistoryList(games: Vec<GameWithPlayers>, preferences: UserPreferences) -> impl IntoView {
     let has_games = !games.is_empty();
 
     view! {
@@ -2443,7 +2519,7 @@ fn GameHistoryList(games: Vec<GameWithPlayers>) -> impl IntoView {
                                 "{} · {} players · {}",
                                 result_type_label(&game.game.result_type),
                                 game.players.len(),
-                                display_datetime(game.game.completed_at)
+                                display_datetime(game.game.completed_at, &preferences)
                             );
                             let mut eliminated = game
                                 .players
@@ -2521,6 +2597,7 @@ fn RsvpPanel(
     event_id: uuid::Uuid,
     csrf_token: String,
     user_rsvp: Option<EventRsvpRecord>,
+    preferences: UserPreferences,
 ) -> impl IntoView {
     let status = user_rsvp
         .as_ref()
@@ -2530,12 +2607,12 @@ fn RsvpPanel(
     let arrival_time = user_rsvp
         .as_ref()
         .and_then(|rsvp| rsvp.arrival_time)
-        .map(datetime_local_value)
+        .map(|value| datetime_local_value(value, &preferences))
         .unwrap_or_default();
     let leaving_time = user_rsvp
         .as_ref()
         .and_then(|rsvp| rsvp.leaving_time)
-        .map(datetime_local_value)
+        .map(|value| datetime_local_value(value, &preferences))
         .unwrap_or_default();
     let guest_count = user_rsvp
         .as_ref()
@@ -2657,28 +2734,12 @@ fn LocationBlock(
     }
 }
 
-fn datetime_local_value(value: OffsetDateTime) -> String {
-    let value = value.to_offset(UtcOffset::UTC);
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}",
-        value.year(),
-        u8::from(value.month()),
-        value.day(),
-        value.hour(),
-        value.minute()
-    )
+fn datetime_local_value(value: time::OffsetDateTime, preferences: &UserPreferences) -> String {
+    localized_datetime_local_value(value, preferences)
 }
 
-fn display_datetime(value: OffsetDateTime) -> String {
-    let value = value.to_offset(UtcOffset::UTC);
-    format!(
-        "{:04}-{:02}-{:02} {:02}:{:02} UTC",
-        value.year(),
-        u8::from(value.month()),
-        value.day(),
-        value.hour(),
-        value.minute()
-    )
+fn display_datetime(value: time::OffsetDateTime, preferences: &UserPreferences) -> String {
+    localized_display_datetime(value, preferences)
 }
 
 fn percent_label(value: i32) -> String {

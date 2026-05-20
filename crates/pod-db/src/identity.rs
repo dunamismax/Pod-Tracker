@@ -49,6 +49,15 @@ pub struct AuthIdentityRecord {
     pub last_used_at: Option<OffsetDateTime>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserPreferencesRecord {
+    pub user_id: Uuid,
+    pub locale: String,
+    pub timezone: String,
+    pub date_time_format: String,
+    pub updated_at: OffsetDateTime,
+}
+
 pub struct IdentityRepository<'a> {
     pool: &'a PgPool,
 }
@@ -181,6 +190,54 @@ impl<'a> IdentityRepository<'a> {
         .await?;
 
         Ok(identity)
+    }
+
+    pub async fn get_user_preferences(
+        &self,
+        user_id: Uuid,
+    ) -> Result<Option<UserPreferencesRecord>, DbError> {
+        let preferences = sqlx::query_as!(
+            UserPreferencesRecord,
+            r#"
+            select id as user_id, locale, timezone, date_time_format, updated_at
+            from core.users
+            where id = $1
+            "#,
+            user_id
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(preferences)
+    }
+
+    pub async fn update_user_preferences(
+        &self,
+        user_id: Uuid,
+        locale: &str,
+        timezone: &str,
+        date_time_format: &str,
+    ) -> Result<Option<UserPreferencesRecord>, DbError> {
+        let preferences = sqlx::query_as!(
+            UserPreferencesRecord,
+            r#"
+            update core.users
+            set locale = $2,
+                timezone = $3,
+                date_time_format = $4,
+                updated_at = now()
+            where id = $1
+            returning id as user_id, locale, timezone, date_time_format, updated_at
+            "#,
+            user_id,
+            locale,
+            timezone,
+            date_time_format
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(preferences)
     }
 
     pub async fn create_session(
@@ -371,5 +428,37 @@ mod tests {
                 .await
                 .expect("revoke second session")
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn stores_user_locale_timezone_and_display_preferences(pool: sqlx::PgPool) {
+        let repo = IdentityRepository::new(&pool);
+        let user = repo
+            .create_user(
+                "preferences@example.test",
+                "Preference Player",
+                "$argon2id$v=19$m=19456,t=2,p=1$placeholder",
+            )
+            .await
+            .expect("create user");
+
+        let defaults = repo
+            .get_user_preferences(user.id)
+            .await
+            .expect("get preferences")
+            .expect("preferences");
+        assert_eq!(defaults.locale, "en-US");
+        assert_eq!(defaults.timezone, "UTC");
+        assert_eq!(defaults.date_time_format, "locale_default");
+
+        let updated = repo
+            .update_user_preferences(user.id, "en-US", "America/New_York", "iso_24h")
+            .await
+            .expect("update preferences")
+            .expect("preferences");
+        assert_eq!(updated.locale, "en-US");
+        assert_eq!(updated.timezone, "America/New_York");
+        assert_eq!(updated.date_time_format, "iso_24h");
+        assert!(updated.updated_at >= defaults.updated_at);
     }
 }

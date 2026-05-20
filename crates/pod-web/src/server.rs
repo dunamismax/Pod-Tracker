@@ -29,6 +29,10 @@ use pod_core::events::{
 };
 use pod_core::games::{GameResultType, normalize_game_tags};
 use pod_core::health::{HealthResponse, ReadinessFailure};
+use pod_core::localization::{
+    UserPreferences, parse_datetime_local_in_timezone, supported_date_time_formats,
+    supported_locales, supported_timezones,
+};
 use pod_core::playgroups::{PlaygroupRole, slugify};
 use pod_db::{
     AddCollectionCardInput, AddWishlistCardInput, AuditRepository, CardSearchFilters,
@@ -37,11 +41,11 @@ use pod_db::{
     EventDeckDeclarationWithDeck, EventLocationInput, EventRepository, EventRsvpRecord,
     EventWithRole, GameRepository, GameWithPlayers, IdentityRepository, LogGameInput,
     MetaRepository, PlaygroupRepository, PodRepository, PodWithSeats, RsvpInput,
-    ScryfallRepository, UpdateEventInput, UserRecord,
+    ScryfallRepository, UpdateEventInput, UserPreferencesRecord, UserRecord,
 };
 use serde::Deserialize;
 use sqlx::PgPool;
-use time::{Date, Duration, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
+use time::{Duration, OffsetDateTime, UtcOffset};
 use tower_http::compression::CompressionLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::services::ServeDir;
@@ -81,7 +85,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/signup", get(signup_form).post(signup))
         .route("/login", get(login_form).post(login))
         .route("/logout", post(logout))
-        .route("/settings", get(settings))
+        .route("/settings", get(settings).post(update_settings))
         .route("/home", get(dashboard))
         .route("/playgroups", get(playgroups).post(create_playgroup))
         .route("/playgroups/{slug}", get(playgroup_detail))
@@ -629,13 +633,98 @@ async fn settings(State(state): State<AppState>, headers: HeaderMap) -> Response
     let Some(user) = require_user(&state, &headers).await else {
         return Redirect::to("/login").into_response();
     };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let preferences = match load_user_preferences(pool, user.id).await {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            tracing::error!(err = %err, "load user preferences");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
     let csrf = ensure_csrf_cookie(&headers, &state.config);
     html_with_cookies(
         StatusCode::OK,
-        ui::render_settings(&user.email, &user.display_name, &csrf.token),
+        ui::render_settings(
+            &user.email,
+            &user.display_name,
+            &preferences,
+            ui::SettingsChoices {
+                locales: supported_locales(),
+                timezones: supported_timezones(),
+                date_time_formats: supported_date_time_formats(),
+            },
+            &csrf.token,
+            None,
+        ),
         csrf.set_cookie,
     )
+}
+
+async fn update_settings(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<SettingsForm>,
+) -> Response {
+    if !csrf_valid(&headers, &form.csrf_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(user) = require_user(&state, &headers).await else {
+        return Redirect::to("/login").into_response();
+    };
+    let Some(pool) = state.db.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+
+    let csrf = ensure_csrf_cookie(&headers, &state.config);
+    let preferences = match UserPreferences::validate(
+        form.locale.trim(),
+        form.timezone.trim(),
+        form.date_time_format.trim(),
+    ) {
+        Ok(preferences) => preferences,
+        Err(_) => {
+            let fallback = load_user_preferences(pool, user.id)
+                .await
+                .unwrap_or_default();
+            return html_with_cookies(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                ui::render_settings(
+                    &user.email,
+                    &user.display_name,
+                    &fallback,
+                    ui::SettingsChoices {
+                        locales: supported_locales(),
+                        timezones: supported_timezones(),
+                        date_time_formats: supported_date_time_formats(),
+                    },
+                    &csrf.token,
+                    Some("Choose supported locale and date/time settings."),
+                ),
+                csrf.set_cookie,
+            );
+        }
+    };
+
+    match IdentityRepository::new(pool)
+        .update_user_preferences(
+            user.id,
+            &preferences.locale,
+            &preferences.timezone,
+            &preferences.date_time_format,
+        )
+        .await
+    {
+        Ok(Some(_)) => Redirect::to("/settings").into_response(),
+        Ok(None) => StatusCode::NOT_FOUND.into_response(),
+        Err(err) => {
+            tracing::error!(err = %err, "update user preferences");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
+    }
 }
 
 async fn dashboard(State(state): State<AppState>, headers: HeaderMap) -> Response {
@@ -832,8 +921,15 @@ async fn events(State(state): State<AppState>, headers: HeaderMap) -> Response {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
+    let preferences = match load_user_preferences(pool, user.id).await {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            tracing::error!(err = %err, "load event list preferences");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
-    Html(ui::render_events(&events)).into_response()
+    Html(ui::render_events(&events, &preferences)).into_response()
 }
 
 async fn decks(
@@ -1714,8 +1810,15 @@ async fn meta_dashboard(State(state): State<AppState>, headers: HeaderMap) -> Re
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
+    let preferences = match load_user_preferences(pool, user.id).await {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            tracing::error!(err = %err, "load meta preferences");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
-    Html(ui::render_meta_dashboard(&dashboard)).into_response()
+    Html(ui::render_meta_dashboard(&dashboard, &preferences)).into_response()
 }
 
 async fn new_event_form(
@@ -1783,6 +1886,13 @@ async fn create_event(
     }
 
     let csrf = ensure_csrf_cookie(&headers, &state.config);
+    let preferences = match load_user_preferences(pool, user.id).await {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            tracing::error!(err = %err, "load create event preferences");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
     let title = form.title.trim();
     let description = form.description.trim();
     let visibility = match EventVisibility::try_from(form.visibility.trim()) {
@@ -1815,7 +1925,7 @@ async fn create_event(
             );
         }
     };
-    let start_time = match parse_datetime_local(&form.start_time) {
+    let start_time = match parse_datetime_local(&form.start_time, &preferences) {
         Some(start_time) if !title.is_empty() => start_time,
         _ => {
             return html_with_cookies(
@@ -1830,7 +1940,7 @@ async fn create_event(
             );
         }
     };
-    let end_time = parse_optional_datetime_local(&form.end_time);
+    let end_time = parse_optional_datetime_local(&form.end_time, &preferences);
     let location_name = form.location_name.trim();
     let location = (!location_name.is_empty()).then(|| EventLocationInput {
         name: location_name,
@@ -1927,10 +2037,17 @@ async fn event_detail(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
+    let preferences = match load_user_preferences(pool, user.id).await {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            tracing::error!(err = %err, "load event detail preferences");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
     let csrf = ensure_csrf_cookie(&headers, &state.config);
     html_with_cookies(
         StatusCode::OK,
-        ui::render_event_detail(&event, &context, &csrf.token),
+        ui::render_event_detail(&event, &context, &preferences, &csrf.token),
         csrf.set_cookie,
     )
 }
@@ -1963,6 +2080,13 @@ async fn event_pods(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
+    let preferences = match load_user_preferences(pool, user.id).await {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            tracing::error!(err = %err, "load event pods preferences");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
     let csrf = ensure_csrf_cookie(&headers, &state.config);
 
     html_with_cookies(
@@ -1970,6 +2094,7 @@ async fn event_pods(
         ui::render_event_pods(
             &event,
             &pods,
+            &preferences,
             &csrf.token,
             role.is_some_and(can_manage_event),
         ),
@@ -2192,10 +2317,17 @@ async fn edit_event_form(
         return StatusCode::FORBIDDEN.into_response();
     }
 
+    let preferences = match load_user_preferences(pool, user.id).await {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            tracing::error!(err = %err, "load edit event preferences");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
     let csrf = ensure_csrf_cookie(&headers, &state.config);
     html_with_cookies(
         StatusCode::OK,
-        ui::render_event_edit(&event, &csrf.token, None, None),
+        ui::render_event_edit(&event, &preferences, &csrf.token, None, None),
         csrf.set_cookie,
     )
 }
@@ -2229,6 +2361,13 @@ async fn update_event(
         return StatusCode::FORBIDDEN.into_response();
     }
 
+    let preferences = match load_user_preferences(pool, user.id).await {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            tracing::error!(err = %err, "load update event preferences");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
     let csrf = ensure_csrf_cookie(&headers, &state.config);
     let title = form.title.trim();
     let visibility = match EventVisibility::try_from(form.visibility.trim()) {
@@ -2238,6 +2377,7 @@ async fn update_event(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 ui::render_event_edit(
                     &event,
+                    &preferences,
                     &csrf.token,
                     Some("Choose a valid event visibility."),
                     Some(&form),
@@ -2246,13 +2386,14 @@ async fn update_event(
             );
         }
     };
-    let start_time = match parse_datetime_local(&form.start_time) {
+    let start_time = match parse_datetime_local(&form.start_time, &preferences) {
         Some(start_time) if !title.is_empty() => start_time,
         _ => {
             return html_with_cookies(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 ui::render_event_edit(
                     &event,
+                    &preferences,
                     &csrf.token,
                     Some("Title and start time are required."),
                     Some(&form),
@@ -2268,7 +2409,7 @@ async fn update_event(
             title,
             description: form.description.trim(),
             start_time,
-            end_time: parse_optional_datetime_local(&form.end_time),
+            end_time: parse_optional_datetime_local(&form.end_time, &preferences),
             visibility: visibility.as_str(),
         })
         .await
@@ -2305,7 +2446,14 @@ async fn save_user_rsvp(
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     }
-    let rsvp = match parse_rsvp_input(id, Some(user.id), None, &form) {
+    let preferences = match load_user_preferences(pool, user.id).await {
+        Ok(preferences) => preferences,
+        Err(err) => {
+            tracing::error!(err = %err, "load rsvp preferences");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let rsvp = match parse_rsvp_input(id, Some(user.id), None, &form, &preferences) {
         Ok(rsvp) => rsvp,
         Err(()) => return StatusCode::BAD_REQUEST.into_response(),
     };
@@ -2567,7 +2715,13 @@ async fn save_guest_rsvp(
             csrf.set_cookie,
         );
     }
-    let rsvp = match parse_rsvp_input(event.id, None, Some(guest_name), &form) {
+    let rsvp = match parse_rsvp_input(
+        event.id,
+        None,
+        Some(guest_name),
+        &form,
+        &UserPreferences::default(),
+    ) {
         Ok(rsvp) => rsvp,
         Err(()) => return StatusCode::BAD_REQUEST.into_response(),
     };
@@ -2629,6 +2783,14 @@ struct LoginForm {
 
 #[derive(Debug, Deserialize)]
 struct CsrfForm {
+    csrf_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SettingsForm {
+    locale: String,
+    timezone: String,
+    date_time_format: String,
     csrf_token: String,
 }
 
@@ -2968,6 +3130,22 @@ async fn load_current_user(
     repo.find_user_by_id(session.user_id).await
 }
 
+async fn load_user_preferences(
+    pool: &PgPool,
+    user_id: uuid::Uuid,
+) -> Result<UserPreferences, DbError> {
+    Ok(IdentityRepository::new(pool)
+        .get_user_preferences(user_id)
+        .await?
+        .map(preferences_from_record)
+        .unwrap_or_default())
+}
+
+fn preferences_from_record(record: UserPreferencesRecord) -> UserPreferences {
+    UserPreferences::validate(&record.locale, &record.timezone, &record.date_time_format)
+        .unwrap_or_default()
+}
+
 async fn start_session(
     state: &AppState,
     headers: &HeaderMap,
@@ -3298,6 +3476,7 @@ fn parse_rsvp_input<'a>(
     user_id: Option<uuid::Uuid>,
     guest_name: Option<&'a str>,
     form: &'a RsvpForm,
+    preferences: &UserPreferences,
 ) -> Result<RsvpInput<'a>, ()> {
     let status = RsvpStatus::try_from(form.status.trim())?;
     let guest_count = parse_optional_i32(&form.guest_count)
@@ -3316,8 +3495,8 @@ fn parse_rsvp_input<'a>(
         user_id,
         guest_name,
         status: status.as_str(),
-        arrival_time: parse_optional_datetime_local(&form.arrival_time),
-        leaving_time: parse_optional_datetime_local(&form.leaving_time),
+        arrival_time: parse_optional_datetime_local(&form.arrival_time, preferences),
+        leaving_time: parse_optional_datetime_local(&form.leaving_time, preferences),
         guest_count,
         travel_buffer_minutes,
         notes: form.notes.trim(),
@@ -3592,35 +3771,20 @@ fn parse_elimination_order(form: &GameLogForm) -> Result<Vec<uuid::Uuid>, ()> {
     .collect()
 }
 
-fn parse_optional_datetime_local(value: &str) -> Option<OffsetDateTime> {
+fn parse_optional_datetime_local(
+    value: &str,
+    preferences: &UserPreferences,
+) -> Option<OffsetDateTime> {
     let value = value.trim();
     if value.is_empty() {
         None
     } else {
-        parse_datetime_local(value)
+        parse_datetime_local(value, preferences)
     }
 }
 
-fn parse_datetime_local(value: &str) -> Option<OffsetDateTime> {
-    let (date, time) = value.trim().split_once('T')?;
-    let mut date_parts = date.split('-');
-    let year = date_parts.next()?.parse::<i32>().ok()?;
-    let month = Month::try_from(date_parts.next()?.parse::<u8>().ok()?).ok()?;
-    let day = date_parts.next()?.parse::<u8>().ok()?;
-    if date_parts.next().is_some() {
-        return None;
-    }
-
-    let mut time_parts = time.split(':');
-    let hour = time_parts.next()?.parse::<u8>().ok()?;
-    let minute = time_parts.next()?.parse::<u8>().ok()?;
-    if time_parts.next().is_some() {
-        return None;
-    }
-
-    let date = Date::from_calendar_date(year, month, day).ok()?;
-    let time = Time::from_hms(hour, minute, 0).ok()?;
-    Some(PrimitiveDateTime::new(date, time).assume_offset(UtcOffset::UTC))
+fn parse_datetime_local(value: &str, preferences: &UserPreferences) -> Option<OffsetDateTime> {
+    parse_datetime_local_in_timezone(value, &preferences.timezone).ok()
 }
 
 fn new_public_token() -> String {
@@ -3980,6 +4144,63 @@ mod tests {
             .expect("response");
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[sqlx::test(migrations = "../pod-db/migrations")]
+    async fn settings_update_locale_timezone_and_display_preferences(pool: sqlx::PgPool) {
+        let app = build_router(test_state_with_db(pool.clone()));
+        let user = sign_up(&app, "settings-owner@example.test", "Settings Owner").await;
+
+        let settings = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/settings")
+                    .header("cookie", user.cookie_header.clone())
+                    .body(Body::empty())
+                    .expect("request"),
+            )
+            .await
+            .expect("settings");
+        assert_eq!(settings.status(), StatusCode::OK);
+        let settings_body = body_string(settings).await;
+        assert!(settings_body.contains("UTC"));
+        assert!(settings_body.contains("Locale default"));
+
+        let update = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/settings")
+                    .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .header("cookie", user.cookie_header)
+                    .body(Body::from(format!(
+                        "locale=en-US&timezone=America%2FNew_York&date_time_format=iso_24h&csrf_token={}",
+                        user.csrf_token
+                    )))
+                    .expect("request"),
+            )
+            .await
+            .expect("update settings");
+        assert_eq!(update.status(), StatusCode::SEE_OTHER);
+        assert_eq!(
+            update.headers().get(LOCATION).expect("location"),
+            "/settings"
+        );
+
+        let user_record = IdentityRepository::new(&pool)
+            .find_user_by_email("settings-owner@example.test")
+            .await
+            .expect("user")
+            .expect("user");
+        let preferences = IdentityRepository::new(&pool)
+            .get_user_preferences(user_record.id)
+            .await
+            .expect("preferences")
+            .expect("preferences");
+        assert_eq!(preferences.locale, "en-US");
+        assert_eq!(preferences.timezone, "America/New_York");
+        assert_eq!(preferences.date_time_format, "iso_24h");
     }
 
     #[tokio::test]
@@ -4785,6 +5006,16 @@ mod tests {
     async fn guest_rsvp_and_calendar_feed_are_scoped(pool: sqlx::PgPool) {
         let app = build_router(test_state_with_db(pool.clone()));
         let owner = sign_up(&app, "calendar-owner@example.test", "Owner").await;
+        let owner_user = IdentityRepository::new(&pool)
+            .find_user_by_email("calendar-owner@example.test")
+            .await
+            .expect("owner user")
+            .expect("owner user");
+        IdentityRepository::new(&pool)
+            .update_user_preferences(owner_user.id, "en-US", "America/New_York", "iso_24h")
+            .await
+            .expect("update owner preferences")
+            .expect("owner preferences");
 
         let create_playgroup = app
             .clone()
@@ -4903,6 +5134,7 @@ mod tests {
         assert_eq!(calendar.status(), StatusCode::OK);
         let calendar_body = body_string(calendar).await;
         assert!(calendar_body.contains("BEGIN:VCALENDAR"));
+        assert!(calendar_body.contains("DTSTART:20260602T223000Z"));
         assert!(calendar_body.contains("SUMMARY:Calendar Pods"));
         assert!(calendar_body.contains("LOCATION:Private House"));
         assert!(!calendar_body.contains("456 Hidden Ave"));
