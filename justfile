@@ -3,7 +3,6 @@ set dotenv-load := true
 database_url := env_var_or_default("POD_TRACKER_DATABASE_URL", "postgres://pod_tracker:pod_tracker@localhost:5432/pod_tracker?sslmode=disable")
 migration_database_url := env_var_or_default("POD_TRACKER_MIGRATION_DATABASE_URL", database_url)
 export DATABASE_URL := env_var_or_default("DATABASE_URL", database_url)
-goose := "go run github.com/pressly/goose/v3/cmd/goose@v3.27.1"
 
 default:
   just --list
@@ -50,9 +49,6 @@ systemd-verify:
     grep -q '^EnvironmentFile=/etc/pod-tracker/env$' deploy/systemd/pod-tracker-worker.service
   fi
 
-legacy-go-test:
-  go test ./...
-
 db-create:
   createdb pod_tracker
 
@@ -77,7 +73,9 @@ migrate-smoke:
   db="pod_tracker_smoke_$(date +%s)"
   createdb "$db"
   trap 'dropdb --if-exists "$db" >/dev/null' EXIT
-  {{goose}} -dir migrations postgres "postgres://$(whoami)@localhost:5432/$db?sslmode=disable" up
+  for migration in crates/pod-db/migrations/*.sql; do
+    psql -v ON_ERROR_STOP=1 -d "$db" -f "$migration" >/dev/null
+  done
   psql -d "$db" -Atc "select extname from pg_extension where extname in ('pgcrypto','pg_trgm','pg_stat_statements','btree_gin') order by extname"
 
 sqlx-migrate-smoke:

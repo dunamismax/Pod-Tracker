@@ -36,7 +36,7 @@ impl<'a> HealthRepository<'a> {
               select 1
               from information_schema.tables
               where table_schema = 'public'
-                and table_name in ('goose_db_version', '_sqlx_migrations')
+                and table_name = '_sqlx_migrations'
             ) as "exists!"
             "#
         )

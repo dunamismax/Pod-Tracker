@@ -93,16 +93,8 @@ recipe. It is not a production command.
 
 ## Migrations
 
-The current migration history was inherited from the Go reference
-implementation and remains numbered as-is. SQL migrations live in
-`migrations/` and still carry Goose annotations because the historical Go
-path remains available for reference until a focused cleanup removes it.
-
-The Rust `pod-db` crate owns a SQLx-compatible copy of the current
-forward migrations in `crates/pod-db/migrations/`. These files intentionally
-do not include Goose down sections because SQLx would execute them as
-ordinary SQL. Keep the two migration sources in sync while the Go/Goose
-reference files remain in the repository.
+SQLx migrations in `crates/pod-db/migrations/` are the canonical schema
+history. The legacy Go/Goose migration copy has been removed.
 
 Useful commands:
 
@@ -137,9 +129,7 @@ crate against that database so SQLx query macros are validated.
 
 ## SQL Generation
 
-Rust database access goes through `sqlx` in `crates/pod-db`. The old
-`sqlc` output remains only as reference behavior until Stephen explicitly
-scopes a cleanup pass.
+Rust database access goes through `sqlx` in `crates/pod-db`.
 
 The current query-check workflow uses a live local PostgreSQL database
 rather than committed SQLx offline metadata. CI applies
@@ -172,6 +162,3 @@ compile checks. If the long-lived local `pod_tracker` database is stale or
 the app role cannot introspect the `core` and `ops` schemas, run the gate
 against a freshly migrated temporary database instead of changing
 production-like credentials.
-
-Use `just legacy-go-test` only when comparing or stabilizing reference
-behavior from the old Go implementation.

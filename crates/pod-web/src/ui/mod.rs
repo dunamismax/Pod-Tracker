@@ -2158,7 +2158,7 @@ pub fn render_placeholder(title: &'static str) -> String {
         ),
         "Roadmap" => (
             "Build plan",
-            "The live Rust app is the product path; Go remains historical reference.",
+            "V1 is complete; future phases can be added when new product ideas are ready.",
         ),
         "SQL Observatory" => (
             "PostgreSQL",

@@ -3,7 +3,7 @@
 .env.*
 !.env.example
 
-# Go build and test outputs
+# Build and test outputs
 /bin/
 /dist/
 /build/

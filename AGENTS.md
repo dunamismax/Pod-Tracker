@@ -3,9 +3,9 @@
 Repo-local operating manual for Pod Tracker. Reading this file plus
 `README.md` and `BUILD.md` is sufficient context to begin work.
 
-`README.md` explains the product. `BUILD.md` is the active build plan.
-This file holds durable operator, engineering, product, database, and
-deployment rules.
+`README.md` explains the product. `BUILD.md` is reserved for future build
+plans now that V1.0 is complete. This file holds durable operator,
+engineering, product, database, and deployment rules.
 
 ## Read Order
 
@@ -98,13 +98,11 @@ Default against:
 - ORMs that hide SQL.
 - Microservices, Kubernetes, queues, Redis, or managed-service lock-in
   before the monolith proves it needs them.
-- AI/RAG/pgvector before the core app and SQL Observatory are useful.
+- AI/RAG beyond the documented optional pgvector foundation before the
+  core product needs it.
 
-The existing Go implementation is historical parity reference behavior.
 The live product path is Rust, Leptos, Axum, Tokio, sqlx, PostgreSQL,
-Caddy, and systemd. Do not extend Go as the product path, and do not
-remove the Go reference code unless Stephen explicitly scopes that
-cleanup.
+Caddy, and systemd. Legacy Go code has been removed.
 
 ---
 
@@ -261,10 +259,10 @@ This file is the only persistent local prompt for this repo.
   this file in the same session.
 - If Stephen says "remember this" and it should shape this repo, update
   this file directly.
-- Keep `README.md` for product current state, `BUILD.md` for active
-  build plan, durable `docs/` for stable technical material, and this
-  file for operator rules.
-- Once the build plan is complete, retire `BUILD.md` instead of keeping
-  stale planning text.
+- Keep `README.md` for product current state, `BUILD.md` for future build
+  planning, durable `docs/` for stable technical material, and this file
+  for operator rules.
+- Keep `BUILD.md` short while there is no active phase; add future
+  sections there only when new work is concrete enough to plan.
 - Keep wording portable across agents and vendors. Every line should pay
   rent.

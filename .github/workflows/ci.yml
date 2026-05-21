@@ -58,9 +58,6 @@ jobs:
       - name: Docs and whitespace check
         run: git diff --check
 
-      - name: Migration placeholder check
-        run: test -f migrations/001_extensions.sql
-
       - name: SQLx migration source check
         run: test -f crates/pod-db/migrations/001_extensions.sql
 

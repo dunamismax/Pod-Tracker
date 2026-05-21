@@ -1834,7 +1834,7 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
 name = "pod-core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "argon2",
  "base64",
@@ -1849,7 +1849,7 @@ dependencies = [
 
 [[package]]
 name = "pod-db"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "dotenvy",
@@ -1866,7 +1866,7 @@ dependencies = [
 
 [[package]]
 name = "pod-web"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -1889,7 +1889,7 @@ dependencies = [
 
 [[package]]
 name = "pod-worker"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "dotenvy",

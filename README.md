@@ -49,9 +49,8 @@ Pod Tracker is built around the game-night loop:
   access.
 - **No Docker PostgreSQL** for local development or production.
 
-Local development uses the installed macOS PostgreSQL service. At project
-start, this machine has Homebrew PostgreSQL 18 available at
-`/opt/homebrew/opt/postgresql@18`.
+Local development uses an installed PostgreSQL service. Do not use
+Docker PostgreSQL for local development or production.
 
 Production target:
 
@@ -64,10 +63,8 @@ Cloudflare DNS
   -> PostgreSQL service
 ```
 
-The existing Go implementation is historical reference behavior. New
-product work proceeds through the live Rust/Leptos/Axum application in
-[BUILD.md](BUILD.md), with PostgreSQL remaining the visible engine of the
-product.
+Product work proceeds through the live Rust/Leptos/Axum application, with
+PostgreSQL remaining the visible engine of the product.
 
 ## PostgreSQL Showcase
 
@@ -93,12 +90,12 @@ The signature demo feature is the **SQL Observatory**: a page that shows
 the real SQL behind pod generation, pairing history, fuzzy card search,
 Game Changers analysis, reminders, and materialized meta views.
 
-## MVP
+## V1 Scope
 
-The MVP is usable when a real playgroup can plan and run a Commander
-night from invitation to pod assignment to game results.
+V1 is usable when a real playgroup can plan and run a Commander night
+from invitation to pod assignment to game results.
 
-Minimum launch checklist:
+Included surface:
 
 - Login and sessions work.
 - Playgroups and memberships work.
@@ -118,9 +115,10 @@ Minimum launch checklist:
 
 ## Development Status
 
-This repository now runs the PostgreSQL-first Rust application using Axum
-and Leptos in production. See [BUILD.md](BUILD.md) for the active phase
-checklist and [AGENTS.md](AGENTS.md) for repo-local operating rules.
+This repository runs the PostgreSQL-first Rust application using Axum and
+Leptos in production. V1.0 is complete; [BUILD.md](BUILD.md) is reserved
+for future planning and [AGENTS.md](AGENTS.md) holds repo-local operating
+rules.
 
 ## License
 

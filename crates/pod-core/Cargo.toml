@@ -1,6 +1,6 @@
 [package]
 name = "pod-core"
-version = "0.1.0"
+version = "1.0.0"
 description = "Core domain and shared application primitives for Pod Tracker."
 authors.workspace = true
 edition.workspace = true
