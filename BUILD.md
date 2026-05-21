@@ -2,13 +2,13 @@
 
 Active build plan for Pod Tracker. `README.md` introduces the product.
 `AGENTS.md` holds durable repo operating rules. This file tracks current
-state, the Rust rewrite, PostgreSQL design, product phases, and
+state, the live Rust application, PostgreSQL design, product phases, and
 verification.
 
 Treat unchecked boxes as plan. Move stable material into `docs/`,
 `README.md`, or runbooks as the implementation matures.
 
-Last reviewed: 2026-05-20.
+Last reviewed: 2026-05-21.
 
 ---
 
@@ -19,18 +19,22 @@ Last reviewed: 2026-05-20.
 - Public production domain is [https://pod-tracker.app/](https://pod-tracker.app/).
 - The old idea document has been distilled into `README.md`,
   `BUILD.md`, and `AGENTS.md`.
-- A Go web and worker implementation currently exists with local
-  HTMX/plain CSS, PostgreSQL migrations, sqlc typed queries,
-  identity/session schema, signup/login/logout, CSRF-protected forms,
-  playgroups, events, public-safe event pages, invite-token RSVP flow,
-  authenticated iCalendar feed, readiness checks, Caddy/systemd deploy
-  assets, and backup/restore scripts.
-- The next active work is a full rewrite to Stephen's Rust web stack:
+- The Rust/Axum/Leptos/sqlx/PostgreSQL app is live in production at
+  `pod-tracker.app`, fronted by Caddy and systemd on Stephen's Ubuntu VM.
+- A Go web and worker implementation remains in the repository as
+  historical parity reference behavior, with local HTMX/plain CSS,
+  PostgreSQL migrations, sqlc typed queries, identity/session schema,
+  signup/login/logout, CSRF-protected forms, playgroups, events,
+  public-safe event pages, invite-token RSVP flow, authenticated iCalendar
+  feed, readiness checks, Caddy/systemd deploy assets, and backup/restore
+  scripts.
+- The current active work is hardening and improving the live Rust stack:
   Rust workspace, Axum, Leptos, Tokio, PostgreSQL, Caddy, and systemd.
 
 The Go implementation is a reference for behavior and production shape,
 not the future stack. Do not add new product surface to Go unless it is
-needed to understand, stabilize, or safely replace existing behavior.
+needed to understand or compare existing behavior. Do not remove Go code
+unless Stephen explicitly scopes that optional cleanup.
 
 ---
 
@@ -262,24 +266,26 @@ clear authorization checks.
 
 ---
 
-## Rewrite Strategy
+## Historical Rewrite Strategy
 
-The Rust rewrite should preserve behavior before adding new scope.
+The Rust rewrite preserved behavior before adding new scope and has now
+cut over to production.
 
-- Port current Go behavior first: auth, sessions, playgroups, events,
+- Ported current Go behavior first: auth, sessions, playgroups, events,
   host-address privacy, public event pages, invite RSVP, calendar feeds,
   readiness, worker skeleton, Caddy/systemd, backups, and restore docs.
-- Treat the Go database schema as observed context. Keep migrations
+- Treated the Go database schema as observed context. Keep migrations
   compatible where practical, but do not keep awkward Go-era names or
   shapes if a documented Rust migration plan produces a better durable
-  schema before real user data depends on it.
-- Do not run production migrations, alter production data, or switch
-  Caddy from Go to Rust without explicit approval.
-- Run the Rust web service beside the Go service on a separate local or
-  production port until parity checks pass.
-- Keep the Go service available as rollback during production cutover.
-- After the Rust app is live and verified, remove Go code, sqlc config,
-  old templates, and old deployment units in one focused cleanup pass.
+  schema.
+- Do not run production migrations, alter production data, deploy,
+  restart services, or change Caddy without explicit approval.
+- The Rust web service is the live product path.
+- Keep the Go code as historical reference until Stephen explicitly scopes
+  a focused cleanup pass.
+- Optional cleanup, when scoped: remove Go code, `go.mod`, `go.sum`,
+  `sqlc.yaml`, generated sqlc files, old Go templates, and Go-specific
+  deploy instructions.
 
 ---
 
@@ -299,7 +305,8 @@ state where documented verification passes on a clean checkout.
 ### Phase 1 - Rust Workspace Foundation
 
 - [x] Add `rust-toolchain.toml`.
-- [ ] Replace Go module metadata with a Cargo workspace.
+- [x] Add a Cargo workspace as the product path while retaining Go module
+      metadata only as historical reference.
 - [x] Add crates: `pod-core`, `pod-db`, `pod-web`, `pod-worker`, and
       `xtask` only when it earns its keep.
 - [x] Add workspace dependency policy and Rust 2024 edition.
@@ -372,10 +379,11 @@ state where documented verification passes on a clean checkout.
 - [x] Update production environment template without secrets.
 - [x] Re-run backup and restore docs against the Rust deployment path.
 - [x] Smoke the Rust service locally.
-- [ ] With explicit approval, run production cutover from Go to Rust.
-- [ ] After verified cutover, remove Go code, `go.mod`, `go.sum`,
-      `sqlc.yaml`, generated sqlc files, old Go templates, and Go-specific
-      deploy instructions.
+- [x] Record the completed production cutover from Go to Rust as current
+      state.
+- [ ] Optional cleanup after explicit scoping: remove Go code, `go.mod`,
+      `go.sum`, `sqlc.yaml`, generated sqlc files, old Go templates, and
+      Go-specific deploy instructions.
 
 ### Phase 6 - Deck Registry And Event Declarations
 
@@ -509,7 +517,7 @@ state where documented verification passes on a clean checkout.
 - [x] Add similar deck recommendations.
 - [x] Add collection-aware deck suggestions.
 - [ ] Add optional pgvector semantic card/deck search.
-- [ ] Add natural-language meta query research after SQL Observatory is
+- [x] Add natural-language meta query research after SQL Observatory is
       useful.
 - [x] Document which recommendations are SQL, heuristic, semantic, or
       AI-backed.
@@ -803,3 +811,9 @@ Trust current primary docs over this file.
   when present; and decklist imports can match localized printed names back
   to canonical English Oracle cards without breaking existing exact,
   normalized, and fuzzy matching.
+- 2026-05-21 - Aligned the build plan, README, operating rules, local
+  development notes, operations runbook, and roadmap copy with the live
+  Rust production cutover while keeping Go removal as an optional
+  explicitly scoped cleanup. Added Phase 16 natural-language meta query
+  research and optional pgvector boundaries in
+  `docs/advanced-intelligence.md`.

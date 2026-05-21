@@ -11,9 +11,10 @@ Cloudflare DNS
   -> PostgreSQL service
 ```
 
-This runbook documents the Rust/PostgreSQL deployment shape. It does not
-claim the current public site has been migrated until these steps have
-been run and verified on the VM.
+This runbook documents the live Rust/PostgreSQL deployment shape for the
+public site. Production actions still require explicit approval before
+deploying, migrating, restarting services, changing Caddy, or accessing
+private production data.
 
 ## Paths
 

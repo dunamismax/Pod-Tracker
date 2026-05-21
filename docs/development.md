@@ -14,7 +14,7 @@ psql --version
 just --version
 ```
 
-Current Rust rewrite baseline:
+Current Rust application baseline:
 
 ```text
 rustc 1.95.0
@@ -93,17 +93,16 @@ recipe. It is not a production command.
 
 ## Migrations
 
-The current migration history is inherited from the Go reference
-implementation and remains numbered as-is before production Rust cutover.
-SQL migrations live in `migrations/` and still carry Goose annotations so
-the existing production path can remain untouched while the Rust rewrite
-comes up beside it.
+The current migration history was inherited from the Go reference
+implementation and remains numbered as-is. SQL migrations live in
+`migrations/` and still carry Goose annotations because the historical Go
+path remains available for reference until a focused cleanup removes it.
 
 The Rust `pod-db` crate owns a SQLx-compatible copy of the current
 forward migrations in `crates/pod-db/migrations/`. These files intentionally
 do not include Goose down sections because SQLx would execute them as
-ordinary SQL. Keep the two migration sources in sync until the production
-cutover retires the Go/Goose path.
+ordinary SQL. Keep the two migration sources in sync while the Go/Goose
+reference files remain in the repository.
 
 Useful commands:
 
@@ -127,9 +126,9 @@ crate against that database so SQLx query macros are validated.
 
 ## SQL Generation
 
-New Rust database access goes through `sqlx` in `crates/pod-db`. The old
-`sqlc` output remains only as reference behavior until the Rust parity
-work replaces it.
+Rust database access goes through `sqlx` in `crates/pod-db`. The old
+`sqlc` output remains only as reference behavior until Stephen explicitly
+scopes a cleanup pass.
 
 The current query-check workflow uses a live local PostgreSQL database
 rather than committed SQLx offline metadata. CI applies

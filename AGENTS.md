@@ -100,10 +100,11 @@ Default against:
   before the monolith proves it needs them.
 - AI/RAG/pgvector before the core app and SQL Observatory are useful.
 
-The existing Go implementation is parity reference behavior for the Rust
-rewrite. Do not extend Go as the product path. Preserve observed behavior
-while replacing it with Rust, Leptos, Axum, Tokio, sqlx, PostgreSQL,
-Caddy, and systemd.
+The existing Go implementation is historical parity reference behavior.
+The live product path is Rust, Leptos, Axum, Tokio, sqlx, PostgreSQL,
+Caddy, and systemd. Do not extend Go as the product path, and do not
+remove the Go reference code unless Stephen explicitly scopes that
+cleanup.
 
 ---
 

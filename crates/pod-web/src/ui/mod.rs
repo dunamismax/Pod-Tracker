@@ -2158,7 +2158,7 @@ pub fn render_placeholder(title: &'static str) -> String {
         ),
         "Roadmap" => (
             "Build plan",
-            "The Rust rewrite is replacing the reference Go surface while preserving the privacy and PostgreSQL-first product boundaries.",
+            "The live Rust app is the product path; Go remains historical reference.",
         ),
         "SQL Observatory" => (
             "PostgreSQL",

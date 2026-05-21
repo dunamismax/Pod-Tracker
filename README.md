@@ -64,10 +64,10 @@ Cloudflare DNS
   -> PostgreSQL service
 ```
 
-The existing Go implementation is now reference behavior for the Rust
-rewrite. New product work should proceed through the Rust/Leptos/Axum plan
-in [BUILD.md](BUILD.md), with PostgreSQL remaining the visible engine of
-the product.
+The existing Go implementation is historical reference behavior. New
+product work proceeds through the live Rust/Leptos/Axum application in
+[BUILD.md](BUILD.md), with PostgreSQL remaining the visible engine of the
+product.
 
 ## PostgreSQL Showcase
 
@@ -117,10 +117,9 @@ Minimum launch checklist:
 
 ## Development Status
 
-This repository is being rewritten from the current Go implementation into
-a PostgreSQL-first Rust application using Axum and Leptos. See
-[BUILD.md](BUILD.md) for the active phase checklist and [AGENTS.md](AGENTS.md)
-for repo-local operating rules.
+This repository now runs the PostgreSQL-first Rust application using Axum
+and Leptos in production. See [BUILD.md](BUILD.md) for the active phase
+checklist and [AGENTS.md](AGENTS.md) for repo-local operating rules.
 
 ## License
 
