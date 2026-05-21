@@ -388,6 +388,59 @@ limit $3;"#,
         sample_data: "Scrubbed fixture: a binder with two Sol Rings suggests an imported artifact deck as complete and ranks it above decks with missing cards.",
     },
     ObservatoryEntry {
+        slug: "optional-semantic-search",
+        title: "Optional semantic card and deck search",
+        badge: "optional pgvector",
+        source: "SemanticSearchRepository::search_cards and SemanticSearchRepository::search_decks",
+        sql: r#"-- Cards. Returns no rows unless the optional pgvector migration
+-- has created search.card_semantic_embeddings and local embeddings exist.
+select d.scryfall_id, d.oracle_id, d.name, d.lang, d.printed_name,
+  coalesce(d.printed_name, d.name) as display_name,
+  d.type_line, d.printed_type_line,
+  coalesce(d.printed_type_line, d.type_line) as display_type_line,
+  d.oracle_text, d.printed_text,
+  coalesce(d.printed_text, d.oracle_text) as display_text,
+  d.color_identity, d.commander_legal, d.mana_value, d.usd, d.game_changer,
+  (1 - (e.embedding <=> $2::vector))::real as semantic_similarity,
+  (e.embedding <=> $2::vector)::real as semantic_distance,
+  e.model as embedding_model,
+  e.dimensions as embedding_dimensions
+from search.card_semantic_embeddings e
+join search.card_documents d on d.oracle_id = e.oracle_id
+where e.model = $1
+  and e.dimensions = $3
+order by e.embedding <=> $2::vector, d.name asc, d.scryfall_id asc
+limit $4;
+
+-- Decks. Candidate decks are scoped to records visible to the viewer.
+select distinct d.id, d.name, d.commander, d.color_identity,
+  d.claimed_bracket, d.archetype, d.tags,
+  (1 - (e.embedding <=> $3::vector))::real as semantic_similarity,
+  (e.embedding <=> $3::vector)::real as semantic_distance,
+  e.model as embedding_model,
+  e.dimensions as embedding_dimensions
+from search.deck_semantic_embeddings e
+join core.decks d on d.id = e.deck_id
+left join core.playgroup_memberships m
+  on m.playgroup_id = d.playgroup_id
+ and m.user_id = $1
+where e.model = $2
+  and e.dimensions = $4
+  and d.status = 'active'
+  and (
+    d.owner_user_id = $1
+    or d.visibility = 'public'
+    or (d.visibility = 'playgroup' and m.user_id is not null)
+  )
+order by e.embedding <=> $3::vector, d.updated_at desc, d.name asc
+limit $5;"#,
+        inputs: "Local embedding model id, query embedding vector, embedding dimension, current user id for deck search, and result limit. Runtime checks return empty results when pgvector or optional tables are absent.",
+        indexes: "Optional tables use primary keys plus model/dimension indexes. After choosing a local model, add model-specific HNSW expression indexes for one dimension; the optional migration includes commented examples.",
+        plan_shape: "Verify optional pgvector availability, filter embeddings by model and dimension, order by cosine distance, and apply deck visibility before returning semantic deck matches.",
+        output: "Local card or visible deck search results with semantic similarity, distance, embedding model, and dimension. SQL/full-text/trigram search and heuristic recommendations remain the default.",
+        sample_data: "Scrubbed fixture: a local 1536-dimension model can rank proliferate cards or visible counters decks by vector similarity without storing raw embedding source text.",
+    },
+    ObservatoryEntry {
         slug: "reminders",
         title: "Reminders and job claiming",
         badge: "ops SQL",
@@ -538,6 +591,7 @@ mod tests {
             "game-changers-count",
             "similar-deck-recommendations",
             "collection-aware-deck-suggestions",
+            "optional-semantic-search",
             "reminders",
             "matchup-history",
             "scryfall-jsonb",

@@ -516,7 +516,7 @@ state where documented verification passes on a clean checkout.
 - [x] Improve pod scoring with matchup freshness and deck variety.
 - [x] Add similar deck recommendations.
 - [x] Add collection-aware deck suggestions.
-- [ ] Add optional pgvector semantic card/deck search.
+- [x] Add optional pgvector semantic card/deck search.
 - [x] Add natural-language meta query research after SQL Observatory is
       useful.
 - [x] Document which recommendations are SQL, heuristic, semantic, or
@@ -817,3 +817,9 @@ Trust current primary docs over this file.
   explicitly scoped cleanup. Added Phase 16 natural-language meta query
   research and optional pgvector boundaries in
   `docs/advanced-intelligence.md`.
+- 2026-05-21 - Completed the optional Phase 16 pgvector semantic-search
+  foundation without changing default migrations: added explicit optional
+  pgvector migration files and `just pgvector-migrate-up`, runtime-gated
+  semantic card and visible-deck repository searches that return empty
+  results without pgvector, SQL Observatory coverage, and no-pgvector
+  tests preserving the SQL/heuristic defaults.

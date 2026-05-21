@@ -114,6 +114,17 @@ just migrate-smoke
 just sqlx-migrate-smoke
 ```
 
+Optional pgvector semantic-search setup is deliberately separate from the
+default migration path:
+
+```sh
+just pgvector-migrate-up
+```
+
+Run it only against a local database where the `vector` extension is
+installed and desired. Normal development, `just check`, and `just test`
+must continue to pass without pgvector.
+
 `just migrate-smoke` creates a timestamped local smoke-test database,
 applies all migrations with the current OS user, checks required
 extensions, and drops the smoke database on exit. On Ubuntu, create a

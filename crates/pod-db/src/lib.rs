@@ -18,6 +18,7 @@ pub mod ops;
 pub mod playgroups;
 pub mod pods;
 pub mod scryfall;
+pub mod semantic;
 
 pub use audit::{AuditEventRecord, AuditRepository};
 pub use collections::{
@@ -61,6 +62,10 @@ pub use pods::{PodGenerationSummary, PodRecord, PodRepository, PodSeatRecord, Po
 pub use scryfall::{
     CardSearchFilters, CardSearchResult, ImportedCardRecord, ScryfallImportInput,
     ScryfallImportRecord, ScryfallRepository,
+};
+pub use semantic::{
+    SemanticCardSearchResult, SemanticDeckSearchResult, SemanticSearchInput,
+    SemanticSearchRepository, SemanticSearchStatus,
 };
 
 #[derive(Debug, Error)]

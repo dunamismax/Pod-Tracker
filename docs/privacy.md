@@ -42,6 +42,9 @@ same viewer scopes. Heuristic recommendations may use decklists and
 collection quantities only after the source collection and candidate decks
 are visible to the requesting user, and should return aggregate coverage
 or reason labels rather than private notes or card storage locations.
+Optional semantic search must follow the same visibility rules and must
+not embed private notes, host addresses, invite tokens, contact details,
+production logs, backups, or database dumps.
 
 ## Address Visibility
 

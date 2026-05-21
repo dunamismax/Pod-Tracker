@@ -17,10 +17,25 @@ These paths are not semantic or AI-backed. They must keep working on a
 plain PostgreSQL install with the required extensions listed in
 `BUILD.md`.
 
-## Optional pgvector Research
+## Optional pgvector Semantic Search
 
-`pgvector` can be useful later for semantic card and deck search, but it
-must remain optional:
+`pgvector` support is optional and local. The default SQLx migrations do
+not create the extension or any vector tables, and the application keeps
+using SQL/full-text/trigram and heuristic recommendations when pgvector
+is absent.
+
+The explicit local setup path is:
+
+```sh
+just pgvector-migrate-up
+```
+
+That recipe applies only `crates/pod-db/optional-migrations/pgvector/`
+against `POD_TRACKER_MIGRATION_DATABASE_URL` or
+`POD_TRACKER_DATABASE_URL`. The optional migration creates the `vector`
+extension plus `search.card_semantic_embeddings` and
+`search.deck_semantic_embeddings`. It stores model names, dimensions,
+vectors, and source text hashes, but not raw embedding source text.
 
 - Do not add `create extension vector` to default migrations.
 - Gate vector schema, indexes, jobs, and queries behind an explicit local
@@ -32,10 +47,16 @@ must remain optional:
 - Never embed private notes, invite tokens, host addresses, emails, phone
   numbers, production logs, or database dumps.
 
-A safe first implementation would add a separate optional migration for
-card/deck embedding tables, repository methods that return empty/disabled
-results when the vector extension is unavailable, and tests that run the
-normal workspace gate against a database without pgvector.
+`SemanticSearchRepository` checks for the extension and optional tables at
+runtime. Card and deck semantic searches return empty results when
+pgvector is unavailable, when the optional tables are absent, or when the
+query embedding is invalid. Deck semantic search still scopes candidates
+to decks visible to the requesting user before returning results.
+
+The optional tables use pgvector's variable-dimension `vector` type so a
+self-hosted instance can choose its local embedding model. Add a
+model-specific HNSW expression index only after choosing a model and
+dimension; the optional migration includes commented examples.
 
 ## Natural-Language Meta Query Research
 
