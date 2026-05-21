@@ -502,9 +502,9 @@ state where documented verification passes on a clean checkout.
 - [x] Add log redaction checks.
 - [x] Add stable request, job, and database spans before considering
       OpenTelemetry export.
-- [ ] Revisit config loading with `figment` or `config` if deployment,
-      worker, email, and tenant settings become too broad for explicit env
-      parsing.
+- [x] Revisited config loading; kept explicit env parsing because the
+      runtime surface remains small, with migration and operations config
+      still isolated to command-specific environment values.
 - [x] Add CSRF tests.
 - [x] Add security header checks.
 - [x] Add privacy model in `docs/privacy.md`.
@@ -823,3 +823,9 @@ Trust current primary docs over this file.
   semantic card and visible-deck repository searches that return empty
   results without pgvector, SQL Observatory coverage, and no-pgvector
   tests preserving the SQL/heuristic defaults.
+- 2026-05-21 - Completed the Phase 15 config-loading revisit: inspected
+  the Rust runtime config, migration binary, worker startup, local
+  examples, production environment template, and operational scripts; kept
+  explicit env parsing because the app-facing surface remains compact and
+  command-specific settings are not yet broad enough to justify `figment`
+  or `config`.

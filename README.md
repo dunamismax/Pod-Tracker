@@ -86,7 +86,8 @@ Core PostgreSQL features to demonstrate:
 - `LISTEN` / `NOTIFY` for realtime UI events.
 - Row-Level Security for playgroup, guest, event, and host-address
   boundaries.
-- Optional `pgvector` later for semantic card and deck intelligence.
+- Optional local `pgvector` support for semantic card and deck search,
+  kept outside the default migration path.
 
 The signature demo feature is the **SQL Observatory**: a page that shows
 the real SQL behind pod generation, pairing history, fuzzy card search,
